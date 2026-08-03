@@ -142,7 +142,10 @@ export function pasangKasir() {
 
             antrean: [],
             online: navigator.onLine,
+            /** Kiriman ke server sedang berjalan. TIDAK menghalangi penjualan. */
             sibuk: false,
+            /** Satu ketukan Bayar = satu transaksi. Hanya berlaku selama bayar() jalan. */
+            menyimpan: false,
             pesan: null,
             jenisPesan: 'info',
             strukTerakhir: null,
@@ -382,7 +385,7 @@ export function pasangKasir() {
             get totalBill() {
                 const bill = this.billTerpilih;
 
-                return bill ? bill.pesanan.reduce((j, i) => j + i.harga * i.qty, 0) : 0;
+                return bill ? this.rupiahUtuh(bill.pesanan.reduce((j, i) => j + i.harga * i.qty, 0)) : 0;
             },
 
             /** Memindahkan isi keranjang menjadi pesanan yang menempel pada bill. */
@@ -790,7 +793,23 @@ export function pasangKasir() {
             },
 
             get totalKeranjang() {
-                return this.keranjang.reduce((j, b) => j + b.harga * b.qty, 0);
+                return this.rupiahUtuh(this.keranjang.reduce((j, b) => j + b.harga * b.qty, 0));
+            },
+
+            /**
+             * Uang SELALU rupiah utuh.
+             *
+             * Satuan pecahan menghasilkan tagihan berpecahan: 0,5 kg × Rp 4.999 = 2.499,5.
+             * Layar menampilkan "2.500" karena rupiah() membulatkan, tapi tagihannya tetap
+             * 2.499,5 — dan begitu kasir menyentuh kolom nominal, angkanya dibaca ulang
+             * sebagai 2.500 sehingga selisih Rp 1 membuat tombol Bayar mati permanen dengan
+             * keterangan "Lebih Rp 1". Tidak ada cara mengetik setengah rupiah, jadi
+             * transaksinya benar-benar tidak bisa ditutup.
+             *
+             * Dibulatkan di SATU tempat, di sumber tagihannya, bukan di setiap tampilan.
+             */
+            rupiahUtuh(nilai) {
+                return Math.round(Number(nilai) || 0);
             },
 
             /*
@@ -840,7 +859,7 @@ export function pasangKasir() {
              * ditutup, dan berhenti mengikuti begitu kasir mengetik sendiri.
              */
             resetPembayaran() {
-                this.pembayaran = [{ metode: 'cash', jumlah: 0, diterima: 0, otomatis: true }];
+                this.pembayaran = [{ metode: 'cash', jumlah: 0, diterima: 0, otomatis: true, disentuh: false }];
                 this.pelangganId = '';
                 this.jatuhTempo = '';
                 this.sinkronOtomatis();
@@ -853,8 +872,15 @@ export function pasangKasir() {
                  * yang menutup sisanya. Kalau dua baris sama-sama otomatis, tidak ada
                  * aturan yang jelas soal siapa menutup berapa.
                 */
+                /*
+                 * Baris lama berhenti jadi penutup sisa, tapi statusnya "belum disentuh"
+                 * DIPERTAHANKAN. Itu bedanya dengan aturan lama yang membekukan semuanya:
+                 * angka hasil isi-otomatis bukan angka yang dipilih kasir, jadi masih boleh
+                 * disesuaikan. Yang tidak boleh disentuh hanyalah angka yang benar-benar
+                 * diketik orang atau tercetak di mesin EDC/QRIS.
+                 */
                 this.pembayaran.forEach((p) => { p.otomatis = false; });
-                this.pembayaran.push({ metode: 'qris', jumlah: 0, diterima: 0, otomatis: true });
+                this.pembayaran.push({ metode: 'qris', jumlah: 0, diterima: 0, otomatis: true, disentuh: false });
                 this.sinkronOtomatis();
             },
 
@@ -862,43 +888,66 @@ export function pasangKasir() {
                 if (this.pembayaran.length > 1) {
                     this.pembayaran.splice(i, 1);
 
-                    // Baris terakhir kembali mengikuti sisa, kalau tidak sisa tagihan
-                    // menggantung tanpa ada yang menutupnya.
-                    this.pembayaran.at(-1).otomatis = true;
+                    /*
+                     * Kalau tinggal SATU baris, baris itu kembali menutup seluruh tagihan —
+                     * walau tadi sudah diketik. Dengan satu metode pembayaran, nominalnya
+                     * tidak punya kemungkinan lain selain sebesar tagihan, jadi
+                     * membiarkannya kurang hanya memaksa kasir mengetik ulang.
+                     *
+                     * Kalau masih ada beberapa baris, yang tersisa TIDAK ditimpa: cukup
+                     * tunjuk penutup sisa dari baris yang belum disentuh, kalau ada.
+                     */
+                    if (this.pembayaran.length === 1) {
+                        this.pembayaran[0].disentuh = false;
+                        this.pembayaran[0].otomatis = true;
+                    }
+
+                    this.tunjukPenutupSisa();
                     this.sinkronOtomatis();
                 }
             },
 
             /**
-             * Baris yang diketik kasir berhenti mengikuti sisa tagihan — dan perannya
-             * sebagai penutup sisa DIPINDAHKAN ke baris lain.
+             * Baris yang diketik kasir berhenti mengikuti sisa — dan TIDAK PERNAH ditimpa lagi.
              *
-             * Tanpa pemindahan itu, bayar terpisah menghasilkan jumlah yang melebihi
-             * tagihan: baris pertama membeku di nominal penuh, kasir mengetik nominal
-             * kedua, dan tidak ada yang mengurangi baris pertama. Yang terlihat kasir:
-             * "saya menambah cara bayar, kok totalnya justru bertambah".
+             * Aturan lama memindahkan peran "penutup sisa" ke baris lain supaya jumlahnya
+             * selalu pas dengan tagihan. Akibatnya nominal yang sudah diketik kasir ditimpa
+             * sistem: tagihan 9.000, tunai diketik 4.000, lalu QRIS 3.000 → tunai dinaikkan
+             * sendiri jadi 6.000 dan layar menyatakan "Dibayar Rp 9.000" tanpa peringatan.
+             * Laci kurang 2.000, dan selisihnya ditagihkan ke kasir saat tutup shift. Pada
+             * tiga baris, bahkan nominal QRIS yang SUDAH TERCETAK di mesin ikut diubah.
              *
-             * Aturannya sekarang: SELALU ada tepat satu baris penutup sisa. Mengetik di
-             * baris penutup memindahkan peran itu ke baris lain, sehingga jumlah seluruh
-             * baris tetap sama dengan tagihan.
+             * Sekarang: angka yang berasal dari manusia atau dari mesin EDC/QRIS adalah
+             * fakta. Kalau jumlahnya belum pas, layar menyebut "Kurang Rp X" dan transaksi
+             * ditahan — kurang bayar harus terlihat, bukan disembunyikan dengan menaikkan
+             * nominal metode lain.
              */
             lepasOtomatis(i) {
+                this.pembayaran[i].disentuh = true;
                 this.pembayaran[i].otomatis = false;
 
-                if (this.pembayaran.length < 2) {
+                this.tunjukPenutupSisa();
+                this.sinkronOtomatis();
+            },
+
+            /**
+             * Menunjuk baris penutup sisa: baris TERAKHIR yang belum disentuh orang.
+             *
+             * Kalau semua baris sudah disentuh, tidak ada yang ditunjuk — dan itu memang
+             * jawabannya. Tagihan yang belum pas lalu tampil sebagai "Kurang Rp X" dan
+             * transaksinya ditahan, alih-alih sistem menaikkan nominal metode lain diam-diam
+             * supaya angkanya kelihatan pas.
+             */
+            tunjukPenutupSisa() {
+                if (this.pembayaran.some((p) => p.otomatis)) {
                     return;
                 }
 
-                const masihAda = this.pembayaran.some((p) => p.otomatis);
+                const i = this.pembayaran.findLastIndex((p) => ! p.disentuh);
 
-                if (! masihAda) {
-                    // Baris terakhir yang bukan baris ini yang mengambil alih; kalau
-                    // yang diketik justru baris terakhir, giliran baris sebelumnya.
-                    const lain = this.pembayaran.findLastIndex((_, idx) => idx !== i);
-                    this.pembayaran[lain].otomatis = true;
+                if (i !== -1) {
+                    this.pembayaran[i].otomatis = true;
                 }
-
-                this.sinkronOtomatis();
             },
 
             /** Menutup sisa tagihan otomatis supaya kasir tidak menghitung manual. */
@@ -908,7 +957,7 @@ export function pasangKasir() {
                     0,
                 );
 
-                this.pembayaran[i].jumlah = Math.max(0, this.totalTagihan - lain);
+                this.pembayaran[i].jumlah = this.rupiahUtuh(Math.max(0, this.totalTagihan - lain));
             },
 
             /**
@@ -917,7 +966,9 @@ export function pasangKasir() {
              * sekarang, bukan pada berapa kali ia dijalankan.
              */
             sinkronOtomatis() {
-                const i = this.pembayaran.findIndex((p) => p.otomatis);
+                // Baris otomatis TERAKHIR yang menutup sisa: baris baru selalu di ujung,
+                // dan itu yang belum disentuh siapa pun.
+                const i = this.pembayaran.findLastIndex((p) => p.otomatis);
 
                 if (i === -1) {
                     return;
@@ -956,7 +1007,17 @@ export function pasangKasir() {
             },
 
             get bisaBayar() {
-                if (this.sibuk || ! this.sesiId || this.totalTagihan <= 0) {
+                /*
+                 * `sibuk` (kiriman ke server sedang berjalan) SENGAJA tidak lagi menutup
+                 * tombol Bayar.
+                 *
+                 * `fetch` tanpa batas waktu bisa menggantung beberapa menit di sinyal 2G,
+                 * dan selama itu kasir tidak bisa melayani pembeli berikutnya sama sekali:
+                 * bayar() langsung kembali dan tidak ada apa pun yang tercatat. Itu
+                 * melanggar aturan pokok layar ini — penjualan tidak boleh bergantung pada
+                 * balasan server. Penjaga tekan-dua-kali ada di bayar() sendiri.
+                 */
+                if (! this.sesiId || this.totalTagihan <= 0) {
                     return false;
                 }
 
@@ -1011,21 +1072,51 @@ export function pasangKasir() {
             },
 
             async bayar() {
-                if (! this.bisaBayar) {
+                /*
+                 * `menyimpan` TERPISAH dari `sibuk`.
+                 *
+                 * `sibuk` menandai kiriman ke server sedang berjalan, dan itu tidak boleh
+                 * menghalangi penjualan berikutnya. Yang harus dijaga di sini cuma satu:
+                 * satu ketukan Bayar = satu transaksi. Tanpa penjaga terpisah, ketukan
+                 * ganda pada layar sentuh membuat DUA transaksi ber-UUID berbeda — dan
+                 * karena idempotensinya berbasis UUID, server menerima keduanya sebagai
+                 * penjualan yang sah.
+                 */
+                if (! this.bisaBayar || this.menyimpan) {
                     return;
                 }
 
-                this.sibuk = true;
+                this.menyimpan = true;
 
                 const bill = this.pakaiBill ? this.billTerpilih : null;
                 const item = bill ? bill.pesanan : this.keranjang;
                 const total = this.totalTagihan;
 
+                // Hanya baris bernominal yang dikirim; baris 0 tidak mewakili apa pun.
+                const dibayar = this.pembayaran.filter((p) => this.rupiahUtuh(p.jumlah) > 0);
+
+                // Baris tunai yang menerima uang paling banyak: di situlah kembalian
+                // sungguhan diserahkan, dan hanya di situ ia dicatat.
+                const barisKembalian = dibayar
+                    .filter((p) => p.metode === 'cash')
+                    .reduce((a, b) => (Number(b.diterima || 0) > Number(a?.diterima || 0) ? b : a), null);
+
                 const transaksi = {
                     id: uuid(),
                     nomor_transaksi: this.nomorTransaksi(),
                     mode: this.mode,
-                    status: this.adaKasbon ? 'belum_lunas' : 'lunas',
+                    /*
+                     * Status ditentukan pembayaran yang BENAR-BENAR dikirim, bukan dari
+                     * ada-tidaknya baris kasbon di layar.
+                     *
+                     * Baris kasbon bernominal 0 (mis. baris baru yang belum diisi) dulu
+                     * membuat transaksi lunas ditandai belum_lunas, padahal tidak ada
+                     * pembayaran kasbon yang terkirim — jadi tidak ada piutang yang dicatat
+                     * dan utang itu tidak bisa dilunasi dari mana pun. Laporan owner
+                     * menghitungnya sebagai piutang, dasbor tidak: dua angka yang tidak
+                     * akan pernah cocok.
+                     */
+                    status: dibayar.some((p) => p.metode === 'kasbon') ? 'belum_lunas' : 'lunas',
                     subtotal: total,
                     total,
                     // Asal dicatat saat transaksi DIBUAT, bukan saat terkirim. Kalau
@@ -1037,22 +1128,35 @@ export function pasangKasir() {
                     cash_session_id: this.sesiId,
                     bill_id: bill ? bill.id : null,
                     customer_id: this.pelangganId || null,
-                    tanggal_jatuh_tempo: this.adaKasbon && this.jatuhTempo ? this.jatuhTempo : null,
+                    tanggal_jatuh_tempo: dibayar.some((p) => p.metode === 'kasbon') && this.jatuhTempo
+                        ? this.jatuhTempo
+                        : null,
                     items: item.map((b) => ({
                         product_id: b.id,
                         nama_produk: b.nama,
                         qty: b.qty,
                         harga_satuan: b.harga,
-                        subtotal: this.bulatkan(b.harga * b.qty),
+                        subtotal: this.rupiahUtuh(b.harga * b.qty),
                     })),
-                    payments: this.pembayaran
-                        .filter((p) => Number(p.jumlah) > 0)
-                        .map((p) => ({
-                            metode: p.metode,
-                            jumlah: Number(p.jumlah),
-                            jumlah_diterima: p.metode === 'cash' ? Number(p.diterima || 0) : null,
-                            kembalian: p.metode === 'cash' ? this.kembalian : null,
-                        })),
+                    payments: dibayar.map((p) => ({
+                        metode: p.metode,
+                        jumlah: this.rupiahUtuh(p.jumlah),
+                        jumlah_diterima: p.metode === 'cash' ? this.rupiahUtuh(p.diterima || 0) : null,
+                        /*
+                         * Kembalian dicatat SEKALI, pada baris tunai yang menerima uang
+                         * paling banyak — bukan diulang di setiap baris tunai.
+                         *
+                         * Dulu setiap baris tunai menyimpan kembalian transaksi utuh: dua
+                         * baris tunai berarti Rp 15.000 diberikan tapi Rp 30.000 tercatat.
+                         * Menghitungnya per baris (diterima − jumlah baris itu) juga salah,
+                         * karena satu tumpukan uang bisa menutup beberapa baris sekaligus.
+                         * Yang harus benar adalah JUMLAHNYA: total kembalian tercatat sama
+                         * dengan uang yang benar-benar dikembalikan — kalau tidak, catatan
+                         * itu tidak akan pernah cocok dengan uang di laci, dan yang
+                         * disalahkan adalah kasirnya.
+                         */
+                        kembalian: p === barisKembalian ? this.rupiahUtuh(this.kembalian) : (p.metode === 'cash' ? 0 : null),
+                    })),
                 };
 
                 this.strukTerakhir = {
@@ -1079,7 +1183,7 @@ export function pasangKasir() {
                 this.keranjang = [];
                 this.simpanKeranjang();
                 this.resetPembayaran();
-                this.sibuk = false;
+                this.menyimpan = false;
 
                 if (this.online) {
                     await this.kirimAntrean();
@@ -1154,10 +1258,22 @@ export function pasangKasir() {
                     const hasil = await respons.json();
                     const gagal = new Set((hasil.detail_gagal ?? []).map((g) => g.id));
 
-                    // Yang dibuat maupun duplikat sama-sama sudah tersimpan di server,
-                    // jadi keduanya keluar dari antrean. Hanya yang gagal ditahan.
+                    /*
+                     * Penyaringannya berdasarkan paket yang BENAR-BENAR DIKIRIM, bukan isi
+                     * antrean sekarang.
+                     *
+                     * Antrean bisa bertambah selama fetch berjalan — kasir melayani pembeli
+                     * berikutnya, atau memajukan status titipan. Menyaring `this.antrean`
+                     * apa adanya membuang paket-paket itu tanpa pernah mengirimnya: mereka
+                     * tidak ada di daftar gagal, jadi ikut dianggap sudah tersimpan di
+                     * server. Yang hilang bisa berupa transaksi berbayar.
+                     *
+                     * Yang dibuat maupun duplikat sama-sama sudah tersimpan di server, jadi
+                     * keduanya keluar. Yang ditahan: paket yang gagal, dan paket yang belum
+                     * ikut terkirim sama sekali.
+                     */
                     this.antrean = this.antrean.filter(
-                        (p) => (p.transactions ?? []).some((t) => gagal.has(t.id)),
+                        (p) => ! paket.includes(p) || (p.transactions ?? []).some((t) => gagal.has(t.id)),
                     );
                     tulisJson(KUNCI_ANTREAN, this.antrean);
 

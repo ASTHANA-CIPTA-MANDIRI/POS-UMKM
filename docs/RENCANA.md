@@ -36,10 +36,10 @@ tidak sesuai** — sekarang masih perkiraan.
 - [x] SKU otomatis per tenant | 2026-08-01 | owner | 2j
 - [x] Laporan penjualan owner: omzet, grafik, terlaris, metode | 2026-07-30 | owner | 6j
 - [x] Alat: agen tim, laporan Telegram, pemeriksa kerapian | 2026-08-01 | infra | 6j
+- [x] Perbaikan uang kasir: bayar terpisah & validasi sinkronisasi | 2026-08-03 | kasir | 6j
 
 ## Wajib sebelum deploy
 
-- [~] Perbaikan uang kasir: bayar terpisah & validasi sinkronisasi | | kasir | 6j
 - [ ] Stok & opname: konversi satuan, sisa di kasir, ambang minimum, hitung fisik | | owner | 12j
 - [ ] Pembelian: stok masuk, supplier, harga beli | | owner | 8j
 - [ ] Kasbon: daftar piutang + pelunasan tercatat | | owner | 6j
@@ -62,6 +62,7 @@ tidak sesuai** — sekarang masih perkiraan.
 - [ ] Buku kasbon + tagih lewat WhatsApp sekali tekan | | owner | 5j
 - [ ] Cetak struk langsung ke printer bluetooth termal | | kasir | 6j
 - [ ] Mode tombol besar untuk kasir lanjut usia | | kasir | 3j
+- [ ] Jenis usaha FOTOKOPI: harga bertingkat per jumlah lembar + entri kuantitas cepat | | owner | 8j
 
 ## Catatan
 
@@ -71,10 +72,14 @@ menunggu jawaban.
 
 - **HTTPS wajib sebelum deploy**, bukan sekadar praktik baik: peramban melarang kamera
   di luar konteks aman, jadi pemindaian barcode lewat kamera mati total di alamat biasa.
-- Menolak sinkronisasi yang jumlah pembayarannya tidak cocok dengan total **belum
-  diputuskan**: kalau server membalas 422, transaksi offline yang sudah benar-benar
-  terjadi akan tertahan permanen di antrean. Perlu keputusan: tolak, atau terima sambil
-  ditandai untuk diperiksa.
+- ~~Menolak sinkronisasi yang pembayarannya tidak cocok~~ **SUDAH DIPUTUSKAN**: ditolak
+  PER TRANSAKSI di dalam action, bukan sebagai 422 untuk seluruh batch. Satu muatan rusak
+  tidak boleh menyandera penjualan sah di belakangnya. Hanya satu bentuk yang ditolak di
+  gerbang (422): jumlah pembayaran MELEBIHI total, karena bentuk itu tidak punya wujud yang
+  sah sama sekali — kelebihan uang tunai dinyatakan lewat jumlah_diterima.
+- Yang belum: kalau server membalas 422, klien masih menahan paketnya di antrean dan
+  mencoba lagi terus. Tidak bisa terjadi dari klien kita sendiri (bisaBayar menuntut
+  jumlahnya pas), tapi belum ada karantina untuk muatan yang ditolak permanen.
 - Estimasi jam di atas perkiraan saya berdasarkan pekerjaan sejenis yang sudah selesai di
   repo ini, sudah termasuk uji dan verifikasi tampilan — **belum termasuk** waktu kamu
   meninjau dan meminta perubahan.

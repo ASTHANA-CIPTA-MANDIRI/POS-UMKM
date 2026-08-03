@@ -12,6 +12,7 @@ use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
+use Illuminate\Validation\Validator;
 
 class SyncOfflineTransactionsRequest extends FormRequest
 {
@@ -81,6 +82,40 @@ class SyncOfflineTransactionsRequest extends FormRequest
             'transactions.*.payments.*.kembalian' => ['nullable', 'numeric', 'min:0'],
             'transactions.*.payments.*.referensi' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * Pembayaran yang MELEBIHI total ditolak di gerbang, bukan diperiksa belakangan.
+     *
+     * Nominal `jumlah` adalah uang yang diterapkan ke tagihan; kelebihan uang tunai
+     * dinyatakan lewat `jumlah_diterima`, bukan di sini. Jadi jumlah pembayaran yang
+     * melampaui total tidak punya bentuk yang sah sama sekali — itu muatan rusak atau
+     * dibuat-buat, dan tidak boleh dibiarkan menyentuh kas.
+     *
+     * Bentuk lain yang tidak konsisten (mis. total tidak cocok dengan rincian item)
+     * SENGAJA tidak ditolak di sini, melainkan per transaksi di dalam action: penolakan
+     * di gerbang membatalkan seluruh batch, dan satu muatan rusak akan menyandera semua
+     * penjualan sah di belakangnya.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $v) {
+            foreach ((array) $this->input('transactions', []) as $i => $transaksi) {
+                $total = (float) ($transaksi['total'] ?? 0);
+                $dibayar = array_sum(array_map(
+                    fn ($p) => (float) ($p['jumlah'] ?? 0),
+                    (array) ($transaksi['payments'] ?? []),
+                ));
+
+                // Toleransi satu rupiah untuk pembulatan di perangkat.
+                if ($dibayar > $total + 1) {
+                    $v->errors()->add(
+                        "transactions.{$i}.payments",
+                        'Jumlah pembayaran melebihi total transaksi.',
+                    );
+                }
+            }
+        });
     }
 
     /**

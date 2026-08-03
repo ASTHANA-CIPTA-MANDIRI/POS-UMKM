@@ -93,6 +93,8 @@ class SyncOfflineTransactionsAction
             }
 
             try {
+                $this->pastikanUangnyaMasukHitungan($data);
+
                 DB::transaction(function () use ($user, $outletId, $data) {
                     $this->simpanSatuTransaksi($user, $outletId, $data);
                 });
@@ -336,6 +338,66 @@ class SyncOfflineTransactionsAction
 
         $movement->tenant_id = $transaction->tenant_id;
         $movement->save();
+    }
+
+    /**
+     * Uang yang masuk harus masuk hitungan.
+     *
+     * Sebelum ini, satu-satunya penjaga uang adalah klien: `bisaBayar` di layar kasir.
+     * Terbukti keliru — bayar terpisah pernah menaikkan sendiri nominal tunai — dan
+     * lebih penting lagi, perangkat mana pun yang bisa membuka layar kasir bisa
+     * mengirim muatan buatan sendiri. Pembayaran Rp 500.000 untuk tagihan Rp 10.000
+     * dulu diterima 200 OK dan tercatat sebagai kas masuk.
+     *
+     * Diperiksa PER TRANSAKSI, bukan untuk seluruh batch, dan sengaja begitu: menolak
+     * seluruh batch berarti satu muatan rusak menyandera semua penjualan sah di
+     * belakangnya sampai kasir menghapus antreannya sendiri. Yang salah dilaporkan di
+     * detail_gagal; yang benar tetap tersimpan.
+     *
+     * Yang TIDAK diperiksa di sini: pembayaran yang lebih kecil daripada total. Itu sah
+     * untuk kasbon (belum_lunas) dan untuk bill yang masih draft.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function pastikanUangnyaMasukHitungan(array $data): void
+    {
+        // Toleransi satu rupiah: pembulatan di perangkat tidak boleh membatalkan
+        // penjualan yang sudah benar-benar terjadi.
+        $toleransi = 1.0;
+
+        $total = (float) ($data['total'] ?? 0);
+        $dibayar = array_sum(array_map(
+            fn (array $p) => (float) ($p['jumlah'] ?? 0),
+            $data['payments'] ?? [],
+        ));
+
+        if ($dibayar > $total + $toleransi) {
+            throw new \RuntimeException(
+                'Jumlah pembayaran ('.$dibayar.') melebihi total transaksi ('.$total.').',
+            );
+        }
+
+        $status = (string) ($data['status'] ?? 'lunas');
+
+        if ($status === 'lunas' && $dibayar < $total - $toleransi) {
+            throw new \RuntimeException(
+                'Transaksi ditandai lunas tapi pembayarannya kurang ('.$dibayar.' dari '.$total.').',
+            );
+        }
+
+        $rincian = array_sum(array_map(
+            fn (array $i) => (float) ($i['subtotal'] ?? 0),
+            $data['items'] ?? [],
+        ))
+            - (float) ($data['diskon'] ?? 0)
+            + (float) ($data['pajak'] ?? 0)
+            + (float) ($data['service_charge'] ?? 0);
+
+        if (abs($total - $rincian) > $toleransi) {
+            throw new \RuntimeException(
+                'Total ('.$total.') tidak sesuai rincian item ('.$rincian.').',
+            );
+        }
     }
 
     private function catat(User $user, array $payload, SyncResult $result): SyncResult
