@@ -1,0 +1,89 @@
+# Laporan progres harian ke Telegram — berjalan di awan, bukan di laptop.
+#
+# Kenapa ini mungkin: `php artisan lapor:telegram` tidak menyentuh database MySQL
+# pengembangan sama sekali. Sumbernya hanya docs/RENCANA.md, suite uji (sqlite di
+# memori), dan riwayat git — semuanya ada di dalam repo. Jadi laporannya bisa disusun
+# di runner GitHub tanpa server, tanpa basis data, dan tanpa laptop menyala.
+#
+# Sebelum ini berguna, dua hal harus dilakukan sekali:
+#   1. repo dikomit & didorong ke GitHub (saat berkas ini dibuat, repo belum punya komit)
+#   2. simpan dua rahasia di Settings → Secrets and variables → Actions:
+#        TELEGRAM_BOT_TOKEN
+#        TELEGRAM_CHAT_ID
+#
+# Yang perlu disadari:
+#   - Jadwal cron GitHub memakai UTC. 11:00 UTC = 18:00 WIB.
+#   - Jalur berjadwal bisa tertunda beberapa menit saat runner ramai; ini laporan
+#     harian, jadi keterlambatan itu tidak penting.
+#   - GitHub MENONAKTIFKAN jadwal otomatis setelah repo 60 hari tanpa aktivitas.
+#     Kalau laporan berhenti datang tanpa sebab, periksa itu lebih dulu.
+
+name: Laporan progres
+
+on:
+  schedule:
+    - cron: '0 11 * * *'   # 18:00 WIB setiap hari
+  workflow_dispatch:        # bisa juga ditekan manual kapan pun dari tab Actions
+
+# Dua jalur sekaligus tidak berguna untuk laporan; yang baru menggantikan yang lama.
+concurrency:
+  group: lapor-progres
+  cancel-in-progress: true
+
+jobs:
+  lapor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Ambil kode
+        uses: actions/checkout@v4
+        with:
+          # Riwayat penuh: laporan menghitung komit 7 hari terakhir. Dengan kedalaman
+          # bawaan (1), angka itu selalu 0 dan bagian git jadi menyesatkan.
+          fetch-depth: 0
+
+      - name: Siapkan PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3, intl, bcmath, gd
+          coverage: none
+
+      - name: Pasang paket PHP
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Siapkan Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Pasang paket JS
+        run: npm ci
+
+      - name: Siapkan lingkungan
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Susun & kirim laporan
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Zona waktu Jakarta supaya tanggal di laporan sama dengan tanggal di warung.
+          APP_TIMEZONE: Asia/Jakarta
+        run: php artisan lapor:telegram --kirim
+
+      - name: Kabari kalau laporannya sendiri gagal
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        # Tanpa langkah ini, kegagalan alur laporan berarti DIAM — dan diam mudah
+        # disalahartikan sebagai "tidak ada kabar berarti aman".
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=⚠️ Laporan progres GAGAL disusun di GitHub Actions. Lihat tab Actions: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            > /dev/null

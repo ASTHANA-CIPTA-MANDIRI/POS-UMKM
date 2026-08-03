@@ -1,0 +1,77 @@
+# Bot yang menjawab /todolist /timeline /progress /improvement /bug — berjalan di awan.
+#
+# Cara kerjanya MENARIK (polling), bukan webhook: webhook menuntut alamat HTTPS yang
+# selalu hidup, yaitu server, yang justru belum ada. Alur ini menarik perintah baru dari
+# Telegram lalu menjawabnya, jadi bot tetap menjawab walau laptopnya mati.
+#
+# YANG HARUS DISADARI:
+#
+#   1. Balasannya TIDAK seketika. Dengan jadwal 15 menit, jawaban datang paling lama 15
+#      menit sesudah perintah dikirim. Kalau butuh jawaban sekarang, tekan "Run workflow"
+#      di tab Actions — jalan manual langsung memproses antrean.
+#   2. Ini memakai menit Actions. Satu jalan tanpa perintah masuk ± 40 detik; pada jadwal
+#      15 menit itu ± 96 jalan/hari ≈ 1.100 menit/bulan. Kuota gratis repo privat 2.000
+#      menit/bulan, jadi cukup — tapi jangan dipercepat ke 5 menit tanpa menghitung ulang.
+#   3. /progress dan /bug menjalankan seluruh suite (beberapa menit). Sisanya dijawab dari
+#      docs/RENCANA.md saja, hitungan detik.
+#   4. GitHub menonaktifkan jadwal otomatis setelah repo 60 hari tanpa aktivitas.
+
+name: Bot Telegram
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+# Dua jalan sekaligus akan berebut antrean pesan yang sama.
+concurrency:
+  group: bot-telegram
+  cancel-in-progress: false
+
+jobs:
+  layani:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Siapkan PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, sqlite3, intl, bcmath, gd
+          coverage: none
+
+      # Cache vendor: tanpa ini composer install memakan ± 30 detik pada SETIAP jalan,
+      # dan pada 96 jalan/hari itu separuh anggaran menit terbuang untuk memasang paket
+      # yang sama persis.
+      - name: Cache paket PHP
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: vendor-${{ hashFiles('composer.lock') }}
+
+      - name: Pasang paket PHP
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Siapkan Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Pasang paket JS
+        run: npm ci
+
+      - name: Siapkan lingkungan
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Layani perintah
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          APP_TIMEZONE: Asia/Jakarta
+        run: php artisan bot:layani
