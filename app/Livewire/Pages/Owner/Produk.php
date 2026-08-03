@@ -2,11 +2,17 @@
 
 namespace App\Livewire\Pages\Owner;
 
+use App\Actions\Stock\SiapkanBarisStokAction;
 use App\Enums\Satuan;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;
 use App\Models\Category;
+use App\Models\Outlet;
 use App\Models\Product;
+use App\Models\Stock;
+use Closure;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
@@ -39,6 +45,20 @@ class Produk extends Component
     #[Url(as: 'status')]
     public string $status = 'semua';
 
+    /** semua|menipis — saringan stok, memakai aturan yang sama dengan kartu dasbor. */
+    #[Url(as: 'stok')]
+    public string $stok = 'semua';
+
+    /**
+     * Outlet yang stoknya sedang dilihat/disetel.
+     *
+     * Stok dan ambang minimum dicatat PER OUTLET, jadi layar ini selalu bekerja atas
+     * satu outlet. Untuk peran yang terkunci ke satu outlet (kasir, manager outlet)
+     * nilai ini tidak dipercaya — outletnya diambil dari sesi login lewat
+     * scopedOutletId(). Untuk owner bercabang banyak, ini pemilihnya.
+     */
+    public ?string $outletStok = null;
+
     /* ── Formulir ────────────────────────────────────────────────────────── */
 
     public bool $panel = false;
@@ -59,6 +79,26 @@ class Produk extends Component
 
     public string $satuan = 'pcs';
 
+    /**
+     * Satuan pencatatan stok. Kosong berarti stok dicatat dalam satuan jual apa adanya.
+     *
+     * String kosong, bukan null, karena <select> HTML mengirim '' untuk pilihan kosong.
+     */
+    public string $satuanDasar = '';
+
+    /**
+     * Berapa satuan dasar di dalam satu satuan jual (1 dus = 12 pcs).
+     *
+     * Angka paling berbahaya di formulir ini. Ia tidak pernah salah secara terlihat:
+     * kalau satuan jualnya pcs tapi isinya 12, setiap penjualan 1 pcs memotong 12 pcs
+     * dari kartu stok — tanpa galat, tanpa uang yang salah, hanya stok yang meleleh
+     * dan opname yang "memperbaikinya" berulang kali tanpa ada yang tahu sebabnya.
+     */
+    public ?float $isiPerSatuan = null;
+
+    /** Ambang "menipis" di outlet terpilih; disimpan di baris stocks, bukan di produk. */
+    public ?float $stokMinimum = null;
+
     public bool $lacakStok = true;
 
     public bool $aktif = true;
@@ -75,18 +115,37 @@ class Produk extends Component
 
     public bool $hapusGambar = false;
 
+    public function mount(): void
+    {
+        $this->outletStok = $this->outletBawaan();
+    }
+
     public function updated(string $properti): void
     {
         // Mengubah saringan harus mengembalikan ke halaman pertama; kalau tidak,
         // owner melihat daftar kosong hanya karena masih berada di halaman 3.
-        if (in_array($properti, ['cari', 'kategoriId', 'status'], true)) {
+        if (in_array($properti, ['cari', 'kategoriId', 'status', 'stok', 'outletStok'], true)) {
             $this->resetPage();
+        }
+    }
+
+    /**
+     * Berganti outlet harus memuat ulang ambangnya.
+     *
+     * Kalau tidak, ambang milik outlet A masih tertinggal di formulir dan ikut tersimpan
+     * ke outlet B begitu tombol simpan ditekan — angka yang tidak pernah diketik siapa
+     * pun untuk outlet itu.
+     */
+    public function updatedOutletStok(): void
+    {
+        if ($this->panel && $this->produkId !== null) {
+            $this->stokMinimum = $this->ambangTersimpan(Product::findOrFail($this->produkId));
         }
     }
 
     public function tambah(): void
     {
-        $this->reset(['produkId', 'nama', 'kategoriForm', 'harga', 'hargaBeli', 'gambar', 'gambarLama', 'hapusGambar', 'sku', 'barcode']);
+        $this->reset(['produkId', 'nama', 'kategoriForm', 'harga', 'hargaBeli', 'gambar', 'gambarLama', 'hapusGambar', 'sku', 'barcode', 'satuanDasar', 'isiPerSatuan', 'stokMinimum']);
         $this->satuan = 'pcs';
         $this->lacakStok = true;
         $this->aktif = true;
@@ -106,6 +165,9 @@ class Produk extends Component
         $this->harga = (float) $produk->harga_default;
         $this->hargaBeli = $produk->harga_beli !== null ? (float) $produk->harga_beli : null;
         $this->satuan = $produk->satuan?->value ?? 'pcs';
+        $this->satuanDasar = $produk->satuan_dasar?->value ?? '';
+        $this->isiPerSatuan = $produk->isi_per_satuan !== null ? (float) $produk->isi_per_satuan : null;
+        $this->stokMinimum = $this->ambangTersimpan($produk);
         $this->lacakStok = (bool) $produk->lacak_stok;
         $this->aktif = (bool) $produk->is_active;
         $this->gambar = null;
@@ -153,6 +215,16 @@ class Produk extends Component
              * dimuat justru di jaringan warung yang paling lemah.
              */
             'gambar' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            /*
+             * Konversi satuan — lihat aturanIsiPerSatuan() untuk aturannya dan alasannya.
+             * Satuan dasar boleh kosong (stok dicatat dalam satuan jual apa adanya), tapi
+             * kombinasi yang setengah terisi TIDAK boleh lolos.
+             */
+            'satuanDasar' => $this->satuanDasarBersih() === null ? ['nullable'] : [Rule::enum(Satuan::class)],
+            'isiPerSatuan' => $this->aturanIsiPerSatuan(),
+            // Ambang stok, per outlet. Boleh 0 (= tidak dipantau), tidak boleh negatif.
+            'stokMinimum' => $this->aturanStokMinimum(),
+            'outletStok' => $this->aturanOutletStok(),
         ], attributes: [
             'nama' => 'nama produk',
             'kategoriForm' => 'kategori',
@@ -160,6 +232,10 @@ class Produk extends Component
             'hargaBeli' => 'harga beli',
             'gambar' => 'gambar produk',
             'barcode' => 'barcode',
+            'satuanDasar' => 'satuan dasar',
+            'isiPerSatuan' => 'isi per satuan',
+            'stokMinimum' => 'stok minimum',
+            'outletStok' => 'outlet',
         ]);
 
         $pathGambar = $this->gambarLama;
@@ -175,6 +251,8 @@ class Produk extends Component
             $pathGambar = null;
         }
 
+        $satuanDasar = $this->satuanDasarBersih();
+
         $muatan = [
             'nama_produk' => $data['nama'],
             'sku' => $data['sku'] !== '' ? $data['sku'] : null,
@@ -184,19 +262,214 @@ class Produk extends Component
             'harga_default' => $data['harga'],
             'harga_beli' => $data['hargaBeli'],
             'satuan' => $data['satuan'],
+            'satuan_dasar' => $satuanDasar,
+            // Tanpa satuan dasar, faktor konversinya tidak punya arti — disimpan null
+            // supaya Product::keSatuanDasar() memakai qty apa adanya.
+            'isi_per_satuan' => $satuanDasar === null ? null : $this->isiPerSatuanBersih(),
             'lacak_stok' => $this->lacakStok,
             'is_active' => $this->aktif,
         ];
 
         if ($this->produkId !== null) {
-            Product::findOrFail($this->produkId)->update($muatan);
+            $produk = Product::findOrFail($this->produkId);
+            $produk->update($muatan);
+            $this->simpanAmbangStok($produk);
             $this->toast('Produk "'.$data['nama'].'" diperbarui.');
         } else {
-            Product::create($muatan);
+            $produk = Product::create($muatan);
+            $this->simpanAmbangStok($produk);
             $this->toast('Produk "'.$data['nama'].'" ditambahkan.');
         }
 
         $this->panel = false;
+    }
+
+    /* ── Konversi satuan ─────────────────────────────────────────────────── */
+
+    /** '' dari <select> disamakan dengan "tidak diisi". */
+    private function satuanDasarBersih(): ?string
+    {
+        $nilai = trim($this->satuanDasar);
+
+        return $nilai === '' ? null : $nilai;
+    }
+
+    private function isiPerSatuanBersih(): ?float
+    {
+        return $this->terisi($this->isiPerSatuan) ? (float) $this->isiPerSatuan : null;
+    }
+
+    /** Nilai 0 dianggap terisi; hanya null/'' yang berarti dibiarkan kosong. */
+    private function terisi(mixed $nilai): bool
+    {
+        return $nilai !== null && $nilai !== '';
+    }
+
+    /**
+     * Aturan isi per satuan, tergantung satuan dasarnya.
+     *
+     * Tiga keadaan, dan ketiganya pernah ada di data sungguhan:
+     *
+     * 1. Tanpa satuan dasar → angka ini HARUS kosong. Kalau tetap tersimpan, tidak ada
+     *    satuan tujuan yang bisa dituju, tapi Product::keSatuanDasar() tetap mengalikan:
+     *    jual 1 pcs memotong 12 pcs. Tidak ada galat, tidak ada uang yang salah — hanya
+     *    stok yang meleleh, dan opname yang menambalnya tiap minggu tanpa ada yang tahu
+     *    kenapa.
+     * 2. Satuan dasar SAMA dengan satuan jual → faktornya 1 (atau dikosongkan, artinya
+     *    sama). Angka 12 di sini adalah kekeliruan yang sama seperti nomor 1.
+     * 3. Satuan dasar BEDA → faktornya wajib. Membiarkannya kosong berarti 1 dus
+     *    dianggap 1 pcs, dan kartu stok berhenti bisa dipercaya dari arah sebaliknya.
+     *
+     * @return array<int, mixed>
+     */
+    private function aturanIsiPerSatuan(): array
+    {
+        $dasar = $this->satuanDasarBersih();
+
+        if ($dasar === null) {
+            return ['nullable', function (string $atribut, mixed $nilai, Closure $gagal): void {
+                if ($this->terisi($nilai)) {
+                    $gagal('Isi per satuan hanya berlaku kalau satuan dasarnya dipilih.');
+                }
+            }];
+        }
+
+        if ($dasar === $this->satuan) {
+            return ['nullable', 'numeric', function (string $atribut, mixed $nilai, Closure $gagal): void {
+                if ($this->terisi($nilai) && (float) $nilai !== 1.0) {
+                    $gagal('Satuan jual sama dengan satuan dasar, jadi isi per satuan harus 1 atau dibiarkan kosong.');
+                }
+            }];
+        }
+
+        // min 0,001 supaya konversi tidak pernah nol (pembagian di daftar belanja) dan
+        // tidak pernah negatif; max 100.000 menahan salah ketik yang kebablasan.
+        return ['required', 'numeric', 'min:0.001', 'max:100000'];
+    }
+
+    /* ── Ambang stok per outlet ──────────────────────────────────────────── */
+
+    /** @return array<int, mixed> */
+    private function aturanStokMinimum(): array
+    {
+        return ['nullable', 'numeric', 'min:0', 'max:99999999', function (string $atribut, mixed $nilai, Closure $gagal): void {
+            if ($this->terisi($nilai) && $this->outletStokTerpakai() === null) {
+                $gagal('Stok minimum dicatat per outlet, jadi outletnya harus dipilih dulu.');
+            }
+        }];
+    }
+
+    /**
+     * Outlet pilihan dari klien tidak dipercaya.
+     *
+     * Tanpa pemeriksaan ini, muatan Livewire yang disusun sendiri bisa menitipkan
+     * outlet_id milik tenant lain, dan baris stocks kita akan menunjuk outlet orang.
+     *
+     * @return array<int, mixed>
+     */
+    private function aturanOutletStok(): array
+    {
+        return [
+            'nullable',
+            'uuid',
+            Rule::exists('outlets', 'id')
+                ->where('tenant_id', auth()->user()->tenant_id)
+                ->whereNull('deleted_at'),
+        ];
+    }
+
+    /**
+     * Outlet yang benar-benar dipakai untuk stok.
+     *
+     * Peran yang terkunci ke satu outlet selalu memakai outletnya sendiri; pilihan dari
+     * klien diabaikan sama sekali untuk peran itu.
+     */
+    public function outletStokTerpakai(): ?string
+    {
+        $terkunci = auth()->user()->scopedOutletId();
+
+        if ($terkunci !== null) {
+            return $terkunci;
+        }
+
+        return $this->terisi($this->outletStok) ? $this->outletStok : null;
+    }
+
+    /**
+     * Outlet bawaan saat halaman dibuka: outlet sesi kalau perannya terkunci, kalau
+     * tidak outlet pertama milik tenant.
+     *
+     * Dipilih di muka, bukan dibiarkan kosong, supaya kolom stok di daftar produk tidak
+     * pernah tampil kosong tanpa penjelasan. Untuk tenant bercabang banyak, pemilihnya
+     * WAJIB terlihat di layar — kalau tidak, ambang bisa tersimpan ke outlet yang tidak
+     * disadari orang yang mengetiknya.
+     */
+    private function outletBawaan(): ?string
+    {
+        $terkunci = auth()->user()->scopedOutletId();
+
+        if ($terkunci !== null) {
+            return $terkunci;
+        }
+
+        return Outlet::query()->orderBy('outlet_name')->value('id');
+    }
+
+    /** Ambang yang sedang tersimpan untuk outlet terpilih; null kalau belum disetel. */
+    private function ambangTersimpan(Product $produk): ?float
+    {
+        $outletId = $this->outletStokTerpakai();
+
+        if ($outletId === null) {
+            return null;
+        }
+
+        $ambang = (float) ($produk->stocks()->where('outlet_id', $outletId)->value('stok_minimum') ?? 0);
+
+        return $ambang > 0 ? $ambang : null;
+    }
+
+    /**
+     * Menyimpan ambang minimum ke baris stok outlet terpilih.
+     *
+     * Menyetel ambang TIDAK membuat mutasi stok. Jumlahnya tidak berubah satu pun, jadi
+     * mencatatnya di stock_movements berarti mengarang pergerakan barang yang tidak
+     * pernah terjadi — dan kartu stok adalah satu-satunya bukti yang tersisa kalau nanti
+     * ada selisih yang harus dijelaskan.
+     *
+     * Barisnya dibuat kalau outlet ini belum pernah mencatat produknya, dengan jumlah 0,
+     * lewat aksi yang sama yang dipakai penjualan (SiapkanBarisStokAction) — supaya tidak
+     * ada dua cara berbeda membuat baris stok.
+     */
+    private function simpanAmbangStok(Product $produk): void
+    {
+        $outletId = $this->outletStokTerpakai();
+
+        if ($outletId === null) {
+            return;
+        }
+
+        $ambang = $this->terisi($this->stokMinimum) ? (float) $this->stokMinimum : 0.0;
+        $stok = $produk->stocks()->where('outlet_id', $outletId)->first();
+
+        // Ambang kosong pada produk yang belum punya baris stok tidak perlu membuat baris
+        // apa pun: "tidak dipantau" memang keadaan bawaannya.
+        if ($stok === null && $ambang <= 0) {
+            return;
+        }
+
+        $stok ??= app(SiapkanBarisStokAction::class)->execute(
+            $produk->tenant_id,
+            $outletId,
+            productId: $produk->getKey(),
+        );
+
+        if ((float) $stok->stok_minimum === $ambang) {
+            return;
+        }
+
+        $stok->stok_minimum = $ambang;
+        $stok->save();
     }
 
     /** Produk yang menunggu konfirmasi hapus; null berarti tidak ada. */
@@ -300,25 +573,103 @@ class Produk extends Component
             : 'Produk "'.$produk->nama_produk.'" disembunyikan dari kasir.');
     }
 
+    /**
+     * Kueri daftar produk beserta stok di outlet terpilih.
+     *
+     * LEFT join, bukan join biasa: produk yang belum pernah punya baris stok di outlet
+     * ini harus tetap muncul di daftar. Kalau tidak, barang yang belum pernah diopname
+     * hilang begitu saja dari layar kelola produk — dan barang yang hilang dari layar
+     * adalah barang yang tidak akan pernah diperbaiki datanya.
+     *
+     * @return Builder<Product>
+     */
+    private function kueriProduk(?string $outletId): Builder
+    {
+        $kueri = Product::query()
+            ->select('products.*')
+            ->with('kategori:id,nama');
+
+        if ($outletId !== null) {
+            $kueri->leftJoin('stocks', fn (JoinClause $join) => $join
+                ->on('stocks.product_id', '=', 'products.id')
+                ->where('stocks.outlet_id', '=', $outletId))
+                ->addSelect(['stocks.jumlah_saat_ini', 'stocks.stok_minimum']);
+        }
+
+        return $kueri
+            ->when($this->cari !== '', fn ($q) => $q->where(function ($w) {
+                $w->where('products.nama_produk', 'like', '%'.$this->cari.'%')
+                    ->orWhere('products.sku', 'like', '%'.$this->cari.'%')
+                    ->orWhere('products.barcode', 'like', '%'.$this->cari.'%');
+            }))
+            ->when($this->kategoriId !== '', fn ($q) => $q->where('products.kategori_id', $this->kategoriId))
+            ->when($this->status === 'aktif', fn ($q) => $q->where('products.is_active', true))
+            ->when($this->status === 'nonaktif', fn ($q) => $q->where('products.is_active', false))
+            ->when($this->stok === 'menipis', fn ($q) => $this->saringMenipis($q, $outletId));
+    }
+
+    /**
+     * Saringan "menipis" — aturannya diambil dari Stock::saringMenipis(), definisi yang
+     * sama yang dipakai kartu dasbor. Angka di dasbor dan isi daftar ini tidak boleh
+     * berbeda; kalau berbeda, salah satunya berbohong dan owner tidak tahu yang mana.
+     *
+     * @param  Builder<Product>  $kueri
+     */
+    private function saringMenipis(Builder $kueri, ?string $outletId): void
+    {
+        if ($outletId === null) {
+            // Tanpa outlet, "menipis" tidak punya jawaban. Daftar kosong lebih jujur
+            // daripada menampilkan semua produk seolah semuanya menipis.
+            $kueri->whereRaw('1 = 0');
+
+            return;
+        }
+
+        Stock::saringMenipis($kueri);
+
+        /*
+         * Dua jenis produk dikecualikan:
+         * - berbasis resep: yang berkurang saat terjual adalah BAHAN BAKUNYA, jadi baris
+         *   stok produk jadinya tidak pernah bergerak dan akan tampak "menipis" abadi;
+         * - lacak_stok mati: jumlahnya memang tidak pernah dicatat, jadi memasukkannya ke
+         *   daftar belanja hanya membuat owner berhenti mempercayai daftar itu.
+         */
+        $kueri->where('products.lacak_stok', true)->whereDoesntHave('recipeItems');
+    }
+
+    /** @return array<int, array{id: string, nama: string}> */
+    private function outletTersedia(): array
+    {
+        return Outlet::query()
+            ->orderBy('outlet_name')
+            ->get(['id', 'outlet_name'])
+            ->map(fn (Outlet $outlet) => ['id' => $outlet->getKey(), 'nama' => $outlet->outlet_name])
+            ->all();
+    }
+
     public function render()
     {
+        $outletId = $this->outletStokTerpakai();
+
         return view('livewire.pages.owner.produk', [
-            'daftar' => Product::query()
-                ->with('kategori:id,nama')
-                ->when($this->cari !== '', fn ($q) => $q->where(function ($w) {
-                    $w->where('nama_produk', 'like', '%'.$this->cari.'%')
-                        ->orWhere('sku', 'like', '%'.$this->cari.'%')
-                        ->orWhere('barcode', 'like', '%'.$this->cari.'%');
-                }))
-                ->when($this->kategoriId !== '', fn ($q) => $q->where('kategori_id', $this->kategoriId))
-                ->when($this->status === 'aktif', fn ($q) => $q->where('is_active', true))
-                ->when($this->status === 'nonaktif', fn ($q) => $q->where('is_active', false))
-                ->orderBy('nama_produk')
+            'daftar' => $this->kueriProduk($outletId)
+                ->orderBy('products.nama_produk')
                 ->paginate(15),
             'kategori' => Category::orderBy('urutan')->orderBy('nama')->get(['id', 'nama']),
             'satuanTersedia' => Satuan::cases(),
             'jumlahAktif' => Product::where('is_active', true)->count(),
             'jumlahNonaktif' => Product::where('is_active', false)->count(),
+            'jumlahMenipis' => $outletId === null ? 0 : Product::query()
+                ->tap(fn (Builder $q) => $this->saringMenipis(
+                    $q->leftJoin('stocks', fn (JoinClause $join) => $join
+                        ->on('stocks.product_id', '=', 'products.id')
+                        ->where('stocks.outlet_id', '=', $outletId)),
+                    $outletId,
+                ))
+                ->count(),
+            // Pemilih outlet: hanya berarti untuk peran yang tidak terkunci ke satu outlet.
+            'outletTersedia' => auth()->user()->scopedOutletId() === null ? $this->outletTersedia() : [],
+            'outletDipakai' => $outletId,
         ]);
     }
 }

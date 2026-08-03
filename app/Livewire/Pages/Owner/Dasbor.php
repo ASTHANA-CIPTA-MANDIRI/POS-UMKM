@@ -77,12 +77,16 @@ class Dasbor extends Component
     /**
      * Hanya baris yang punya ambang minimum yang dihitung. Tanpa filter itu, semua
      * item bersaldo nol ikut terhitung "menipis" dan angkanya jadi tidak berarti.
+     *
+     * Aturannya TIDAK ditulis ulang di sini: Stock::scopeMenipis() adalah satu-satunya
+     * definisinya, dan saringan "menipis" di daftar produk memakai definisi yang sama.
+     * Dua salinan aturan yang sama berarti kartu dasbor dan daftar produk cepat atau
+     * lambat menyebut dua angka berbeda untuk satu kenyataan.
      */
     private function stokMenipis(?string $outletId): int
     {
-        return Stock::when($outletId, fn ($q) => $q->where('outlet_id', $outletId))
-            ->where('stok_minimum', '>', 0)
-            ->whereColumn('jumlah_saat_ini', '<=', 'stok_minimum')
+        return Stock::menipis()
+            ->when($outletId, fn ($q) => $q->where('outlet_id', $outletId))
             ->count();
     }
 

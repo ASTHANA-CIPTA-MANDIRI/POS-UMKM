@@ -107,6 +107,37 @@ Yang harus diukur, bukan dilihat: `scrollHeight > clientHeight` (menggulir?),
 
 Bersihkan sesudahnya: `rm -rf public/pratinjau storage/pratinjau storage/app/public/pratinjau`.
 
+## WAJIB: setiap permintaan lewat tim agen — tanpa pengecualian
+
+Pemilik proyek meminta ini secara tegas, dan berlaku untuk **apa pun**: cacat, perbaikan
+besar, perbaikan sepele, fitur baru, perubahan tampilan, pertanyaan desain.
+
+```
+Permintaan pemilik proyek
+      ▼
+LEAD      pecah pekerjaannya, tentukan urutan, pegang berkas bersama
+      ▼
+ANALIS    spesifikasi: yang sudah ada, kriteria terima, keadaan tepi, yang TIDAK dibangun
+      ▼
+BACKEND   model, migrasi, Action, komponen Livewire, uji PHPUnit
+FRONTEND  Blade, Tailwind, Alpine, JS + BUKTI kerapian berupa angka
+      ▼
+QA        cari cacat & buktikan; sesudah diperbaiki, uji ULANG dengan langkah yang sama
+      ▼
+LEAD      tandai di docs/RENCANA.md + kabari Telegram
+```
+
+Yang TIDAK boleh: mengerjakan permintaan langsung tanpa melewati rantai ini, sekecil apa
+pun perubahannya. Alasannya bukan formalitas — sesi ini sudah membuktikan tiga kali bahwa
+pekerjaan yang dikerjakan langsung menyisakan cacat yang baru ketemu belakangan: nominal
+bayar terpisah yang ditimpa sistem, sepuluh kegagalan uji palsu di salinan bersih, dan
+tombol yang menimpa teks di kolom sempit. Ketiganya lolos dari mata dan dari PHPUnit;
+ketiganya tertangkap oleh peran yang berbeda.
+
+Untuk perubahan sepele (mis. satu kalimat teks UI), rantainya boleh dipendekkan menjadi
+FRONTEND → QA — tapi **harus dikatakan** bahwa itu yang dilakukan, beserta alasannya.
+Jangan melewatinya diam-diam.
+
 ## Alur perbaikan cacat (QA → lead → BE/FE/analis → QA)
 
 Ini alur kerja tim agen di repo ini. Satu putaran, berulang sampai QA menyatakan hijau.

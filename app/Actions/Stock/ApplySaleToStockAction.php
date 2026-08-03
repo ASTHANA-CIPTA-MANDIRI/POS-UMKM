@@ -23,7 +23,10 @@ use App\Models\Transaction;
  */
 class ApplySaleToStockAction
 {
-    public function __construct(private AdjustStockAction $adjust) {}
+    public function __construct(
+        private AdjustStockAction $adjust,
+        private SiapkanBarisStokAction $siapkanStok,
+    ) {}
 
     /** @return array<int, StockMovement> */
     public function execute(Transaction $transaction, ?string $olehUserId = null): array
@@ -93,6 +96,10 @@ class ApplySaleToStockAction
     /**
      * Baris stok dibuat otomatis kalau outlet belum pernah mencatat item ini —
      * kalau tidak, penjualan offline atas produk baru akan gagal disinkronkan.
+     *
+     * Pembuatan barisnya dititipkan ke SiapkanBarisStokAction supaya jalur lain yang
+     * butuh hal sama (setel ambang minimum dari formulir produk, opname) memakai kode
+     * yang sama persis, bukan salinan yang bisa menyimpang.
      */
     private function resolveStock(
         string $tenantId,
@@ -100,30 +107,6 @@ class ApplySaleToStockAction
         ?string $productId = null,
         ?string $rawMaterialId = null,
     ): Stock {
-        $query = Stock::query()->where('outlet_id', $outletId);
-
-        $productId === null
-            ? $query->whereNull('product_id')
-            : $query->where('product_id', $productId);
-
-        $rawMaterialId === null
-            ? $query->whereNull('raw_material_id')
-            : $query->where('raw_material_id', $rawMaterialId);
-
-        if ($stock = $query->first()) {
-            return $stock;
-        }
-
-        $stock = new Stock([
-            'outlet_id' => $outletId,
-            'product_id' => $productId,
-            'raw_material_id' => $rawMaterialId,
-            'jumlah_saat_ini' => 0,
-        ]);
-
-        $stock->tenant_id = $tenantId;
-        $stock->save();
-
-        return $stock;
+        return $this->siapkanStok->execute($tenantId, $outletId, $productId, $rawMaterialId);
     }
 }

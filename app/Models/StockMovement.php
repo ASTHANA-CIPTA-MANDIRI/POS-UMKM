@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AlasanOpname;
 use App\Enums\StockMovementType;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * Transaction, atau NULL untuk stok opname.
  */
 #[Fillable([
-    'outlet_id', 'stock_id', 'tipe', 'jumlah', 'saldo_sesudah',
+    'outlet_id', 'stock_id', 'tipe', 'alasan', 'jumlah', 'saldo_sesudah',
     'referensi_type', 'referensi_id', 'oleh_user_id', 'catatan',
 ])]
 class StockMovement extends Model
@@ -26,6 +27,10 @@ class StockMovement extends Model
     {
         return [
             'tipe' => StockMovementType::class,
+            // Kode alasan, bukan teks bebas: nilainya harus tetap bisa dikelompokkan
+            // di laporan selisih. Nullable — penjualan/pembelian/transfer tidak punya
+            // alasan, tipenya sudah menjelaskan sebabnya.
+            'alasan' => AlasanOpname::class,
             'jumlah' => 'decimal:3',
             'saldo_sesudah' => 'decimal:3',
         ];
