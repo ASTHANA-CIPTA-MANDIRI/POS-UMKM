@@ -15,6 +15,13 @@
 #   3. /progress dan /bug menjalankan seluruh suite (beberapa menit). Sisanya dijawab dari
 #      docs/RENCANA.md saja, hitungan detik.
 #   4. GitHub menonaktifkan jadwal otomatis setelah repo 60 hari tanpa aktivitas.
+#   5. Jadwal cron HANYA berjalan dari CABANG BAWAAN repo. Kalau cabang bawaannya bukan
+#      yang kamu kira, jadwalnya diam tanpa galat — periksa Settings → General → Default
+#      branch lebih dulu sebelum mencari kesalahan di tempat lain.
+#
+# Nama secret diterima dua-duanya (TELEGRAM_BOT_TOKEN atau BOT_TELEGRAM, TELEGRAM_CHAT_ID
+# atau CHAT_TELEGRAM): nama yang beda sedikit membuat alur ini berjalan "berhasil" tanpa
+# mengirim apa pun, dan kegagalan diam adalah yang paling lama tidak disadari.
 
 name: Bot Telegram
 
@@ -71,7 +78,7 @@ jobs:
 
       - name: Layani perintah
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || secrets.BOT_TELEGRAM }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || secrets.CHAT_TELEGRAM }}
           APP_TIMEZONE: Asia/Jakarta
         run: php artisan bot:layani

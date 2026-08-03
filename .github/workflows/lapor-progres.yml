@@ -69,8 +69,8 @@ jobs:
 
       - name: Susun & kirim laporan
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || secrets.BOT_TELEGRAM }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || secrets.CHAT_TELEGRAM }}
           # Zona waktu Jakarta supaya tanggal di laporan sama dengan tanggal di warung.
           APP_TIMEZONE: Asia/Jakarta
         run: php artisan lapor:telegram --kirim
@@ -78,8 +78,8 @@ jobs:
       - name: Kabari kalau laporannya sendiri gagal
         if: failure()
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || secrets.BOT_TELEGRAM }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || secrets.CHAT_TELEGRAM }}
         # Tanpa langkah ini, kegagalan alur laporan berarti DIAM — dan diam mudah
         # disalahartikan sebagai "tidak ada kabar berarti aman".
         run: |
