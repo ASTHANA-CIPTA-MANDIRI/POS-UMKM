@@ -51,9 +51,26 @@ class BotLayani extends Command
             return self::FAILURE;
         }
 
-        $masuk = Http::timeout(30)
-            ->get("https://api.telegram.org/bot{$pengirim->token()}/getUpdates", ['timeout' => 0])
-            ->json('result') ?? [];
+        $respons = Http::timeout(30)
+            ->get("https://api.telegram.org/bot{$pengirim->token()}/getUpdates", ['timeout' => 0]);
+
+        /*
+         * Telegram yang MENOLAK harus membuat perintah ini gagal, bukan diam.
+         *
+         * Ditemukan saat mencoba jalur CI: dengan token salah, Telegram membalas 401 dan
+         * `->json('result')` menjadi null, sehingga perintah ini dulu mencetak "tidak ada
+         * perintah baru" lalu keluar SUKSES. Di alur berjadwal itu artinya run hijau yang
+         * tidak pernah menjawab apa pun — kegagalan paling mahal karena tidak terlihat.
+         */
+        if ($respons->failed() || $respons->json('ok') !== true) {
+            $this->error('Telegram menolak permintaan: HTTP '.$respons->status().' — '
+                .($respons->json('description') ?? 'tanpa keterangan'));
+            $this->line('Periksa TELEGRAM_BOT_TOKEN. Token yang dicabut di BotFather akan selalu ditolak.');
+
+            return self::FAILURE;
+        }
+
+        $masuk = $respons->json('result') ?? [];
 
         if ($masuk === []) {
             $this->info('Tidak ada perintah baru.');

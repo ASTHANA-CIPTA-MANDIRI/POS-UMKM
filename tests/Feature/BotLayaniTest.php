@@ -209,6 +209,28 @@ class BotLayaniTest extends TestCase
         $this->assertSame([], $this->terkirim());
     }
 
+    /**
+     * Telegram yang menolak harus membuat perintah ini GAGAL, bukan diam.
+     *
+     * Ditemukan saat mencoba jalur CI: dengan token salah, Telegram membalas 401 dan
+     * perintah ini dulu mencetak "tidak ada perintah baru" lalu keluar sukses. Di alur
+     * berjadwal itu berarti run hijau yang tidak pernah menjawab apa pun — kegagalan
+     * paling mahal karena tidak terlihat.
+     */
+    public function test_gagal_keras_ketika_telegram_menolak_token(): void
+    {
+        Http::fake([
+            'api.telegram.org/*/getUpdates*' => Http::response(
+                ['ok' => false, 'error_code' => 401, 'description' => 'Unauthorized'],
+                401,
+            ),
+        ]);
+
+        $this->artisan('bot:layani')
+            ->expectsOutputToContain('Unauthorized')
+            ->assertFailed();
+    }
+
     public function test_menolak_jalan_tanpa_token(): void
     {
         config(['services.telegram.token' => null]);

@@ -82,3 +82,17 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || secrets.CHAT_TELEGRAM }}
           APP_TIMEZONE: Asia/Jakarta
         run: php artisan bot:layani
+
+      # Tanpa langkah ini, run yang merah hanya terlihat oleh orang yang membuka tab
+      # Actions — dan orang yang mengandalkan Telegram justru tidak membukanya. Kegagalan
+      # harus mengabari lewat jalur yang sama dengan keberhasilan.
+      - name: Kabari kalau botnya gagal
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || secrets.BOT_TELEGRAM }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || secrets.CHAT_TELEGRAM }}
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=⚠️ Bot Telegram GAGAL di GitHub Actions. Log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            > /dev/null
