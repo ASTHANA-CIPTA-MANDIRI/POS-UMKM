@@ -1,0 +1,772 @@
+@import 'tailwindcss';
+
+@source '../views';
+
+/*
+ * Berkas JS ikut dipindai karena komponen kasir menyusun sebagian kelas di sana
+ * (mis. warna tile gambar default yang dipilih dari nama produk). Tanpa baris ini
+ * kelas itu tidak pernah digenerate dan tile-nya keluar tanpa warna.
+ */
+@source '../js';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+/*
+ * Palet Horizon UI, diambil apa adanya dari colors di tailwind.config.js template
+ * (horizon-next-1.0.0). Skala aslinya disediakan lengkap supaya kode baru bisa
+ * memakai nama yang sama dengan template — bg-brand-500, text-navy-700,
+ * bg-lightPrimary — tanpa menerjemahkan apa pun.
+ *
+ * Nama semantik lama (cream, ink, terracotta, umber, line) DIPERTAHANKAN sebagai
+ * alias yang menunjuk ke warna Horizon. Ratusan tempat di seluruh view memakai
+ * nama itu; memetakan ulang tokennya jauh lebih aman daripada menyisir tiap kelas
+ * satu per satu, dan hasil visualnya sama.
+ *
+ * Kontras terhadap latar #F4F7FE:
+ *   ink #1B254B      -> 13.4:1  (badan teks)
+ *   umber #2D396B    -> 10.2:1  (teks sekunder)
+ *   brand #422AFB    ->  6.9:1  (aksen & tautan)
+ *   umber-soft #707EAE -> 3.7:1 (label redup)
+ *
+ * Satu penyimpangan yang disengaja: teks sekunder memakai gray-800 #2D396B, bukan
+ * gray-700 #707EAE seperti template. Nilai template itu hanya 3.7:1 di atas
+ * latarnya — gagal WCAG AA untuk teks ukuran normal. #707EAE tetap dipakai lewat
+ * alias umber-soft untuk label redup dan placeholder, yang memang bukan teks
+ * yang harus terbaca.
+ */
+@theme {
+    /* ── Skala Horizon asli ─────────────────────────────────────────────── */
+    --color-brand-50: #e9e3ff;
+    --color-brand-100: #c0b8fe;
+    --color-brand-200: #a195fd;
+    --color-brand-300: #8171fc;
+    --color-brand-400: #7551ff;
+    --color-brand-500: #422afb;
+    --color-brand-600: #3311db;
+    --color-brand-700: #2111a5;
+    --color-brand-800: #190793;
+    --color-brand-900: #11047a;
+
+    --color-navy-50: #d0dcfb;
+    --color-navy-100: #aac0fe;
+    --color-navy-200: #a3b9f8;
+    --color-navy-300: #728fea;
+    --color-navy-400: #3652ba;
+    --color-navy-500: #1b3bbb;
+    --color-navy-600: #24388a;
+    --color-navy-700: #1b254b;
+    --color-navy-800: #111c44;
+    --color-navy-900: #0b1437;
+
+    --color-gray-50: #f5f6fa;
+    --color-gray-100: #eef0f6;
+    --color-gray-200: #dadeec;
+    --color-gray-300: #c9d0e3;
+    --color-gray-400: #b0bbd5;
+    --color-gray-500: #b5bed9;
+    --color-gray-600: #a3aed0;
+    --color-gray-700: #707eae;
+    --color-gray-800: #2d396b;
+    --color-gray-900: #1b2559;
+
+    --color-light-primary: #f4f7fe;
+    --color-brand-linear: #868cff;
+
+    /* Warna status khas Horizon (horizonGreen / horizonOrange / horizonRed). */
+    --color-hijau: #01b574;
+    --color-hijau-deep: #01935d;
+    /* horizonGreen-700, untuk teks di atas latar hijau muda (6,1:1). */
+    --color-hijau-tua: #016b44;
+    --color-jingga: #ffb547;
+    --color-jingga-deep: #ff9b05;
+    /*
+     * Varian gelap khusus TEKS. horizonOrange-500/600 di template dipakai untuk
+     * ikon dan isian, bukan tulisan: #FF9B05 di atas latar terang hanya ~2:1 dan
+     * praktis tak terbaca. Nilai -tua diambil dari horizonOrange-800 (6,2:1).
+     */
+    --color-jingga-tua: #855000;
+    --color-merah: #ea4848;
+    --color-merah-deep: #e31a1a;
+
+    /* ── Alias semantik yang dipakai seluruh view ───────────────────────── */
+    --color-cream: #f4f7fe;
+    --color-cream-deep: #eef0f6;
+    --color-paper: #ffffff;
+
+    --color-ink: #1b254b;
+    --color-umber: #2d396b;
+    --color-umber-soft: #707eae;
+
+    --color-terracotta: #422afb;
+    --color-terracotta-deep: #2111a5;
+    --color-terracotta-soft: #7551ff;
+
+    --color-amber-warm: #ff9b05;
+    --color-amber-glow: #ffb547;
+
+    --color-olive: #01b574;
+    --color-olive-soft: #01935d;
+
+    --color-line: #dadeec;
+    --color-line-soft: #eef0f6;
+
+    --font-display: 'Fraunces', ui-serif, Georgia, serif;
+    --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /*
+     * Font khusus area aplikasi. Horizon UI memakai DM Sans di seluruh antarmuka
+     * tanpa serif sama sekali; halaman publik tetap memakai Fraunces + Inter.
+     */
+    --font-dash: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+
+    /* Wordmark sidebar. Di template hanya dipakai untuk logo, bukan badan teks. */
+    --font-brand: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+
+    /*
+     * Token turunan Horizon UI. Nilai STRUKTURAL diambil apa adanya dari CSS
+     * template (radius kartu 20px, navbar 30px, bayangan lembut menyebar), sedangkan
+     * warnanya dipetakan ke palet hangat proyek ini supaya dashboard dan halaman
+     * publik tidak terasa seperti dua aplikasi berbeda.
+     *
+     * Pemetaan dari nilai asli Horizon:
+     *   #4318FF brand   -> terracotta
+     *   #F4F7FE latar   -> cream
+     *   #0B1437 teks    -> ink
+     *   #A3AED0 sekunder-> umber-soft
+     */
+    --radius-kartu: 20px;
+
+    /*
+     * Navbar template memakai rounded-xl (12px) pada bilah tembus pandangnya, dan
+     * kontrolnya diletakkan pada pil putih terpisah yang membulat penuh. Sebelumnya
+     * di sini tertulis 30px — hasil membaca situs demo, bukan berkas templatenya.
+     */
+    --radius-navbar: 12px;
+    --tinggi-pil: 61px;
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        background-color: var(--color-cream);
+        color: var(--color-ink);
+        font-family: var(--font-body);
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+
+    /* Fraunces punya sumbu SOFT & WONK; disetel agar terasa hangat, bukan kaku. */
+    h1,
+    h2,
+    h3 {
+        font-family: var(--font-display);
+        font-variation-settings: 'SOFT' 40, 'WONK' 1;
+        letter-spacing: -0.02em;
+        line-height: 1.06;
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--color-terracotta);
+        outline-offset: 3px;
+        border-radius: 4px;
+    }
+
+    ::selection {
+        background: var(--color-amber-glow);
+        color: var(--color-ink);
+    }
+
+    /*
+     * x-cloak TIDAK berfungsi tanpa aturan ini — atributnya hanya penanda, dan Alpine
+     * sekadar membuangnya setelah dimuat.
+     *
+     * Tanpa aturan ini, semua yang seharusnya tersembunyi sampai Alpine siap justru
+     * terlihat lebih dulu: panel kamera layar penuh berkedip di atas halaman, pesan
+     * galat muncul sebelum ada galatnya, dan lencana yang bergantung keadaan tampil
+     * salah selama sepersekian detik pertama.
+     */
+    [x-cloak] {
+        display: none !important;
+    }
+}
+
+@layer components {
+    /* ── Komponen area aplikasi, mengikuti Horizon UI ────────────────────────
+     * Ciri visual Horizon yang ditiru: sudut membulat besar, bayangan sangat
+     * lembut dan menyebar luas (bukan bayangan pekat berjarak dekat), serta
+     * kartu putih di atas latar bertint.
+     */
+    .app-font {
+        font-family: var(--font-dash);
+    }
+
+    /*
+     * Judul di area aplikasi ikut DM Sans. Aturan dasar h1–h3 memakai Fraunces untuk
+     * halaman publik, dan tanpa penimpaan ini judul dashboard & login jadi serif —
+     * Horizon UI tidak memakai serif sama sekali di antarmukanya.
+     */
+    .app-font :is(h1, h2, h3) {
+        font-family: var(--font-dash);
+        font-variation-settings: normal;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+    }
+
+    /* Kartu dasar. Bayangan Horizon aslinya rgba(112,144,176,0.12) — biru dingin;
+       di sini dihangatkan ke coklat supaya cocok dengan latar krem. */
+    .kartu {
+        border-radius: var(--radius-kartu);
+        background: var(--color-paper);
+        /* shadow-3xl template: 14px 17px 40px 4px, warna shadow-500
+           rgba(112,144,176,0.08). Offset-x 14px itu ciri khasnya — bayangannya
+           bergeser ke kanan, tidak jatuh lurus ke bawah. */
+        box-shadow: 14px 17px 40px 4px rgb(112 144 176 / 0.08);
+    }
+
+    .kartu-garis {
+        border-radius: var(--radius-kartu);
+        background: var(--color-paper);
+        border: 1px solid var(--color-line-soft);
+    }
+
+    /*
+     * Lencana ikon bundar di kartu statistik — elemen paling khas Horizon.
+     * Latarnya tint lembut dari warna aksen, ikonnya warna aksen penuh.
+     */
+    .lencana-ikon {
+        display: grid;
+        width: 3.25rem;
+        height: 3.25rem;
+        flex-shrink: 0;
+        place-items: center;
+        border-radius: 9999px;
+    }
+
+    /*
+     * Bilah navbar sendiri hampir tak terlihat — hanya kaca dengan blur kuat, tanpa
+     * bayangan. Yang memberi bentuk adalah pil putih di sebelah kanannya.
+     */
+    .navbar-apung {
+        border-radius: var(--radius-navbar);
+        background: color-mix(in srgb, var(--color-paper) 10%, transparent);
+        backdrop-filter: blur(24px);
+    }
+
+    /* Pil kontrol kanan: putih penuh, membulat sempurna, bayangan menyebar. */
+    .pil-kontrol {
+        min-height: var(--tinggi-pil);
+        border-radius: 9999px;
+        background: var(--color-paper);
+        box-shadow: 0 20px 25px -5px rgb(112 144 176 / 0.08), 0 8px 10px -6px rgb(112 144 176 / 0.06);
+    }
+
+    /*
+     * Penanda menu aktif Horizon: batang vertikal membulat di TEPI KANAN sidebar,
+     * bukan latar penuh di belakang teksnya.
+     */
+    .bar-aktif {
+        position: absolute;
+        top: 50%;
+        right: 0;
+        height: 2.25rem;
+        width: 4px;
+        transform: translateY(-50%);
+        border-radius: 0.5rem;
+        background: var(--color-terracotta);
+    }
+
+    /*
+     * Toast SweetAlert2 disetel mengikuti bahasa visual aplikasi: radius kartu yang
+     * sama, bayangan menyebar yang sama, font yang sama. Tanpa ini toastnya terlihat
+     * seperti tempelan dari aplikasi lain.
+     */
+    .toast-nampan {
+        border-radius: var(--radius-kartu) !important;
+        border: 1px solid var(--color-line) !important;
+        box-shadow: 14px 17px 40px 4px rgb(112 144 176 / 0.14) !important;
+        font-family: var(--font-dash) !important;
+        padding: 0.875rem 1rem !important;
+    }
+
+    .toast-nampan-judul {
+        font-size: 0.875rem !important;
+        font-weight: 600 !important;
+        color: var(--color-ink) !important;
+        line-height: 1.45 !important;
+    }
+
+    .toast-nampan-bilah {
+        background: var(--color-terracotta) !important;
+    }
+
+    /* Masuk dari kanan, arah yang sama dengan tempat toastnya berhenti. */
+    @keyframes swal-masuk-anim {
+        from { opacity: 0; transform: translateX(1.25rem); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes swal-keluar-anim {
+        from { opacity: 1; transform: translateX(0); }
+        to { opacity: 0; transform: translateX(1.25rem); }
+    }
+
+    .swal-masuk {
+        animation: swal-masuk-anim 0.22s ease-out;
+    }
+
+    .swal-keluar {
+        animation: swal-keluar-anim 0.16s ease-in;
+    }
+
+    /*
+     * Denyut pada titik status: satu cincin yang membesar lalu memudar, BUKAN
+     * animate-pulse bawaan yang memudarkan seluruh lencana. Memudarkan teksnya
+     * membuat status jadi lebih sulit dibaca, padahal justru itu yang harus terbaca.
+     *
+     * Cincinnya memakai currentColor, jadi warnanya otomatis mengikuti warna titiknya
+     * tanpa perlu satu kelas untuk setiap warna.
+     */
+    @keyframes denyut-anim {
+        0% { transform: scale(1); opacity: 0.55; }
+        70%, 100% { transform: scale(2.4); opacity: 0; }
+    }
+
+    .titik-denyut {
+        position: relative;
+    }
+
+    .titik-denyut::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 9999px;
+        background: currentColor;
+        animation: denyut-anim 1.7s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    /* Angka rupiah pakai figure tabular supaya kolom harga tidak bergeser. */
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Label kecil huruf besar — penanda editorial antar section. */
+    .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 0.6875rem;
+        font-weight: 500;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+    }
+
+    /*
+     * Grain halus di atas latar. Bidang krem yang benar-benar rata terlihat
+     * "digital"; noise tipis inilah yang membuatnya terasa seperti kertas.
+     */
+    .grain::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0.45;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
+    }
+
+    /* ── Panggung 3D ────────────────────────────────────────────────────────
+     * perspective ada di wadah luar, preserve-3d di panggung yang diputar.
+     * Karena tiap lapisan punya translateZ berbeda, memutar panggung otomatis
+     * menghasilkan parallax — tidak perlu menganimasikan tiap lapisan sendiri.
+     */
+    /*
+     * Selektor memakai atribut data, bukan kelas: atribut yang sama sudah menjadi
+     * pengait bagi JavaScript, jadi tidak ada dua penanda yang harus dijaga sinkron.
+     */
+    [data-scene] {
+        perspective: 1400px;
+        perspective-origin: 50% 45%;
+    }
+
+    /*
+     * Rotasi panggung dibaca dari custom property yang dianimasikan motion lewat
+     * MotionValue. Cara ini dipilih supaya motion tidak perlu menulis properti
+     * transform elemen ini secara langsung — jadi tidak bentrok dengan transform
+     * milik tiap lapisan di dalamnya.
+     */
+    [data-stage] {
+        position: relative;
+        transform-style: preserve-3d;
+        transform: rotateX(var(--stage-rx, 0deg)) rotateY(var(--stage-ry, 0deg));
+        will-change: transform;
+    }
+
+    /*
+     * Sengaja TANPA properti transform di CSS. Kedalaman (translateZ) diatur motion
+     * lewat properti `z`, supaya motion memegang seluruh komposisi transform lapisan
+     * dan animasi float tidak menghapus kedalamannya.
+     */
+    [data-layer] {
+        position: absolute;
+        transform-style: preserve-3d;
+        opacity: 0;
+        will-change: transform, opacity;
+    }
+
+    /* ── Terminal kasir 3D ──────────────────────────────────────────────────
+     * Ukuran dipegang custom property agar bisa diubah per breakpoint tanpa
+     * menyentuh transform tiap sisi balok.
+     */
+    .term-scene {
+        --tw: 232px; /* lebar tablet  */
+        --th: 158px; /* tinggi tablet */
+        --td: 12px;  /* ketebalan     */
+
+        position: relative;
+        width: var(--tw);
+        height: calc(var(--th) + 84px);
+        perspective: 1150px;
+        perspective-origin: 50% 38%;
+    }
+
+    @media (min-width: 640px) {
+        .term-scene {
+            --tw: 296px;
+            --th: 202px;
+            --td: 15px;
+        }
+    }
+
+    .term-tilt,
+    .term-spin {
+        position: absolute;
+        inset: 0;
+        transform-style: preserve-3d;
+    }
+
+    /*
+     * rotateX bertanda POSITIF = kita memandang tablet sedikit dari atas, seperti
+     * kasir yang berdiri di depannya. Nilai ini dipakai sebelum JS jalan, lalu
+     * diambil alih callback scroll.
+     */
+    .term-tilt {
+        transform: rotateX(13deg);
+        will-change: transform;
+    }
+
+    .term-spin {
+        will-change: transform;
+    }
+
+    .term-tablet {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: var(--tw);
+        height: var(--th);
+        transform-style: preserve-3d;
+    }
+
+    /* Sisi depan & belakang balok */
+    .term-front,
+    .term-back {
+        position: absolute;
+        inset: 0;
+        border-radius: 14px;
+        backface-visibility: hidden;
+    }
+
+    .term-front {
+        padding: 7px;
+        background: linear-gradient(160deg, hsl(226 46% 24%), hsl(228 67% 13%));
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.16),
+            0 24px 44px -20px rgb(11 20 55 / 0.55);
+        transform: translateZ(calc(var(--td) / 2));
+    }
+
+    /* Kilau kaca diagonal. Dipasang di atas layar dengan pointer-events none, jadi
+       murni optik dan tidak mengganggu apa pun di bawahnya. */
+    .term-front::after {
+        content: '';
+        position: absolute;
+        inset: 7px;
+        border-radius: 9px;
+        pointer-events: none;
+        background: linear-gradient(126deg, rgb(255 255 255 / 0.34) 0 26%, transparent 44%, transparent 100%);
+    }
+
+    .term-back {
+        background: linear-gradient(200deg, hsl(226 46% 20%), hsl(228 67% 11%));
+        transform: rotateY(180deg) translateZ(calc(var(--td) / 2));
+    }
+
+    .term-back-mark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 26px;
+        height: 26px;
+        margin: -13px 0 0 -13px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, hsl(249 96% 65%), hsl(250 82% 36%));
+    }
+
+    /* Empat tepi balok */
+    .term-edge {
+        position: absolute;
+        background: linear-gradient(to bottom, hsl(226 44% 28%), hsl(228 60% 15%));
+    }
+
+    .term-edge-top,
+    .term-edge-bottom {
+        left: 0;
+        width: 100%;
+        height: var(--td);
+    }
+
+    .term-edge-top {
+        top: 0;
+        transform: rotateX(90deg) translateZ(calc(var(--td) / -2));
+        transform-origin: top center;
+    }
+
+    .term-edge-bottom {
+        bottom: 0;
+        transform: rotateX(-90deg) translateZ(calc(var(--td) / -2));
+        transform-origin: bottom center;
+    }
+
+    .term-edge-left,
+    .term-edge-right {
+        top: 0;
+        width: var(--td);
+        height: 100%;
+    }
+
+    .term-edge-left {
+        left: 0;
+        transform: rotateY(-90deg) translateZ(calc(var(--td) / -2));
+        transform-origin: center left;
+    }
+
+    .term-edge-right {
+        right: 0;
+        transform: rotateY(90deg) translateZ(calc(var(--td) / -2));
+        transform-origin: center right;
+    }
+
+    /* Leher penopang, sedikit di belakang tablet */
+    .term-neck {
+        position: absolute;
+        top: calc(var(--th) - 6px);
+        left: 50%;
+        width: 44px;
+        height: 34px;
+        margin-left: -22px;
+        border-radius: 3px 3px 1px 1px;
+        background: linear-gradient(to bottom, hsl(226 46% 24%), hsl(228 67% 13%));
+        transform: translateZ(-10px);
+    }
+
+    /* Pelat dudukan yang berbaring di lantai */
+    .term-base {
+        position: absolute;
+        top: calc(var(--th) + 8px);
+        left: 50%;
+        width: calc(var(--tw) * 0.5);
+        height: 58px;
+        margin-left: calc(var(--tw) * -0.25);
+        border-radius: 10px;
+        background: linear-gradient(to bottom, hsl(226 46% 21%), hsl(228 67% 12%));
+        box-shadow: 0 12px 24px -12px rgb(11 20 55 / 0.65);
+        transform: rotateX(76deg) translateZ(-4px);
+    }
+
+    /* ── Isi layar ─────────────────────────────────────────────────────────── */
+    .term-screen {
+        display: flex;
+        height: 100%;
+        flex-direction: column;
+        gap: 6px;
+        border-radius: 9px;
+        background: linear-gradient(170deg, var(--color-paper), var(--color-cream));
+        padding: 9px 10px 10px;
+    }
+
+    .term-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+    }
+
+    .term-outlet {
+        font-family: var(--font-mono);
+        font-size: 0.4375rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--color-umber-soft);
+    }
+
+    .term-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--color-olive) 12%, transparent);
+        padding: 2px 6px;
+        font-family: var(--font-mono);
+        font-size: 0.4062rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-olive);
+    }
+
+    .term-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--color-olive);
+    }
+
+    .term-grid {
+        display: grid;
+        flex: 1;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+    }
+
+    .term-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        border: 1px solid var(--color-line-soft);
+        border-radius: 6px;
+        background: linear-gradient(to bottom, #fff, var(--color-cream));
+        box-shadow: inset 0 1px 0 #fff;
+    }
+
+    .term-btn-aktif {
+        border-color: color-mix(in srgb, var(--color-terracotta) 30%, transparent);
+        background: linear-gradient(to bottom, color-mix(in srgb, var(--color-terracotta) 9%, #fff), color-mix(in srgb, var(--color-terracotta) 14%, #fff));
+    }
+
+    .term-btn-nama {
+        font-size: 0.5rem;
+        font-weight: 500;
+        line-height: 1.1;
+        color: var(--color-ink);
+    }
+
+    .term-btn-harga {
+        font-family: var(--font-mono);
+        font-size: 0.4062rem;
+        color: var(--color-umber-soft);
+    }
+
+    .term-total {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        border-top: 1px solid var(--color-line);
+        padding-top: 6px;
+    }
+
+    .term-total-ket {
+        font-family: var(--font-mono);
+        font-size: 0.4062rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--color-umber);
+    }
+
+    .term-total-nilai {
+        font-family: var(--font-display);
+        font-size: 0.75rem;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: var(--color-ink);
+    }
+
+    /* Cahaya layar yang jatuh ke sekelilingnya — ini yang membuat objek terasa
+       menyala, bukan sekadar gambar gelap yang ditempel. */
+    .term-glow {
+        position: absolute;
+        top: 6%;
+        left: 50%;
+        width: 150%;
+        height: 78%;
+        margin-left: -75%;
+        border-radius: 50%;
+        background: radial-gradient(ellipse at center, rgb(117 81 255 / 0.32), transparent 66%);
+        filter: blur(16px);
+        pointer-events: none;
+    }
+
+    .term-floor {
+        position: absolute;
+        bottom: 4px;
+        left: 50%;
+        width: 118%;
+        height: 26px;
+        margin-left: -59%;
+        border-radius: 50%;
+        background: radial-gradient(ellipse at center, rgb(27 37 75 / 0.28), transparent 70%);
+        filter: blur(6px);
+        pointer-events: none;
+    }
+
+    /* Bayangan berlapis; satu bayangan pekat selalu terlihat murah. */
+    .lift {
+        box-shadow:
+            0 1px 2px rgb(27 37 75 / 0.04),
+            0 8px 20px -6px rgb(27 37 75 / 0.08),
+            0 28px 60px -24px rgb(112 144 176 / 0.20);
+    }
+
+    .lift-sm {
+        box-shadow:
+            0 1px 2px rgb(27 37 75 / 0.05),
+            0 6px 16px -8px rgb(27 37 75 / 0.12);
+    }
+}
+
+@layer utilities {
+    /* Garis rambut yang lebih hangat daripada border-gray bawaan. */
+    .rule {
+        border-top: 1px solid var(--color-line);
+    }
+
+    .mask-fade-x {
+        mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    }
+}
+
+/* Hormati preferensi gerak minimal untuk seluruh animasi dekoratif. */
+@media (prefers-reduced-motion: reduce) {
+    .swal-masuk,
+    .swal-keluar {
+        animation: none;
+    }
+
+    /* Denyut ikut berhenti: gerak berulang tanpa henti adalah hal pertama yang
+       mengganggu orang yang meminta gerak minimal. */
+    .titik-denyut::after {
+        animation: none;
+    }
+
+    html {
+        scroll-behavior: auto;
+    }
+
+    [data-stage] {
+        transform: none !important;
+    }
+}

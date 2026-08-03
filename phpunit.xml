@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <!--
+            PERINGATAN, sudah diuji: force="true" TIDAK cukup.
+
+            Variabel yang benar-benar ada di lingkungan OS tetap menang atas <env> di sini,
+            walau force dipasang (dibuktikan dengan `SESSION_DRIVER=database php artisan
+            test`). Jadi suite yang dijalankan sebagai ANAK proses Laravel lain akan
+            mewarisi DB_CONNECTION=mysql dari induknya, dan RefreshDatabase menjalankan
+            migrate:fresh pada DATABASE SUNGGUHAN. Itu sudah terjadi sekali di proyek ini
+            dan menghapus seluruh data pengembangan.
+
+            Penjaga yang benar-benar bekerja ada dua, dan keduanya harus tetap ada:
+            1. tests/Feature/PenjagaDatabaseUjiTest.php — gagal keras kalau suite tidak
+               menunjuk sqlite :memory:.
+            2. Siapa pun yang memanggil `php artisan test` dari dalam kode WAJIB
+               mengoper lingkungan uji secara eksplisit (lihat LaporTelegram::jalankanUji).
+
+            force="true" dibiarkan karena tetap membantu untuk pembacaan lewat $_ENV, tapi
+            jangan pernah mengandalkannya sebagai satu-satunya pelindung.
+        -->
+        <env name="DB_CONNECTION" value="sqlite" force="true"/>
+        <env name="DB_DATABASE" value=":memory:" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+    </php>
+</phpunit>
