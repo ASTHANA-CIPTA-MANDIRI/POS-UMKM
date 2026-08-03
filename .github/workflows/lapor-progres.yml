@@ -59,8 +59,29 @@ jobs:
           node-version: '24'
           cache: npm
 
+      # continue-on-error DISENGAJA.
+      #
+      # Node hanya dibutuhkan untuk suite uji JS, dan itu hanya dipakai oleh /progress
+      # dan /bug. Kalau pemasangan paket JS gagal, seluruh bot ikut mati — padahal
+      # /todolist, /timeline, dan /improvement tidak menyentuh Node sama sekali. Laporan
+      # akan menyebut "JS: tidak terbaca" apa adanya, dan itu jauh lebih baik daripada
+      # tidak ada kabar sama sekali.
+      #
+      # --no-audit --fund=false: keduanya menghubungi registry SESUDAH pemasangan dan
+      # tidak memengaruhi hasilnya, tapi bisa menggagalkan langkah ini saat registry
+      # sedang lambat. .npmrc proyek menyalakan audit; di CI itu tidak berguna.
       - name: Pasang paket JS
-        run: npm ci
+        id: paket_js
+        continue-on-error: true
+        run: npm ci --no-audit --fund=false
+
+      - name: Catat kalau paket JS gagal dipasang
+        if: steps.paket_js.outcome == 'failure'
+        run: |
+          echo "::warning::npm ci gagal — angka uji JS tidak akan terbaca di laporan."
+          node --version || true
+          npm --version || true
+          test -f package-lock.json && echo "package-lock.json ADA" || echo "package-lock.json TIDAK ADA"
 
       - name: Siapkan lingkungan
         run: |

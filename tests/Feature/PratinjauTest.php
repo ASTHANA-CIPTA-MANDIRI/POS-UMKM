@@ -29,6 +29,20 @@ class PratinjauTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Vite dinyalakan kembali untuk kelas ini.
+     *
+     * TestCase mematikannya supaya uji tidak bergantung pada hasil build. Tapi harness ini
+     * justru menulis HTML yang akan DIBUKA DI PERAMBAN untuk diukur — tanpa tag aset yang
+     * nyata, halamannya tanpa gaya dan tanpa Alpine, dan seluruh pengukurannya menipu.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withVite();
+    }
+
     public function test_menangkap_layar_kasir(): void
     {
         if (env('PRATINJAU') !== '1') {

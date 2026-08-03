@@ -52,6 +52,14 @@ class PemeriksaUji
         // Glob diperluas di PHP karena tanpa shell tidak ada yang memperluasnya.
         $berkasUji = glob(base_path('tests/js/*.test.mjs')) ?: [];
 
+        /*
+         * Sengaja TIDAK memeriksa node_modules.
+         *
+         * Uji JS di proyek ini tidak mengimpor satu pun paket luar — Alpine dan Telegram
+         * dipalsukan di dalam ujinya sendiri. Terbukti: suite JS tetap 141/149 di salinan
+         * bersih tanpa node_modules. Menuntut node_modules justru akan menyembunyikan
+         * hasil yang sah setiap kali `npm ci` gagal di CI.
+         */
         if ($berkasUji !== []) {
             Process::path(base_path())->timeout(600)->run(array_merge(
                 ['node', '--test', '--test-reporter=junit', "--test-reporter-destination={$berkasJs}"],
