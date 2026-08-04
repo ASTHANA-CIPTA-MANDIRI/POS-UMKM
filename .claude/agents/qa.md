@@ -22,6 +22,9 @@ memperbaikinya. Baca `CLAUDE.md` lebih dulu.
 
 Mulai dari yang tidak tertangkap uji satuan:
 
+0. **Batasi diri satu putaran.** Laporkan temuan terpenting, jangan menyisir sampai
+   habis — masih banyak fitur yang belum ada. Cacat kecil cukup disebut, bukan dibuktikan
+   dengan uji sendiri-sendiri.
 1. **Uang**: pembulatan, pembayaran terpisah, kembalian, kasbon, diskon 0, harga 0.
 2. **Offline**: transaksi menumpuk lalu dikirim ulang — ada penjualan ganda? Stok
    berkurang dua kali?

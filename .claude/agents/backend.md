@@ -25,6 +25,8 @@ stok, dan offline di sana bukan saran.
    dipakai (`stok_minimum`, `satuan_dasar`, `isi_per_satuan`, `pantau_kadaluarsa`).
 3. Apakah ini uang? Kalau ya, validasinya wajib dan ujinya wajib.
 4. Ada daftar? Pakai `config('nampan.per_halaman')` — JANGAN mengetik angkanya.
+   Termasuk daftar di dalam panel; `pageName`-nya sendiri, dan reset ke halaman 1 saat
+   panelnya dibuka. `limit(n)` tanpa penunjuk halaman = pemotongan diam-diam.
    `PenjagaPerHalamanTest` memeriksa sumber kode, jadi angka langsung akan gagal.
 
 ## Uji

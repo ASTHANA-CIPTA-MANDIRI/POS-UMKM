@@ -83,6 +83,11 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
   Konsekuensi yang harus ditangani, bukan diabaikan: 10 baris berarti lembar panjang
   (opname 120 barang = 12 halaman), jadi nilai yang sudah diketik WAJIB bertahan
   antar-halaman.
+  Berlaku juga untuk daftar di DALAM panel (mis. riwayat kartu stok), dan di situ
+  `pageName`-nya harus SENDIRI — kalau ikut `page`, membuka riwayat di halaman 3 daftar
+  akan melompatkan daftarnya. Reset ke halaman 1 saat panel dibuka, kalau tidak panelnya
+  terbuka kosong dan terbaca sebagai "tidak ada data". `->links()` selalu dirender;
+  `limit(n)` tanpa penunjuk halaman adalah pemotongan diam-diam.
 
 ## Menulis uji
 
@@ -119,6 +124,23 @@ Yang harus diukur, bukan dilihat: `scrollHeight > clientHeight` (menggulir?),
 (seragam? sejajar?), dan perpotongan kotak antar-elemen (ada teks tertimpa?).
 
 Bersihkan sesudahnya: `rm -rf public/pratinjau storage/pratinjau storage/app/public/pratinjau`.
+
+## Kecepatan: jangan berlama-lama di satu pekerjaan
+
+Pemilik proyek meminta ini tegas — masih banyak fitur yang belum ada, dan kualitas satu
+layar tidak menolong kalau sepuluh layar lain kosong.
+
+- **Satu putaran QA per fitur.** Cacat yang tersisa dicatat di `docs/RENCANA.md` lalu
+  LANJUT. Jangan menyelesaikan semuanya sekarang.
+- Perbaiki cacat yang ditemukan; jangan melebar jadi penyempurnaan.
+- Agen kena batas sesi? **Kerjakan sendiri, jangan menunggu reset** — dan sebutkan di
+  laporan bahwa rantainya dipendekkan.
+- Uji mutasi hanya untuk penjaga yang menyentuh uang/stok, bukan setiap uji.
+- Jalankan seluruh berkas uji di AKHIR, bukan berkali-kali di tengah.
+
+Yang TIDAK boleh dipotong, karena masing-masing sudah pernah merugikan: env uji eksplisit,
+jangan hapus `storage/app/public/produk/`, uang divalidasi ketat, dan klaim "rapi" tetap
+harus diukur.
 
 ## WAJIB: setiap permintaan lewat tim agen — tanpa pengecualian
 
