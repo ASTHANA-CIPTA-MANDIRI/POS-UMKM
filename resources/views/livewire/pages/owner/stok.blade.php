@@ -621,23 +621,26 @@
                      18:09" yang terulang sepuluh kali membuat kolom pertama jadi tembok teks
                      yang berat sama dengan angka di sebelahnya. --}}
                 <div class="hidden lg:block">
-                    <table class="w-full text-left">
+                    <table class="w-full table-fixed text-center">
                         <thead>
                             <tr class="border-b border-line">
-                                <th class="w-36 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Waktu</th>
-                                {{-- Pergerakan TIDAK diberi lebar tetap, sama seperti Catatan.
-                                     Dengan lima kolom berlebar tetap, seluruh sisa lebar panel
-                                     tertumpuk di satu kolom terakhir — dan karena catatan
-                                     biasanya pendek, sisi kanan tabel jadi bidang kosong lebar.
-                                     Dua kolom tanpa lebar tetap membuat sisa itu terbagi ke
-                                     kolom yang isinya memang bisa panjang ("Transfer Antar
-                                     Outlet", "Pemakaian bahan baku dari penjualan TRX-…"),
-                                     bukan menumpuk di tepi. --}}
-                                <th class="px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Pergerakan</th>
-                                <th class="w-28 px-5 py-3 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Jumlah</th>
-                                <th class="w-28 px-5 py-3 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Saldo</th>
-                                <th class="w-36 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Oleh</th>
-                                <th class="px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Catatan</th>
+                                {{-- Lebar PERSEN + table-fixed, bukan lebar tetap sebagian.
+                                     Kalau ada kolom yang tidak diberi lebar, seluruh sisa
+                                     lebar panel menumpuk di kolom itu — dan lubangnya sekadar
+                                     BERPINDAH: dulu menganga di kanan kolom Catatan, lalu
+                                     menganga di tengah begitu Pergerakan yang menyerapnya.
+                                     Dengan persen, sisa itu terbagi ke semua kolom sekaligus,
+                                     jadi tidak ada satu bidang kosong yang mencolok.
+
+                                     CATATAN sengaja tidak berkolom sendiri: ia turun jadi
+                                     baris kedua di Pergerakan, tempat ia memang menjelaskan —
+                                     "Stok Keluar · Penjualan TRX-…" terbaca sebagai satu
+                                     keterangan, bukan dua kolom yang harus dipasangkan mata. --}}
+                                <th class="w-[18%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Waktu</th>
+                                <th class="w-[38%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Pergerakan</th>
+                                <th class="w-[12%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Jumlah</th>
+                                <th class="w-[12%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Saldo</th>
+                                <th class="w-[20%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Oleh</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-line-soft">
@@ -653,19 +656,27 @@
                                     </td>
                                     <td class="px-5 py-3 text-[0.8125rem]">
                                         <span class="block font-semibold text-ink">{{ $m->tipe->label() }}</span>
-                                        <span class="block text-[0.75rem] text-umber-soft">{{ $m->alasan?->label() ?? '—' }}</span>
+                                        @php
+                                            // Alasan dan catatan digabung dengan pemisah titik tengah,
+                                            // dan yang kosong DIBUANG — bukan ditulis "—". Deretan
+                                            // "— · —" hanya menambah tanda baca tanpa menambah
+                                            // keterangan, dan mata tetap harus memeriksanya satu-satu.
+                                            $ket = collect([$m->alasan?->label(), $m->catatan])
+                                                ->filter(fn ($x) => filled($x))
+                                                ->implode(' · ');
+                                        @endphp
+                                        <span class="block text-[0.75rem] text-umber-soft">{{ $ket !== '' ? $ket : '—' }}</span>
                                     </td>
                                     <td @class([
-                                        'tabular px-5 py-3 text-right text-[0.9375rem] font-bold',
+                                        'tabular px-5 py-3 text-center text-[0.9375rem] font-bold',
                                         'text-hijau-tua' => (float) $m->jumlah > 0,
                                         'text-merah-deep' => (float) $m->jumlah < 0,
                                         'text-umber-soft' => (float) $m->jumlah === 0.0,
                                     ])>
                                         {{ (float) $m->jumlah > 0 ? '+' : '' }}{{ $angka($m->jumlah) }}
                                     </td>
-                                    <td class="tabular px-5 py-3 text-right text-[0.8125rem] text-umber">{{ $angka($m->saldo_sesudah) }}</td>
+                                    <td class="tabular px-5 py-3 text-center text-[0.8125rem] text-umber">{{ $angka($m->saldo_sesudah) }}</td>
                                     <td class="px-5 py-3 text-[0.8125rem] text-umber">{{ $m->olehUser?->name ?? 'sistem' }}</td>
-                                    <td class="px-5 py-3 text-[0.75rem] text-umber-soft">{{ $m->catatan ?: '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -806,7 +817,7 @@
         </div>
 
         <div class="kartu hidden overflow-hidden lg:block">
-            <table class="w-full text-left">
+            <table class="w-full table-fixed text-center">
                 <thead>
                     {{-- Perataan judul kolom DISAMAKAN dengan perataan isinya, satu per satu:
                          Barang kiri/kiri · Sistem kanan/kanan · Ambang kanan/kanan ·
@@ -819,15 +830,19 @@
                          daripada tepi sel. Tanpa tambahan itu judulnya melayang 12px di
                          sebelah kanan angkanya — sudah dibandingkan kotaknya di peramban. --}}
                     <tr class="border-b border-line">
-                        <th class="px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Barang</th>
-                        <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sistem</th>
-                        <th class="w-56 py-3.5 pr-8 pl-5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Ambang</th>
-                        <th class="w-28 px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
-                        <th class="w-44 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Opname terakhir</th>
+                        {{-- Lebar PERSEN + table-fixed, alasan yang sama dengan tabel riwayat
+                             di panel kartu stok: kolom tanpa lebar akan menyerap SELURUH sisa
+                             lebar panel, dan lubangnya cuma berpindah tempat. Dibagi persen,
+                             sisanya tersebar rata dan jarak antar kolom terbaca seragam. --}}
+                        <th class="w-[22%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Barang</th>
+                        <th class="w-[12%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sistem</th>
+                        <th class="w-[20%] py-3.5 pr-8 pl-5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Ambang</th>
+                        <th class="w-[16%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
+                        <th class="w-[20%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Opname terakhir</th>
                         {{-- Kolom terakhir DIBERI NAMA. Ikon tanpa keterangan di ujung baris
                              membuat orang harus mengklik untuk tahu apa yang akan terjadi;
                              judul kolomnya cukup untuk menjelaskannya sekali untuk semua baris. --}}
-                        <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide whitespace-nowrap text-umber uppercase">Kartu stok</th>
+                        <th class="w-[10%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Kartu stok</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line-soft">
@@ -847,7 +862,7 @@
                             {{-- "belum dihitung", BUKAN "0": nol adalah pernyataan bahwa
                                  barangnya habis, dan barang yang belum pernah dicatat tidak
                                  pernah menyatakan itu. --}}
-                            <td class="tabular px-5 py-3.5 text-right text-[0.9375rem]">
+                            <td class="tabular px-5 py-3.5 text-center text-[0.9375rem]">
                                 @if ($b['punya_baris'])
                                     <span @class([
                                         'font-bold',
@@ -875,7 +890,7 @@
                                             <input id="ambang-{{ $b['kunci'] }}" type="text" inputmode="decimal"
                                                    wire:model="ambangNilai" wire:keydown.enter="simpanAmbang"
                                                    placeholder="0" value="{{ $ambangNilai }}"
-                                                   class="tabular h-10 w-full rounded-lg border border-line bg-white px-3 text-right text-[0.875rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
+                                                   class="tabular h-10 w-full rounded-lg border border-line bg-white px-3 text-center text-[0.875rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
                                         </div>
                                         <x-aksi warna="utama" label="Simpan ambang {{ $b['nama'] }}"
                                                 class="size-10" wire:click="simpanAmbang">
@@ -891,7 +906,7 @@
                                         </x-aksi>
                                     </div>
                                     @error('ambangNilai')
-                                        <p class="mt-1.5 text-right text-[0.75rem] text-merah-deep">{{ $message }}</p>
+                                        <p class="mt-1.5 text-center text-[0.75rem] text-merah-deep">{{ $message }}</p>
                                     @enderror
                                 @else
                                     {{-- Terbaca BISA DITEKAN tanpa perlu dicoba, dan tanpa
@@ -917,7 +932,7 @@
                                          berbunyi "ubah ambang" tanpa nama tidak bisa dipakai
                                          dengan pembaca layar. --}}
                                     <button type="button" wire:click="ubahAmbang('{{ $b['kunci'] }}')"
-                                            class="tabular ml-auto flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-cream px-3 text-[0.875rem] text-ink transition-colors hover:bg-cream-deep"
+                                            class="tabular mx-auto flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-cream px-3 text-[0.875rem] text-ink transition-colors hover:bg-cream-deep"
                                             aria-label="Ubah ambang minimum {{ $b['nama'] }}"
                                             title="Ubah ambang minimum {{ $b['nama'] }}">
                                         <svg viewBox="0 0 20 20" class="size-4 shrink-0 text-terracotta" fill="none" aria-hidden="true">

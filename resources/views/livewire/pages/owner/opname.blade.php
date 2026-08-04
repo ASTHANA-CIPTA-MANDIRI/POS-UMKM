@@ -397,14 +397,23 @@
         </div>
 
         <div class="kartu hidden overflow-hidden lg:block">
-            <table class="w-full text-left">
+            <table class="w-full table-fixed text-center">
                 <thead>
                     <tr class="border-b border-line">
-                        <th class="px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Barang</th>
-                        <th class="w-28 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sistem</th>
-                        <th class="w-36 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Fisik</th>
-                        <th class="w-28 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Selisih</th>
-                        <th class="w-60 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Alasan selisih</th>
+                        {{-- Semua kolom rata TENGAH, judul maupun isinya, atas permintaan
+                             pemilik proyek. Lebarnya persen + table-fixed supaya sisa lebar
+                             panel terbagi rata — kolom tanpa lebar akan menyerap seluruh sisa
+                             dan lubangnya cuma berpindah tempat.
+
+                             Catatan jujur untuk yang membaca ini nanti: kolom ANGKA lebih
+                             mudah dibandingkan kalau rata kanan, karena digit satuan berbaris
+                             lurus ke bawah. Ini keputusan pemilik proyek yang disampaikan
+                             eksplisit, bukan kelalaian — jangan "dibetulkan" diam-diam. --}}
+                        <th class="w-[30%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Barang</th>
+                        <th class="w-[14%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sistem</th>
+                        <th class="w-[16%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Fisik</th>
+                        <th class="w-[14%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Selisih</th>
+                        <th class="w-[26%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Alasan selisih</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line-soft">
@@ -445,7 +454,7 @@
                                 </div>
                             </td>
 
-                            <td class="tabular px-5 py-3 text-right text-[0.875rem]">
+                            <td class="tabular px-5 py-3 text-center text-[0.875rem]">
                                 @if ($b['punya_baris'])
                                     <span class="font-semibold text-ink">{{ $angka($b['sistem']) }}</span>
                                     <span class="block text-[0.6875rem] text-umber-soft">{{ $satuan !== '' ? $satuan : '—' }}</span>
@@ -467,7 +476,7 @@
                                 @enderror
                             </td>
 
-                            <td class="tabular px-5 py-3 text-right text-[0.9375rem] font-bold">
+                            <td class="tabular px-5 py-3 text-center text-[0.9375rem] font-bold">
                                 <span x-bind:class="selisih ? 'text-jingga-tua' : 'text-umber-soft'"
                                       x-text="teksBeda">{{ $beda === null ? '—' : ($beda > 0 ? '+' : '').$angka($beda) }}</span>
                             </td>
