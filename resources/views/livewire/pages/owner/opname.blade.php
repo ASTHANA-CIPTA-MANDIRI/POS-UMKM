@@ -81,10 +81,12 @@
                  satu layar membuat keduanya berhenti berarti. --}}
             <a href="{{ route('owner.stok', $outletDipakai !== null ? ['outlet' => $outletDipakai] : []) }}"
                wire:navigate
-               class="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-line bg-white px-5 text-[0.9375rem] font-semibold text-ink transition-colors hover:bg-cream sm:h-11 sm:w-auto sm:text-[0.875rem]">
-                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                    <path d="M11.5 5.5 7 10l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+               class="tombol-kedua h-12 w-full px-5 text-[0.9375rem] sm:h-11 sm:w-auto sm:text-[0.875rem]">
+                <span class="tombol-ikon">
+                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                        <path d="M11.5 5.5 7 10l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </span>
                 Daftar stok
             </a>
         </x-slot:aksi>
@@ -561,8 +563,16 @@
              bawah 640px, dan nama cabangnya TIDAK hilang dari bar ini — kalimat di atas
              tombol ("… baris terisi untuk <cabang>, belum disimpan") menyebutnya, dan itulah
              pertahanan terakhir sebelum hitungan tersimpan ke cabang yang salah. --}}
+        {{-- Ikon disket DITAMBAHKAN: sebelumnya tombol terpenting di layar ini satu-satunya
+             yang teksnya polos tanpa ikon, padahal dua tombol lain di sekitarnya punya —
+             ia justru terlihat paling kurang jadi. --}}
         <button type="button" wire:click="simpan" wire:loading.attr="disabled"
-                class="min-h-12 w-full cursor-pointer rounded-xl bg-terracotta px-6 py-3 text-[0.9375rem] font-bold text-white transition-colors hover:bg-terracotta-deep disabled:opacity-60 sm:w-auto sm:shrink-0">
+                class="tombol-utama min-h-12 w-full cursor-pointer px-6 py-3 text-[0.9375rem] sm:w-auto sm:shrink-0">
+            <span class="tombol-ikon" wire:loading.remove wire:target="simpan">
+                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                    <path d="M4.5 4.5h8L15.5 7.5v8h-11v-11Zm2.5 0h5v3.5h-5V4.5Zm0 6.5h6v4.5h-6V11Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </span>
             <span wire:loading.remove wire:target="simpan">
                 <span class="sm:hidden">Simpan hasil hitung</span>
                 <span class="hidden sm:inline">Simpan hasil hitung{{ $namaDipakai !== null ? ' — '.$namaDipakai : '' }}</span>

@@ -267,6 +267,114 @@
     }
 
     /*
+     * Tombol tindakan — SATU tempat, dipakai semua layar.
+     *
+     * Sebelum ini tiap layar menuliskan kelasnya sendiri, dan hasilnya tombol yang
+     * paling sering ditekan ("Hitung fisik", "Simpan hasil hitung") tampil sebagai kotak
+     * warna rata tanpa kedalaman — sementara kartu di sekitarnya punya bayangan menyebar
+     * dan kartu pengguna di sidebar punya gradien. Tombolnya jadi terasa paling datar
+     * justru di tempat yang paling penting. Ditaruh di sini, bukan disalin per layar,
+     * supaya Pembelian/Kasbon/Pelanggan nanti tidak lahir datar lagi.
+     *
+     * Warnanya HANYA dari token yang sudah ada (terracotta / terracotta-soft /
+     * terracotta-deep / cream / line). Tidak ada warna baru.
+     */
+    .tombol-utama {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.625rem;
+        border-radius: 0.75rem;
+        /* Gradien halus, bukan dua warna yang jauh: yang dicari kesan permukaan
+           terangkat, bukan tombol berhias. */
+        background: linear-gradient(180deg, var(--color-terracotta-soft), var(--color-terracotta));
+        color: #fff;
+        font-weight: 700;
+        /* Bayangan diberi warna tombolnya sendiri, bukan hitam netral — bayangan kelabu
+           di bawah tombol ungu terbaca kotor. */
+        box-shadow:
+            0 1px 0 rgb(255 255 255 / 0.18) inset,
+            0 10px 20px -10px color-mix(in srgb, var(--color-terracotta) 65%, transparent);
+        transition:
+            background 0.15s ease,
+            box-shadow 0.15s ease,
+            transform 0.1s ease;
+    }
+
+    .tombol-utama:hover {
+        background: linear-gradient(180deg, var(--color-terracotta), var(--color-terracotta-deep));
+        box-shadow:
+            0 1px 0 rgb(255 255 255 / 0.18) inset,
+            0 14px 26px -10px color-mix(in srgb, var(--color-terracotta) 75%, transparent);
+    }
+
+    /* Ditekan = turun sedikit. Satu-satunya umpan balik sentuh yang bekerja di layar
+       tanpa hover, dan di situlah tombol ini paling sering dipakai. */
+    .tombol-utama:active {
+        transform: translateY(1px);
+        box-shadow: 0 1px 0 rgb(255 255 255 / 0.18) inset;
+    }
+
+    .tombol-utama:disabled {
+        opacity: 0.6;
+        box-shadow: none;
+        transform: none;
+    }
+
+    /*
+     * Tombol pendamping: tetap jelas bisa ditekan, tapi TIDAK bersaing dengan tombol
+     * utama. Dua tombol berwarna penuh di satu layar membuat keduanya berhenti berarti.
+     * Resep gradien putih→cream-nya sama dengan tombol di panel 3D, supaya tidak ada dua
+     * bahasa untuk permukaan yang sama.
+     */
+    .tombol-kedua {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        border-radius: 0.75rem;
+        border: 1px solid var(--color-line);
+        background: linear-gradient(180deg, #fff, var(--color-cream));
+        color: var(--color-ink);
+        font-weight: 600;
+        box-shadow:
+            inset 0 1px 0 #fff,
+            0 6px 14px -10px rgb(112 144 176 / 0.5);
+        transition:
+            background 0.15s ease,
+            border-color 0.15s ease,
+            transform 0.1s ease;
+    }
+
+    .tombol-kedua:hover {
+        border-color: color-mix(in srgb, var(--color-terracotta) 28%, var(--color-line));
+        background: linear-gradient(180deg, var(--color-cream), var(--color-cream-deep));
+    }
+
+    .tombol-kedua:active {
+        transform: translateY(1px);
+    }
+
+    /*
+     * Wadah ikon di dalam tombol. Ikon 16px yang menempel langsung ke teks terbaca
+     * seperti tempelan; diberi bidangnya sendiri ia menjadi bagian dari tombolnya.
+     */
+    .tombol-ikon {
+        display: grid;
+        place-items: center;
+        width: 1.5rem;
+        height: 1.5rem;
+        flex-shrink: 0;
+        border-radius: 0.5rem;
+        background: rgb(255 255 255 / 0.18);
+    }
+
+    .tombol-kedua .tombol-ikon {
+        background: color-mix(in srgb, var(--color-terracotta) 10%, transparent);
+        color: var(--color-terracotta);
+    }
+
+    /*
      * Penanda menu aktif Horizon: batang vertikal membulat di TEPI KANAN sidebar,
      * bukan latar penuh di belakang teksnya.
      */

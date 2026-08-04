@@ -220,10 +220,12 @@
                  kecil menempel di kanan judul ia terbaca setara dengan tautan biasa. --}}
             <a href="{{ route('owner.stok.opname', $outletDipakai !== null ? ['outlet' => $outletDipakai] : []) }}"
                wire:navigate
-               class="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-terracotta px-5 text-[0.9375rem] font-bold text-white transition-colors hover:bg-terracotta-deep sm:h-11 sm:w-auto sm:text-[0.875rem]">
-                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                    <path d="M6 4h8v12H6V4Zm2.5 3.5h3M8.5 10h3M8.5 12.5h1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                </svg>
+               class="tombol-utama h-12 w-full px-5 text-[0.9375rem] sm:h-11 sm:w-auto sm:text-[0.875rem]">
+                <span class="tombol-ikon">
+                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                        <path d="M6 4h8v12H6V4Zm2.5 3.5h3M8.5 10h3M8.5 12.5h1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                </span>
                 Hitung fisik (opname)
             </a>
         </x-slot:aksi>
