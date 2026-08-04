@@ -176,6 +176,34 @@ class Product extends Model
             : $qty * (float) $this->isi_per_satuan;
     }
 
+    /**
+     * Status stok dari kolom yang IKUT DI-JOIN oleh daftar produk.
+     *
+     * Daftar produk menempelkan `jumlah_saat_ini` & `stok_minimum` lewat left join, bukan
+     * memuat relasi `stocks` — satu kueri untuk 15 baris, bukan enam belas. Tapi aturan
+     * "minus / habis / menipis / aman" TIDAK boleh ditulis ulang di sini maupun di Blade:
+     * begitu ada dua tempat yang memutuskannya, dasbor dan daftar akan berbeda suatu hari
+     * dan itu terbaca sebagai cacat. Jadi nilainya dititipkan ke satu Stock sementara, dan
+     * Stock-lah yang memutuskan.
+     *
+     * null berarti barang ini memang tidak punya angka stok: belum pernah dihitung, atau
+     * memang tidak dilacak (jasa, menu berbasis resep). Pemanggilnya wajib menampilkan
+     * penanda "—", bukan angka nol — nol adalah pernyataan bahwa barangnya habis.
+     */
+    public function statusStokTerjoin(): ?string
+    {
+        if ($this->jumlah_saat_ini === null) {
+            return null;
+        }
+
+        $sementara = new Stock([
+            'jumlah_saat_ini' => $this->jumlah_saat_ini,
+            'stok_minimum' => $this->stok_minimum ?? 0,
+        ]);
+
+        return $sementara->statusStok();
+    }
+
     public function stokDiOutlet(string $outletId): ?Stock
     {
         return $this->stocks()->where('outlet_id', $outletId)->first();

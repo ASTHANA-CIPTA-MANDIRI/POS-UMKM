@@ -63,6 +63,21 @@
                      Barisnya digulir mendatar di ponsel, bukan melebarkan halaman. --}}
                 <div class="-m-px max-w-full overflow-x-auto p-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <div class="inline-flex w-fit items-center gap-1 rounded-xl bg-white p-1 ring-1 ring-line">
+                        {{-- Chip "Menipis" memakai saringan yang BERBEDA ($stok, bukan
+                             $status), jadi ia perlu penanda aktif sendiri. Angkanya dihitung
+                             komponen dengan aturan yang sama persis seperti dasbor — kalau
+                             dihitung ulang di sini, dua angka itu akan berbeda suatu hari. --}}
+                        <button type="button" wire:click="$set('stok', '{{ $stok === 'menipis' ? 'semua' : 'menipis' }}')"
+                                aria-pressed="{{ $stok === 'menipis' ? 'true' : 'false' }}"
+                                @class([
+                                    'flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[0.8125rem] whitespace-nowrap transition',
+                                    'bg-jingga font-semibold text-ink' => $stok === 'menipis',
+                                    'font-medium text-umber hover:bg-cream hover:text-ink' => $stok !== 'menipis',
+                                ])>
+                            Menipis
+                            <span class="tabular text-[0.6875rem] opacity-70">{{ $jumlahMenipis }}</span>
+                        </button>
+
                         @foreach ([
                             ['semua', 'Semua', $jumlahAktif + $jumlahNonaktif],
                             ['aktif', 'Aktif', $jumlahAktif],
@@ -146,6 +161,18 @@
                                     beli Rp {{ number_format((float) $produk->harga_beli, 0, ',', '.') }}
                                 </p>
                             @endif
+                            @php($statusStokKartu = $produk->statusStokTerjoin())
+                            @if ($statusStokKartu !== null)
+                                <p @class([
+                                    'tabular text-[0.75rem] font-semibold',
+                                    'text-merah-deep' => in_array($statusStokKartu, ['minus', 'habis'], true),
+                                    'text-jingga-tua' => $statusStokKartu === 'menipis',
+                                    'text-umber' => $statusStokKartu === 'aman',
+                                ])>
+                                    sisa {{ rtrim(rtrim(number_format((float) $produk->jumlah_saat_ini, 3, ',', '.'), '0'), ',') }}
+                                    @if ($statusStokKartu !== 'aman') · {{ $statusStokKartu }} @endif
+                                </p>
+                            @endif
                         </div>
                         @if ($produkMauDihapus === $produk->id)
                             <div class="flex gap-2">
@@ -214,6 +241,7 @@
                         <th class="w-40 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Kategori</th>
                         <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Harga jual</th>
                         <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Harga beli</th>
+                        <th class="w-28 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Stok</th>
                         <th class="w-28 px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
                         <th class="w-56 px-5 py-3.5"><span class="sr-only">Aksi</span></th>
                     </tr>
@@ -273,6 +301,25 @@
                             </td>
                             <td class="tabular px-5 py-3.5 text-right text-[0.875rem] text-umber">
                                 {{ $produk->harga_beli !== null ? 'Rp '.number_format((float) $produk->harga_beli, 0, ',', '.') : '—' }}
+                            </td>
+                            {{-- "—" WAJIB, bukan sel kosong: kosong membuat pembacanya
+                                 menebak "nol, atau belum diisi?" — dan nol adalah pernyataan
+                                 bahwa barangnya habis. --}}
+                            @php($statusStok = $produk->statusStokTerjoin())
+                            <td class="tabular px-5 py-3.5 text-right text-[0.875rem]">
+                                @if ($statusStok === null)
+                                    <span class="text-umber-soft">—</span>
+                                @else
+                                    <span @class([
+                                        'font-semibold',
+                                        'text-merah-deep' => in_array($statusStok, ['minus', 'habis'], true),
+                                        'text-jingga-tua' => $statusStok === 'menipis',
+                                        'text-ink' => $statusStok === 'aman',
+                                    ])>{{ rtrim(rtrim(number_format((float) $produk->jumlah_saat_ini, 3, ',', '.'), '0'), ',') }}</span>
+                                    @if ($statusStok !== 'aman')
+                                        <span class="block text-[0.6875rem] text-umber-soft">{{ $statusStok }}</span>
+                                    @endif
+                                @endif
                             </td>
                             <td class="px-5 py-3.5 text-center">
                                 <x-lencana :warna="$produk->is_active ? 'hijau' : 'merah'">
@@ -424,7 +471,7 @@
                     <div class="grid items-start gap-x-6 gap-y-5 md:grid-cols-2 xl:grid-cols-3">
                         <div>
                             <div class="hidden xl:block">
-                                <p class="eyebrow text-umber-soft">Yang ditagih</p>
+                                <p class="eyebrow text-umber-soft">Barang &amp; harga</p>
                                 <div class="mt-1 mb-2.5 h-px bg-line"></div>
                             </div>
 
@@ -488,43 +535,6 @@
                                     <p class="mt-1 text-[0.75rem] text-umber-soft">Untuk menghitung untung. Boleh dikosongkan.</p>
                                 </div>
                             </div>
-                            </div>
-                        </div>
-
-                        {{-- Kelompok kedua: penggolongan & saklar. Dipisah supaya di layar
-                             sangat lebar formulirnya jadi tiga kolom, bukan dua kolom panjang. --}}
-                        <div>
-                            <div class="hidden xl:block">
-                                <p class="eyebrow text-umber-soft">Penggolongan</p>
-                                <div class="mt-1 mb-2.5 h-px bg-line"></div>
-                            </div>
-
-                            <div class="space-y-4">
-                            <div class="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label for="kategori-form" class="block text-[0.8125rem] font-semibold text-ink">Kategori</label>
-                                    <select id="kategori-form" wire:model="kategoriForm"
-                                            class="mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-3 text-[0.9375rem] text-ink focus:border-terracotta focus:outline-none">
-                                        <option value="">Tanpa kategori</option>
-                                        @foreach ($kategori as $k)
-                                            <option value="{{ $k->id }}">{{ $k->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label for="satuan" class="block text-[0.8125rem] font-semibold text-ink">Satuan</label>
-                                    <select id="satuan" wire:model="satuan"
-                                            class="mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-3 text-[0.9375rem] text-ink focus:border-terracotta focus:outline-none">
-                                        @foreach ($satuanTersedia as $s)
-                                            <option value="{{ $s->value }}">{{ $s->label() }}</option>
-                                        @endforeach
-                                    </select>
-                                    <p class="mt-1 text-[0.75rem] text-umber-soft">
-                                        Kg dan liter bisa dijual setengah di kasir.
-                                    </p>
-                                </div>
-                            </div>
 
                             <div class="grid gap-3 rounded-xl border border-line p-3.5 sm:grid-cols-2">
                                 <label class="flex cursor-pointer items-start gap-3">
@@ -549,6 +559,171 @@
                                     </span>
                                 </label>
                             </div>
+                            </div>
+                        </div>
+
+                        {{-- Kelompok kedua: penggolongan & saklar. Dipisah supaya di layar
+                             sangat lebar formulirnya jadi tiga kolom, bukan dua kolom panjang. --}}
+                        <div>
+                            <div class="hidden xl:block">
+                                <p class="eyebrow text-umber-soft">Penggolongan &amp; stok</p>
+                                <div class="mt-1 mb-2.5 h-px bg-line"></div>
+                            </div>
+
+                            <div class="space-y-4">
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label for="kategori-form" class="block text-[0.8125rem] font-semibold text-ink">Kategori</label>
+                                    <select id="kategori-form" wire:model="kategoriForm"
+                                            class="mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-3 text-[0.9375rem] text-ink focus:border-terracotta focus:outline-none">
+                                        <option value="">Tanpa kategori</option>
+                                        @foreach ($kategori as $k)
+                                            <option value="{{ $k->id }}">{{ $k->nama }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="satuan" class="block text-[0.8125rem] font-semibold text-ink">Satuan</label>
+                                    <select id="satuan" wire:model="satuan"
+                                            class="mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-3 text-[0.9375rem] text-ink focus:border-terracotta focus:outline-none">
+                                        @foreach ($satuanTersedia as $s)
+                                            <option value="{{ $s->value }}">{{ $s->label() }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+
+                            {{--
+                                Bagian stok BISA DILIPAT, dan tertutup secara bawaan.
+
+                                Konversi satuan dan ambang minimum hanya dipakai sebagian kecil
+                                produk — warung yang jual satuan tunggal tidak pernah
+                                menyentuhnya. Dibiarkan terbuka, empat medan ini membuat panel
+                                formulir menggulir lagi di layar 768px, dan tombol Simpan
+                                kembali di luar jangkauan; itu batas yang sudah dimenangkan
+                                dengan susah payah dan tidak boleh hilang untuk medan yang
+                                jarang dipakai.
+
+                                Terbuka SENDIRI kalau produknya memang sudah punya konversi
+                                atau ambang: mengubah barang yang sudah disetel tidak boleh
+                                menyembunyikan setelannya, karena yang tersembunyi akan
+                                dianggap tidak ada lalu ditimpa tanpa sadar.
+                            --}}
+                            <div x-data="{ buka: @js($satuanDasar !== '' || $isiPerSatuan !== null || ($stokMinimum ?? 0) > 0) }"
+                                 class="rounded-xl border border-line">
+                                <button type="button" @click="buka = ! buka"
+                                        class="flex w-full cursor-pointer items-center justify-between gap-3 px-3.5 py-2.5 text-left">
+                                    <span>
+                                        <span class="block text-[0.8125rem] font-semibold text-ink">Satuan stok &amp; ambang minimum</span>
+                                        <span class="block text-[0.75rem] text-umber-soft">
+                                            @if ($satuanDasar === '' && ($stokMinimum ?? 0) <= 0)
+                                                Belum disetel — stok dicatat dalam satuan jual
+                                            @else
+                                                @if ($satuanDasar !== '')
+                                                    1 {{ $satuan }} = {{ $isiPerSatuan ?: '…' }} {{ $satuanDasar }}
+                                                @endif
+                                                @if (($stokMinimum ?? 0) > 0)
+                                                    · ambang {{ rtrim(rtrim(number_format((float) $stokMinimum, 3, ',', '.'), '0'), ',') }}
+                                                @endif
+                                            @endif
+                                        </span>
+                                    </span>
+                                    <svg viewBox="0 0 20 20" class="size-4 shrink-0 text-umber-soft transition-transform"
+                                         x-bind:class="buka ? 'rotate-180' : ''" fill="none" aria-hidden="true">
+                                        <path d="m6 8 4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </button>
+
+                                <div x-show="buka" x-cloak class="space-y-4 border-t border-line p-3.5">
+                                {{--
+                                    Konversi satuan: beli dus, jual pcs.
+
+                                    Labelnya menyebut MAKSUDNYA, bukan nama kolom — "isi per
+                                    satuan" tidak berarti apa pun bagi pemilik warung. Kalimat di
+                                    bawahnya ikut berubah mengikuti isian, jadi orangnya melihat
+                                    akibat pilihannya sebelum menyimpan.
+
+                                    Salah mengisi ini berbahaya justru karena tidak terlihat:
+                                    kalau satuan jual pcs tapi isinya 12, setiap penjualan 1 pcs
+                                    memotong 12 pcs. Tidak ada galat, tidak ada uang yang salah —
+                                    hanya stok yang meleleh, dan opname "memperbaikinya" berulang
+                                    kali tanpa ada yang tahu sebabnya. Komponennya menolak bentuk
+                                    itu; keterangan di sini yang menjelaskan bentuk yang benar.
+                                --}}
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label for="satuan-dasar" class="block text-[0.8125rem] font-semibold text-ink">
+                                            Stok dihitung dalam
+                                        </label>
+                                        <select id="satuan-dasar" wire:model.live="satuanDasar"
+                                                class="mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-3 text-[0.9375rem] text-ink focus:border-terracotta focus:outline-none">
+                                            <option value="">Sama dengan satuan jual</option>
+                                            @foreach ($satuanTersedia as $sd)
+                                                <option value="{{ $sd->value }}">{{ $sd->label() }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('satuanDasar')
+                                            <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <label for="isi-per-satuan" class="block text-[0.8125rem] font-semibold text-ink">
+                                            Isinya berapa
+                                        </label>
+                                        <input id="isi-per-satuan" type="text" inputmode="decimal" wire:model="isiPerSatuan"
+                                               placeholder="mis. 12"
+                                               class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
+                                        @error('isiPerSatuan')
+                                            <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <p class="text-[0.75rem] text-umber sm:col-span-2">
+                                        @if ($satuanDasar === '')
+                                            Stok dicatat dalam satuan jual.
+                                        @else
+                                            1 {{ $satuan }} = {{ $isiPerSatuan ?: '…' }} {{ $satuanDasar }} · stok dicatat dalam {{ $satuanDasar }}.
+                                        @endif
+                                    </p>
+                                </div>
+
+                                {{-- Ambang minimum adalah angka PER OUTLET (kolomnya ada di tabel
+                                     stocks, bukan products). Nama outletnya wajib terlihat: tanpa
+                                     itu ambang bisa tersimpan ke outlet yang tidak disadari
+                                     pengetiknya, lalu owner menyimpulkan fiturnya tidak jalan. --}}
+                                <div class="grid gap-4 @if ($outletTersedia !== []) sm:grid-cols-2 @endif">
+                                    @if ($outletTersedia !== [])
+                                        <div>
+                                            <label for="outlet-stok" class="block text-[0.8125rem] font-semibold text-ink">Outlet</label>
+                                            <select id="outlet-stok" wire:model.live="outletStok"
+                                                    class="mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-3 text-[0.9375rem] text-ink focus:border-terracotta focus:outline-none">
+                                                @foreach ($outletTersedia as $o)
+                                                    <option value="{{ $o['id'] }}">{{ $o['nama'] }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    @endif
+
+                                    <div>
+                                        <label for="stok-minimum" class="block text-[0.8125rem] font-semibold text-ink">
+                                            Ambang minimum
+                                        </label>
+                                        <input id="stok-minimum" type="text" inputmode="decimal" wire:model="stokMinimum"
+                                               placeholder="0"
+                                               class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
+                                        <p class="mt-1 text-[0.75rem] text-umber-soft">
+                                            Di bawah angka ini, barangnya masuk daftar harus belanja.
+                                        </p>
+                                        @error('stokMinimum')
+                                            <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+
                             </div>
                         </div>
 
