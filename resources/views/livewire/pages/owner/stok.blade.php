@@ -212,6 +212,7 @@
     </div>
 
     <x-kartu-alat
+        :aksi-penuh="true"
         judul="Stok per outlet"
         jumlah="{{ $daftar->total() }}"
         keterangan="Selalu satu outlet — angka gabungan cabang tidak bisa dibelanjakan."
@@ -224,7 +225,7 @@
                  kecil menempel di kanan judul ia terbaca setara dengan tautan biasa. --}}
             <a href="{{ route('owner.stok.opname', $outletDipakai !== null ? ['outlet' => $outletDipakai] : []) }}"
                wire:navigate
-               class="tombol-utama h-12 w-full px-5 text-[0.9375rem] sm:h-11 sm:w-auto sm:text-[0.875rem]">
+               class="tombol-utama h-12 w-full px-5 text-[0.9375rem]">
                 <span class="tombol-ikon">
                     <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                         <path d="M6 4h8v12H6V4Zm2.5 3.5h3M8.5 10h3M8.5 12.5h1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
@@ -266,6 +267,11 @@
                 </div>
 
                 @if ($outletTersedia !== [])
+                    {{-- Berbagi baris dengan dropdown jenis (tidak selebar kartu), atas
+                         permintaan pemilik proyek. Di layar Opname dropdown ini justru dibuat
+                         selebar penuh — di sana cabang yang sedang dilihat menentukan ke mana
+                         hasil hitung tersimpan, jadi namanya tidak boleh terpotong. Di sini ia
+                         hanya menyaring tampilan, dan salah baca tidak mengubah data apa pun. --}}
                     <div class="min-w-0">
                         <label for="outlet" class="sr-only">Outlet</label>
                         <select id="outlet" wire:model.live="outletId"
@@ -286,7 +292,14 @@
                          menggerombol di kiri, ia menyisakan bidang kosong selebar sepertiga
                          kartu di kanannya. Di ponsel tetap `w-fit` supaya bisa digulir
                          mendatar di dalam wadah ini — bukan melebarkan halaman. --}}
-                    <div class="inline-flex w-fit items-center gap-1 rounded-xl bg-white p-1 ring-1 ring-line lg:flex lg:w-full">
+                    {{-- min-w-full, bukan w-fit: deretnya mengisi lebar penuh di SEMUA ukuran, dan
+                         tetap bisa digulir mendatar kalau pilnya tidak muat. Dengan `w-fit`
+                         ia menggerombol di kiri dan menyisakan bidang kosong di kanannya —
+                         paling terasa di tablet, tempat lebarnya cukup tapi tidak dipakai.
+                         Pilnya TIDAK dipaksa `flex-1` di ponsel: tujuh pil dibagi 390px
+                         menyisakan ±50px masing-masing, dan angka di sebelah namanya —
+                         justru isi utamanya — akan hilang. --}}
+                    <div class="inline-flex min-w-full items-center gap-1 rounded-xl bg-white p-1 ring-1 ring-line lg:flex lg:w-full">
                         {{-- 'Semua' memakai $ringkasan['semua'] — jumlah baris yang SEBENARNYA,
                              bukan penjumlahan chip di sebelahnya. Bentuk lama menjumlah empat
                              status manual, jadi status kelima membuatnya kurang secara diam-diam:

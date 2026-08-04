@@ -81,7 +81,7 @@
                  satu layar membuat keduanya berhenti berarti. --}}
             <a href="{{ route('owner.stok', $outletDipakai !== null ? ['outlet' => $outletDipakai] : []) }}"
                wire:navigate
-               class="tombol-kedua h-12 w-full px-5 text-[0.9375rem] sm:h-11 sm:w-auto sm:text-[0.875rem]">
+               class="tombol-kedua h-11 w-auto shrink-0 px-4 text-[0.875rem]">
                 <span class="tombol-ikon">
                     <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                         <path d="M11.5 5.5 7 10l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
@@ -140,7 +140,11 @@
                 </div>
 
                 @if ($outletTersedia !== [])
-                    <div class="min-w-0 lg:col-span-full xl:col-span-1">
+                    {{-- Selebar penuh sampai ≥xl. Nama cabang bisa panjang ("Benjamin Cabang
+                         Seturan"), dan di kotak separuh lebar ia terpotong jadi "Benjamin
+                         Caban…" — sementara cabang yang sedang dilihat adalah keterangan
+                         paling menentukan di layar ini: hasil hitung tersimpan ke cabang itu. --}}
+                    <div class="col-span-2 min-w-0 lg:col-span-full xl:col-span-1">
                         <label for="outlet" class="sr-only">Outlet</label>
                         <select id="outlet" wire:model.live="outletId"
                                 class="h-11 w-full rounded-xl border border-line bg-white px-3 text-[0.875rem] font-medium text-ink focus:border-terracotta focus:outline-none">
@@ -257,11 +261,13 @@
          jadi halaman tidak menjadi lebih panjang dan tidak ada lubang kosong di kakinya.
 
          Angkanya DIUKUR, bukan dikira — tinggi bar itu berubah menurut lebar layar karena
-         tombol dan kalimatnya berpindah baris: 152px di 390, 127px di 768, 71px di 1280.
-         Ruangnya dibuat sedikit lebih besar daripada masing-masing (176 / 144 / 88), dan
+         tombol dan kalimatnya berpindah baris: 156px di 390, 96px di 768, 96px di 1280
+         (diukur ulang sesudah barnya dipusatkan di ponsel — di ≥sm ia kembali sebaris, tapi
+         paddingnya bertambah sehingga 71px yang lama tidak berlaku lagi).
+         Ruangnya dibuat sedikit lebih besar daripada masing-masing (176 / 144 / 112), dan
          margin negatifnya sedikit lebih kecil daripada ruangnya supaya barnya tetap DI DALAM
          ruang itu. Kalau nanti isi barnya bertambah, ukur ulang di tiga lebar itu. --}}
-    <div class="pb-44 sm:pb-36 xl:pb-[5.5rem]">
+    <div class="pb-44 sm:pb-36 xl:pb-28">
     @if ($daftar->isEmpty())
         <x-kosong judul="Tidak ada barang yang cocok"
                   keterangan="Coba ubah kata pencarian atau saringannya. Menu berbasis resep tidak dihitung di sini — yang dihitung adalah bahan bakunya.">
@@ -554,7 +560,11 @@
          ini pertahanan terakhir sebelum tombol simpan ditekan tanpa cabangnya pernah dibaca.
          Tanpa nama hanya untuk peran yang terkunci satu outlet — di situ dropdownnya tidak
          ada, jadi tidak ada cabang yang bisa tertukar. --}}
-    <div class="sticky bottom-0 z-10 -mt-40 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-line bg-white/95 px-4 py-2.5 backdrop-blur sm:-mt-32 sm:px-5 xl:-mt-[4.5rem]">
+    {{-- Rata tengah HANYA di ponsel: keterangan di atas, tombol di bawahnya, keduanya di
+         tengah. Di ≥sm kembali ke keterangan di kiri dan tombol di kanan — di layar lebar
+         susunan tegak yang dipusatkan membuat barnya tinggi tanpa alasan, sementara lebarnya
+         justru berlimpah. --}}
+    <div class="sticky bottom-0 z-10 -mt-40 flex flex-col items-center gap-2.5 rounded-[20px] border border-line bg-white/95 px-4 py-3 text-center backdrop-blur sm:-mt-32 sm:flex-row sm:justify-between sm:gap-3 sm:px-5 sm:py-2.5 sm:text-left xl:-mt-24">
         <div class="min-w-0">
             {{-- Dua bentuk utuh, bukan satu kalimat dengan @if di tengahnya: Blade TIDAK
                  mengenali direktif yang menempel di belakang huruf (`terisi@if` dibaca
@@ -579,7 +589,7 @@
                  kali lembarnya digulir. Kedua keterangan yang mengubah keputusan tetap ada,
                  hanya dipendekkan: angkanya milik seluruh lembar (jadi pindah halaman aman),
                  dan desimal ditulis dengan titik. --}}
-            <p class="text-[0.75rem] text-umber">
+            <p class="mt-0.5 text-[0.75rem] text-umber">
                 Seluruh lembar · desimal pakai titik (1.5)
             </p>
         </div>
@@ -597,7 +607,7 @@
              yang teksnya polos tanpa ikon, padahal dua tombol lain di sekitarnya punya —
              ia justru terlihat paling kurang jadi. --}}
         <button type="button" wire:click="simpan" wire:loading.attr="disabled"
-                class="tombol-utama min-h-12 w-full cursor-pointer px-6 py-3 text-[0.9375rem] sm:w-auto sm:shrink-0">
+                class="tombol-utama min-h-12 w-full cursor-pointer px-8 py-3 text-[0.9375rem] sm:w-auto sm:min-w-[18rem]">
             <span class="tombol-ikon" wire:loading.remove wire:target="simpan">
                 <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                     <path d="M4.5 4.5h8L15.5 7.5v8h-11v-11Zm2.5 0h5v3.5h-5V4.5Zm0 6.5h6v4.5h-6V11Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />

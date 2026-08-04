@@ -1,4 +1,4 @@
-@props(['judul', 'keterangan' => null, 'jumlah' => null])
+@props(['judul', 'keterangan' => null, 'jumlah' => null, 'aksiPenuh' => false])
 
 {{--
     Kartu alat: kepala halaman (judul seksi, jumlah, aksi) menyatu dengan barisan
@@ -33,13 +33,13 @@
         {{-- min-w-0, bukan shrink-0: dua kontrol berdampingan yang menolak menyusut
              akan mendorong lebar halaman di ponsel.
 
-             `max-sm:w-full` hanya MEMBUKA ruangnya, tidak memaksa isinya melebar: di ponsel
-             wadah ini selebar kartu, sehingga halaman yang mau memasang tombol utamanya
-             selebar layar (`w-full`) bisa melakukannya — tanpa itu, `w-full` di dalam wadah
-             selebar-isi tidak pernah melebar. Isi yang memang harus tetap seukuran teksnya
-             (mis. lencana rentang tanggal di layar laporan) tidak berubah sama sekali. --}}
+             `aksiPenuh` MEMBUKA ruang selebar kartu di ponsel, dan hanya dipakai halaman
+             yang tombolnya memang tindakan utama (mis. "Hitung stok sekarang"). Tanpa itu
+             wadahnya selebar isinya, sehingga tautan kembali seperti "Daftar stok" duduk
+             SEJAJAR dengan judul seksinya alih-alih turun jadi tombol selebar kartu — dan
+             tombol selebar kartu terbaca setara dengan tindakan utama, padahal bukan. --}}
         @if (isset($aksi))
-            <div class="flex min-w-0 flex-wrap items-center gap-2 max-sm:w-full">{{ $aksi }}</div>
+            <div {{ ($aksiPenuh ?? false) ? 'class="flex min-w-0 flex-wrap items-center gap-2 max-sm:w-full"' : 'class="flex min-w-0 flex-wrap items-center gap-2"' }}>{{ $aksi }}</div>
         @endif
     </div>
 
