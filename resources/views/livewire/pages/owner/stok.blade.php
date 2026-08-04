@@ -131,7 +131,7 @@
                      membuat angka di atas terbaca lebih kecil daripada kenyataan, dan pemilik
                      yang membandingkannya dengan uang belanjanya menyimpulkan pencatatannya
                      kacau — padahal yang kurang hanya harga belinya. --}}
-                <p class="mt-0.5 truncate text-[0.6875rem] {{ $nilaiPersediaan['tanpa_harga'] > 0 ? 'text-jingga-tua' : 'text-umber-soft' }}">
+                <p class="mt-0.5 line-clamp-2 text-[0.6875rem] leading-snug {{ $nilaiPersediaan['tanpa_harga'] > 0 ? 'text-jingga-tua' : 'text-umber-soft' }}">
                     @if ($nilaiPersediaan['tanpa_harga'] > 0)
                         {{ $nilaiPersediaan['tanpa_harga'] }} barang belum ada harga belinya
                     @else
@@ -150,7 +150,12 @@
                 'nilai' => 'minus',
                 'label' => 'Minus',
                 'jumlah' => $ringkasan['minus'],
-                'ket' => 'pencatatannya bermasalah, bukan raknya',
+                // Sengaja sependek dua keterangan lainnya: di kolom ~200px, kalimat yang
+                // lebih panjang tetap terpotong walau diberi dua baris. Maksudnya yang
+                // penting harus utuh — stok minus berarti CATATANNYA salah, bukan raknya
+                // berisi minus, dan yang salah membacanya akan mencari barang yang tidak
+                // pernah hilang.
+                'ket' => 'catatannya, bukan raknya',
                 'warna' => 'text-merah-deep',
                 'ikon' => 'M12 4.5 21 19.5H3L12 4.5Zm0 5.5v4.5m0 2.7v.3',
             ],
@@ -188,7 +193,13 @@
                     <p class="tabular truncate text-[1.25rem] leading-tight font-bold text-ink">
                         {{ $kartuAngka['jumlah'] }} barang
                     </p>
-                    <p class="mt-0.5 truncate text-[0.6875rem] {{ $kartuAngka['jumlah'] > 0 ? $kartuAngka['warna'] : 'text-umber-soft' }}">
+                    {{-- Dibiarkan turun ke baris kedua, BUKAN `truncate`. Di petak empat
+                         kolom, "sudah di bawah ambang minimum" terpotong jadi "sudah di
+                         bawah a…" — dan keterangan yang terpotong di tengah kata lebih buruk
+                         daripada keterangan yang memakai dua baris: pembacanya berhenti
+                         membaca, bukan melanjutkan. Dibatasi dua baris supaya tinggi keempat
+                         kartu tetap sama. --}}
+                    <p class="mt-0.5 line-clamp-2 text-[0.6875rem] leading-snug {{ $kartuAngka['jumlah'] > 0 ? $kartuAngka['warna'] : 'text-umber-soft' }}">
                         {{ $kartuAngka['ket'] }}
                     </p>
                 </div>
@@ -485,8 +496,12 @@
                         : null);
             @endphp
 
+            {{-- flex-wrap + order: di bawah 1024px ketiga kotak keterangan pindah ke barisnya
+                 SENDIRI selebar panel (`w-full`), karena di 390px berbagi baris dengan judul
+                 menyisakan 41px per kotak dan seluruh isinya luber keluar kotaknya (terukur).
+                 Di ≥1024px mereka kembali ke sisi kanan judul — bidang yang tadinya kosong. --}}
             <div class="flex flex-wrap items-start gap-4 border-b border-line px-5 py-4 sm:px-6">
-                <div class="min-w-0 flex-1">
+                <div class="order-1 min-w-0 flex-1">
                     <p class="eyebrow text-umber-soft">Kartu stok</p>
                     <div class="mt-1 flex flex-wrap items-center gap-2">
                         <h2 class="text-[1.0625rem] font-bold text-ink">{{ $barisKartu['nama'] }}</h2>
@@ -504,7 +519,7 @@
                     </p>
                 </div>
 
-                <div class="grid min-w-0 flex-1 grid-cols-3 gap-2 lg:max-w-lg">
+                <div class="order-3 grid w-full min-w-0 grid-cols-3 gap-2 lg:order-2 lg:w-auto lg:max-w-lg lg:flex-1">
                     <div class="min-w-0 rounded-xl border border-line px-3 py-2">
                         <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Saldo sekarang</p>
                         @if ($barisKartu['punya_baris'])
@@ -783,10 +798,20 @@
         <div class="kartu hidden overflow-hidden lg:block">
             <table class="w-full text-left">
                 <thead>
+                    {{-- Perataan judul kolom DISAMAKAN dengan perataan isinya, satu per satu:
+                         Barang kiri/kiri · Sistem kanan/kanan · Ambang kanan/kanan ·
+                         Status tengah/tengah · Opname terakhir kiri/kiri · Kartu stok
+                         kanan/kanan. Judul yang tidak berdiri di atas datanya membuat mata
+                         menghitung ulang kolomnya setiap kali turun satu baris.
+
+                         `pr-8` pada AMBANG bukan angka karangan: isinya tombol pil dengan
+                         padding dalam 12px, jadi angkanya berhenti 12px lebih ke dalam
+                         daripada tepi sel. Tanpa tambahan itu judulnya melayang 12px di
+                         sebelah kanan angkanya — sudah dibandingkan kotaknya di peramban. --}}
                     <tr class="border-b border-line">
                         <th class="px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Barang</th>
                         <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sistem</th>
-                        <th class="w-56 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Ambang</th>
+                        <th class="w-56 py-3.5 pr-8 pl-5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Ambang</th>
                         <th class="w-28 px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
                         <th class="w-44 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Opname terakhir</th>
                         {{-- Kolom terakhir DIBERI NAMA. Ikon tanpa keterangan di ujung baris
@@ -859,23 +884,41 @@
                                         <p class="mt-1.5 text-right text-[0.75rem] text-merah-deep">{{ $message }}</p>
                                     @enderror
                                 @else
-                                    {{-- Garisnya baru muncul saat disentuh. Kotak bergaris di
-                                         setiap baris membuat kolom ini terbaca sebagai
-                                         formulir, dan seluruh tabelnya terlihat seperti
-                                         lembar isian — padahal ini daftar yang kebetulan
-                                         satu nilainya bisa disunting. --}}
+                                    {{-- Terbaca BISA DITEKAN tanpa perlu dicoba, dan tanpa
+                                         bergantung pada hover — layar ini dipakai di tablet dan
+                                         HP, dan di sana hover tidak ada sama sekali (aturan
+                                         CLAUDE.md). Bentuknya pil berlatar cream dengan pensil
+                                         terracotta yang SELALU terlihat: itu bahasa "tombol",
+                                         bukan "kolom isian" seperti kotak putih bergaris yang
+                                         sebelumnya membuat seluruh tabel terlihat sebagai
+                                         formulir. Pensilnya 16px (size-4) dan berwarna
+                                         terracotta di atas cream — terukur 6,6:1.
+
+                                         Ikon di KIRI angka, bukan di kanan: dengan ikon di
+                                         kanan, angkanya tidak pernah berhenti di tepi yang sama
+                                         dengan judul kolomnya, dan judul "Ambang" jadi melayang
+                                         tidak di atas datanya.
+
+                                         Kedua keadaan (sudah ada ambang / belum) memakai bentuk
+                                         yang SAMA — sebelumnya yang sudah terisi hampir tak
+                                         terlihat sebagai tombol.
+
+                                         aria-label menyebut nama barangnya: delapan tombol
+                                         berbunyi "ubah ambang" tanpa nama tidak bisa dipakai
+                                         dengan pembaca layar. --}}
                                     <button type="button" wire:click="ubahAmbang('{{ $b['kunci'] }}')"
-                                            class="tabular group ml-auto flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-3 text-[0.875rem] text-ink transition-colors hover:border-line hover:bg-cream"
-                                            title="Setel ambang minimum {{ $b['nama'] }}">
+                                            class="tabular ml-auto flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-cream px-3 text-[0.875rem] text-ink transition-colors hover:bg-cream-deep"
+                                            aria-label="Ubah ambang minimum {{ $b['nama'] }}"
+                                            title="Ubah ambang minimum {{ $b['nama'] }}">
+                                        <svg viewBox="0 0 20 20" class="size-4 shrink-0 text-terracotta" fill="none" aria-hidden="true">
+                                            <path d="M13 3.5 16.5 7 8 15.5H4.5V12L13 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
                                         @if ($b['minimum'] > 0)
                                             <span class="font-semibold">{{ $angka($b['minimum']) }}</span>
                                             <span class="text-[0.75rem] text-umber-soft">{{ $b['satuan_dasar'] ?? '' }}</span>
                                         @else
-                                            <span class="text-[0.8125rem] text-umber">Setel ambang</span>
+                                            <span class="text-[0.8125rem] font-semibold text-terracotta">Setel ambang</span>
                                         @endif
-                                        <svg viewBox="0 0 20 20" class="size-3.5 shrink-0 text-umber-soft opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" fill="none" aria-hidden="true">
-                                            <path d="M13 3.5 16.5 7 8 15.5H4.5V12L13 3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                        </svg>
                                     </button>
                                 @endif
                             </td>
