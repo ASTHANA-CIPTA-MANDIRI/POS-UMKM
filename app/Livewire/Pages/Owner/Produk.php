@@ -365,6 +365,12 @@ class Produk extends Component
      * Tanpa pemeriksaan ini, muatan Livewire yang disusun sendiri bisa menitipkan
      * outlet_id milik tenant lain, dan baris stocks kita akan menunjuk outlet orang.
      *
+     * Milik tenant yang benar belum cukup: outlet yang bukan tanggung jawab penggunanya
+     * (Regional Manager yang hanya ditugaskan ke sebagian cabang) juga ditolak, dengan
+     * pesan yang TERLIHAT. outletStokTerpakai() sudah mengabaikan nilainya sehingga tidak
+     * ada yang tertulis ke outlet itu — tapi tanpa galat di sini, ambang yang sudah
+     * diketik cuma hilang tanpa kabar dan orangnya percaya angkanya tersimpan.
+     *
      * @return array<int, mixed>
      */
     private function aturanOutletStok(): array
@@ -375,24 +381,62 @@ class Produk extends Component
             Rule::exists('outlets', 'id')
                 ->where('tenant_id', auth()->user()->tenant_id)
                 ->whereNull('deleted_at'),
+            function (string $atribut, mixed $nilai, Closure $gagal): void {
+                $user = auth()->user();
+
+                // Peran yang terkunci ke satu outlet: nilai dari klien memang tidak pernah
+                // dipakai (outletStokTerpakai() memakai outlet sesi), jadi menolaknya hanya
+                // memunculkan galat untuk kolom yang tidak ada di layarnya.
+                if ($user->scopedOutletId() !== null) {
+                    return;
+                }
+
+                if ($this->terisi($nilai) && ! $user->canAccessOutlet((string) $nilai)) {
+                    $gagal('Outlet itu bukan tanggung jawab Anda.');
+                }
+            },
         ];
     }
 
     /**
-     * Outlet yang benar-benar dipakai untuk stok.
+     * Outlet yang benar-benar dipakai untuk stok — dan gerbang aksesnya.
      *
      * Peran yang terkunci ke satu outlet selalu memakai outletnya sendiri; pilihan dari
      * klien diabaikan sama sekali untuk peran itu.
+     *
+     * Gerbangnya dijalankan SETIAP kali outlet ini dipakai, bukan sekali di mount() —
+     * alasannya sama dengan Stok::outletTerpakai(). `$outletStok` adalah properti publik,
+     * jadi nilainya bisa diganti kapan saja lewat muatan pembaruan Livewire; pemeriksaan
+     * yang hanya berjalan di mount cukup dilewati dengan menyetelnya belakangan. Tanpa
+     * gerbang ini, Regional Manager yang hanya ditugaskan ke Outlet A bisa memaksa kolom
+     * Stok dan hitungan "Menipis" di layar ini memakai Outlet B — outlet lain di tenant
+     * yang sama, tapi bukan tanggung jawabnya. Aturan tenant (aturanOutletStok()) tidak
+     * menangkapnya: outletnya memang milik tenant yang benar.
+     *
+     * Bedanya dengan Stok::outletTerpakai(): di sana outletnya datang dari URL dan SELURUH
+     * halaman adalah tentang satu outlet, jadi tautan yang menyebut outlet orang lain
+     * ditolak keras dengan 403. Di sini outletnya cuma penentu satu kolom pada daftar
+     * produk — isi halaman lainnya tetap sah — jadi nilai yang bukan haknya DIABAIKAN
+     * (dianggap "outlet belum dipilih"), persis seperti nilai dari klien untuk peran yang
+     * terkunci. Yang penting: nilainya tidak dipakai untuk mengambil maupun menulis data
+     * outlet itu. Nilainya sendiri tetap dibiarkan di properti supaya percobaan menyimpan
+     * ambang ke outlet itu tetap ditolak dengan pesan yang terlihat — lihat
+     * aturanOutletStok(), bukan gagal diam-diam.
      */
     public function outletStokTerpakai(): ?string
     {
-        $terkunci = auth()->user()->scopedOutletId();
+        $user = auth()->user();
+        $terkunci = $user->scopedOutletId();
 
         if ($terkunci !== null) {
             return $terkunci;
         }
 
-        return $this->terisi($this->outletStok) ? $this->outletStok : null;
+        if (! $this->terisi($this->outletStok)) {
+            return null;
+        }
+
+        return $user->canAccessOutlet($this->outletStok) ? $this->outletStok : null;
     }
 
     /**
@@ -654,7 +698,7 @@ class Produk extends Component
         return view('livewire.pages.owner.produk', [
             'daftar' => $this->kueriProduk($outletId)
                 ->orderBy('products.nama_produk')
-                ->paginate(15),
+                ->paginate(config('nampan.per_halaman')),
             'kategori' => Category::orderBy('urutan')->orderBy('nama')->get(['id', 'nama']),
             'satuanTersedia' => Satuan::cases(),
             'jumlahAktif' => Product::where('is_active', true)->count(),

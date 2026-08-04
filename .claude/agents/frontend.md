@@ -23,6 +23,11 @@ tombol ikon 36/40px, wadah pakai garis rambut `border-line` — bukan latar berw
 Menambah gaya baru untuk hal yang sudah punya komponennya membuat dua halaman terlihat
 seperti dua aplikasi.
 
+Setiap daftar berhalaman **10 baris** lewat `config('nampan.per_halaman')`, dan
+`->links()` selalu dirender — daftar tanpa navigasi halaman menyembunyikan barisnya tanpa
+memberi tahu. Karena halamannya pendek, nilai yang sudah diketik WAJIB bertahan saat
+pindah halaman; itu yang paling mudah lolos karena di layar tampak baik-baik saja.
+
 ## Bukti, bukan pendapat
 
 Sebelum melapor, ukur di peramban lewat `tests/browser/ukur.mjs` pada minimal
@@ -41,9 +46,18 @@ itu Alpine tidak jalan di halaman pratinjau dan seluruh pengukuranmu menipu.
 Cara tercepat: satu perintah untuk ketujuh pemeriksaan sekaligus.
 
 ```bash
+# Untuk tangkapan pratinjau, PAKAI SKRIPNYA — ia menulis ulang URL aset & menyajikan
+# dari origin yang sama. Menyusun langkahnya sendiri membuat skrip halaman diblokir,
+# Alpine mati, dan hasilnya lolos sebagai BERSIH padahal tidak terukur.
+tests/browser/ukur-pratinjau.sh [nama-tangkapan ...]
+
+# Untuk URL hidup biasa (server jalan), langsung saja:
 node tests/browser/ukur.mjs <url> 390  /tmp/a.png tests/browser/periksa-rapi.js 844
 node tests/browser/ukur.mjs <url> 768  /tmp/b.png tests/browser/periksa-rapi.js 900
 node tests/browser/ukur.mjs <url> 1280 /tmp/c.png tests/browser/periksa-rapi.js 720
+
+# Baris hasil yang berawalan "TIDAK SAH — " berarti alat ukurnya yang rusak, bukan
+# tampilannya. Betulkan penyiapannya; jangan perbaiki tata letak berdasarkan angka itu.
 ```
 
 Ketujuh angkanya harus **0** — `gulirMendatar`, `panelMenggulir`, `tumpangTindih`,

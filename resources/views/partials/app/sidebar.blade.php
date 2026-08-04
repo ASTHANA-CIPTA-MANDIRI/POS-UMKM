@@ -50,7 +50,7 @@
             'Katalog & stok' => [
                 ['Produk', 'owner.produk', 'kotak'],
                 ['Bahan baku & resep', null, 'daun'],
-                ['Stok & opname', null, 'lapis'],
+                ['Stok & opname', 'owner.stok', 'lapis'],
                 ['Pembelian', null, 'truk'],
             ],
             'Pelanggan' => [

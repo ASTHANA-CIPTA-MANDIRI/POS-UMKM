@@ -37,10 +37,13 @@ tidak sesuai** — sekarang masih perkiraan.
 - [x] Laporan penjualan owner: omzet, grafik, terlaris, metode | 2026-07-30 | owner | 6j
 - [x] Alat: agen tim, laporan Telegram, pemeriksa kerapian | 2026-08-01 | infra | 6j
 - [x] Perbaikan uang kasir: bayar terpisah & validasi sinkronisasi | 2026-08-03 | kasir | 6j
+- [x] Stok & opname: konversi satuan, ambang minimum, hitung fisik, status "belum dihitung" | 2026-08-04 | owner | 12j
+- [x] Pagination 10 baris seluruh aplikasi (satu setelan + uji penjaga sumber) | 2026-08-04 | infra | 2j
 
 ## Wajib sebelum deploy
 
-- [ ] Stok & opname: konversi satuan, sisa di kasir, ambang minimum, hitung fisik | | owner | 12j
+- [ ] Baris `stocks` kembar: `SiapkanBarisStokAction` tidak atomik | | data | 2j
+- [ ] Sisa stok tampil di layar kasir (lencana di petak produk) | | kasir | 4j
 - [ ] Pembelian: stok masuk, supplier, harga beli | | owner | 8j
 - [ ] Kasbon: daftar piutang + pelunasan tercatat | | owner | 6j
 - [ ] Pelanggan: daftar + formulir | | owner | 4j
@@ -85,3 +88,21 @@ menunggu jawaban.
   meninjau dan meminta perubahan.
 - Zona waktu aplikasi sudah Asia/Jakarta. Data lama yang ditulis saat masih UTC terbaca
   bergeser +7 jam; data demo cukup disemai ulang.
+- **Baris `stocks` bisa kembar** (temuan analis, belum diperbaiki, sudah masuk daftar
+  wajib): `SiapkanBarisStokAction` memakai `first()` lalu `create`, bukan operasi atomik.
+  Dua perangkat kasir yang menjual barang yang sama saat barangnya belum punya baris stok
+  bisa membuat dua baris sekaligus, dan `LEFT JOIN` di layar stok akan menampilkannya
+  **kembar**. Obatnya unique index `(outlet_id, product_id)` dan
+  `(outlet_id, raw_material_id)` — bukan sekadar mengubah ke `firstOrCreate`, karena
+  balapannya ada di tingkat basis data.
+- **Status stok "belum dihitung" dipisahkan dari "habis"** (diputuskan 2026-08-04). Barang
+  yang belum pernah punya baris `stocks` tidak lagi dicap merah "Habis" dan tidak lagi
+  masuk blok "Harus belanja" — angkanya belum ada, jadi jumlah belanjanya tidak bisa
+  dihitung. Alasannya bukan estetika: 300 lencana merah di warung baru membuat pemilik
+  belajar mengabaikan warna merah, sehingga saat satu barang benar-benar kosong,
+  peringatannya sudah tidak berarti apa-apa. Yang SENGAJA belum dibedakan: baris yang ada
+  tapi belum pernah dihitung fisik (mis. lahir dari penyetelan ambang) — di situ pemilik
+  sudah menyatakan harapannya sendiri, jadi meminta beli sebanyak ambang bukan mengarang.
+- Yang QA jujur belum buktikan di lembar opname, jangan dianggap aman maupun cacat: angka
+  fisik notasi ilmiah (`1e10`), dan `alasan`/`catatan` dikirim sebagai array lewat payload
+  Livewire mentah.

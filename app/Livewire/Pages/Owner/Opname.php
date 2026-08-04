@@ -12,6 +12,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -73,9 +74,37 @@ class Opname extends Component
      * catatan mutasi bisa memuat KEDUA angka, sehingga kartu stok bisa menjelaskan
      * selisih yang bukan salah penghitungnya.
      *
+     * #[Locked] WAJIB di sini, dan alasannya bukan kerapian.
+     *
+     * Nilainya HANYA diisi server, di updatedFisik() dan saat baris dirender — perhatikan
+     * `??=` di kedua tempat: yang tercatat adalah angka yang benar-benar pernah tampil,
+     * dan hanya yang pertama. Tanpa #[Locked], properti publik ini bisa diganti lewat
+     * muatan pembaruan Livewire, memotong Alpine sepenuhnya; QA membuktikannya dengan
+     * mengirim 999 pada baris yang layarnya hanya pernah menunjukkan 10, dan catatan kartu
+     * stok jadi berbunyi "layar menunjukkan 999, saldo saat disimpan 10" — angka yang tidak
+     * pernah dirender kepada siapa pun.
+     *
+     * Angka stoknya sendiri tidak terpengaruh (selisihnya tetap fisik − saldo saat simpan),
+     * jadi yang rusak bukan uang melainkan JEJAK AUDITNYA: satu-satunya keterangan yang
+     * menjelaskan kenapa saldo bergerak selama penghitungan, bisa dikarang oleh orang yang
+     * sedang dijelaskan oleh keterangan itu. Jejak audit yang bisa dipalsukan oleh pihak
+     * yang diaudit sama saja dengan tidak ada.
+     *
      * @var array<string, float>
      */
+    #[Locked]
     public array $sistemSaatDibuka = [];
+
+    /**
+     * Sebagian baris tersimpan sementara sebagian gagal, pada percobaan simpan terakhir.
+     *
+     * Dipakai Blade untuk memilih kalimat penjelas di blok ringkasan galat. Blok itu
+     * lahir untuk galat validasi, yang menahan SELURUH lembar — kalimatnya berbunyi "tidak
+     * ada satu baris pun yang tersimpan". Untuk kegagalan sesudah simpan, kalimat itu
+     * menjadi keterangan yang salah tentang data yang sudah berubah, dan pemiliknya bisa
+     * menghitung ulang barang yang sebenarnya sudah tercatat.
+     */
+    public bool $sebagianTersimpan = false;
 
     public function mount(): void
     {
@@ -190,6 +219,10 @@ class Opname extends Component
      */
     public function simpan(): void
     {
+        // Dinolkan di awal SETIAP percobaan: penanda dari percobaan sebelumnya akan
+        // membuat kalimat penjelasnya berbicara tentang penyimpanan yang sudah lewat.
+        $this->sebagianTersimpan = false;
+
         $outletId = $this->outletTerpakai();
 
         if ($outletId === null) {
@@ -244,7 +277,37 @@ class Opname extends Component
         $pesan = $ringkasan['dihitung'].' barang dihitung, '.$ringkasan['mutasi'].' selisih tercatat.';
 
         if ($ringkasan['gagal'] !== []) {
-            $this->toast($pesan.' '.count($ringkasan['gagal']).' baris gagal disimpan dan masih terisi.', 'peringatan');
+            /*
+             * Sebabnya per baris DITERUSKAN, bukan cuma dihitung.
+             *
+             * Dulu pesannya hanya "1 baris gagal disimpan dan masih terisi" — tanpa nama
+             * barang, tanpa sebab. Pemilik yang menghitung 120 barang menghadapi 12 halaman
+             * (10 baris per halaman), jadi ia harus membuka halaman satu per satu mencari
+             * baris mana yang masih terisi, tanpa tahu kenapa. Padahal CatatOpnameAction
+             * sudah menyerahkan kalimat penuhnya di $ringkasan['gagal'][*]['pesan'];
+             * keterangan itu dibuang di sini.
+             *
+             * Dititipkan ke $errors, bukan hanya ke toast: blok ringkasan galat di Blade
+             * memasangkan kunci baris dengan NAMA barangnya dan tampil walau barisnya
+             * sedang berada di halaman lain — sementara toast hilang begitu ditutup dan
+             * penanda per baris tidak ada gunanya kalau barisnya tidak sedang dirender.
+             */
+            foreach ($ringkasan['gagal'] as $baris) {
+                $kunci = $baris['product_id'] ?? $baris['raw_material_id'];
+
+                if ($kunci !== null) {
+                    $this->addError('fisik.'.$kunci, $baris['pesan']);
+                }
+            }
+
+            // Blok ringkasan itu biasanya dipakai untuk galat validasi, yang menahan SELURUH
+            // penyimpanan. Di sini sebagian baris sudah benar-benar tersimpan, jadi kalimat
+            // "tidak ada satu baris pun yang tersimpan" akan menjadi keterangan yang salah
+            // tentang data yang sudah berubah — dan pemilik bisa menghitung ulang barang
+            // yang sebenarnya sudah tercatat.
+            $this->sebagianTersimpan = $ringkasan['dihitung'] > 0;
+
+            $this->toast($pesan.' '.count($ringkasan['gagal']).' baris gagal dan masih terisi — sebabnya di daftar atas.', 'peringatan');
 
             return;
         }
@@ -334,6 +397,45 @@ class Opname extends Component
     /* ── Daftar ──────────────────────────────────────────────────────────── */
 
     /** @return Collection<int, array<string, mixed>> */
+    /**
+     * Nama barang per kunci, untuk blok ringkasan galat.
+     *
+     * Halaman yang sedang tampak TIDAK cukup, dan itu justru inti masalahnya. Blok
+     * ringkasan ada supaya baris bermasalah di halaman lain tetap terlihat; kalau namanya
+     * diambil dari baris yang sedang dirender saja, baris di halaman 3 tampil sebagai
+     * "Baris lain" — pemiliknya tahu ada yang salah tapi tetap tidak tahu barang apa, yaitu
+     * keadaan yang sama dengan tidak diberi tahu. Dengan 10 baris per halaman, lembar 120
+     * barang punya 12 halaman, jadi keadaan ini normal, bukan pengecualian.
+     *
+     * Baris seluruh outlet hanya diambil kalau memang ADA galat — pada penyimpanan yang
+     * lancar (jalur yang biasa terjadi) tidak ada kueri tambahan sama sekali.
+     *
+     * @param  array<int, array<string, mixed>>  $halamanIni
+     * @return Collection<string, string>
+     */
+    private function namaPerKunci(array $halamanIni): Collection
+    {
+        $nama = collect($halamanIni)->pluck('nama', 'kunci');
+
+        if (! $this->getErrorBag()->isNotEmpty()) {
+            return $nama;
+        }
+
+        $kurang = collect($this->getErrorBag()->keys())
+            ->map(fn (string $kunci) => str($kunci)->after('.')->toString())
+            ->reject(fn (string $kunci) => $nama->has($kunci));
+
+        if ($kurang->isEmpty()) {
+            return $nama;
+        }
+
+        return $nama->merge(
+            $this->semuaBaris()
+                ->filter(fn (array $b) => $kurang->contains($b['kunci']))
+                ->pluck('nama', 'kunci')
+        );
+    }
+
     private function semuaBaris(): Collection
     {
         $outletId = $this->outletTerpakai();
@@ -369,8 +471,12 @@ class Opname extends Component
      * @param  Collection<int, array<string, mixed>>  $baris
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
-    private function halamankan(Collection $baris, int $perHalaman = 25): LengthAwarePaginator
+    private function halamankan(Collection $baris, int $perHalaman = 0): LengthAwarePaginator
     {
+        // 0 = pakai setelan bersama. Angkanya tidak diketik ulang di sini supaya
+        // seluruh daftar di aplikasi berpindah bersamaan kalau nanti diubah.
+        $perHalaman = $perHalaman > 0 ? $perHalaman : (int) config('nampan.per_halaman');
+
         $halaman = max(1, (int) $this->getPage(self::NAMA_HALAMAN));
 
         return new LengthAwarePaginator(
@@ -405,6 +511,7 @@ class Opname extends Component
 
         return view('livewire.pages.owner.opname', [
             'daftar' => $daftar,
+            'namaPerKunci' => $this->namaPerKunci($daftar->items()),
             'alasanTersedia' => AlasanOpname::pilihan(),
             'jumlahTerisi' => $this->jumlahTerisi(),
             'outletTersedia' => auth()->user()->scopedOutletId() === null ? $this->outletTersedia() : [],

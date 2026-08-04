@@ -148,6 +148,12 @@ class SusunBarisStokAction
      * memutuskan — pola yang sama dengan Product::statusStokTerjoin(). Dua tempat yang
      * memutuskan hal yang sama berarti dasbor dan daftar akan berbeda suatu hari, dan itu
      * terbaca sebagai cacat oleh orang yang melihatnya.
+     *
+     * `?? 0` di sini WAJIB dan bukan kelalaian: kekurangan() dan
+     * kekuranganDalamSatuanBeli() mengerjakan aritmetika atas kedua nilai ini. Barang
+     * yang belum punya baris `stocks` dibedakan di baris(), lewat `stok_id === null` —
+     * BUKAN dengan menaruh null di sini, karena `(float) null` tetap 0.0 dan statusnya
+     * tetap keluar 'habis'.
      */
     private function stokSementara(mixed $jumlah, mixed $ambang, ?Product $produk): Stock
     {
@@ -196,7 +202,25 @@ class SusunBarisStokAction
             'satuan' => $satuan,
             'satuan_dasar' => $satuanDasar,
             'isi_per_satuan' => $isiPerSatuan,
-            'status' => $stok->statusStok(),
+            // Status mengikuti ada-tidaknya ANGKA, bukan besarnya angka. Tanpa baris
+            // `stocks` tidak ada angka yang bisa ditanyakan statusnya, jadi memanggil
+            // Stock::statusStok() di sini berarti mengarang: `0` masuk, `habis` keluar,
+            // dan warung yang baru memasukkan 300 barang melihat 300 lencana merah
+            // "Habis". Hari kedua pemiliknya belajar mengabaikan merah, dan hari barang
+            // pertama benar-benar kosong, merah sudah tidak berarti apa-apa lagi.
+            //
+            // Ini cabang di SINI, bukan di stokSementara() maupun Stock::statusStok():
+            // - stokSementara() butuh `?? 0` supaya kekurangan() tidak pecah, dan
+            //   `jumlah = null` di sana tetap dibaca `(float) null === 0.0` → 'habis';
+            // - Stock::statusStok() menjawab "diberi sebuah angka, apa statusnya" —
+            //   `0` dengan baris nyata memang 'habis', dan itu benar.
+            // Presedennya Product::statusStokTerjoin(), yang sudah membedakan hal sama.
+            //
+            // Nilainya string bernama, BUKAN null: `match` di Blade berakhir
+            // `default => 'Aman'`, jadi null akan menampilkan 300 barang sebagai hijau
+            // "Aman" — lebih merugikan daripada merah, karena merah setidaknya membuat
+            // orang memeriksa.
+            'status' => $sumber->stok_id === null ? 'belum_dihitung' : $stok->statusStok(),
             'kekurangan' => $stok->kekurangan(),
             'beli' => $stok->kekuranganDalamSatuanBeli(),
             'opname_terakhir_pada' => $sumber->stok_opname_pada !== null

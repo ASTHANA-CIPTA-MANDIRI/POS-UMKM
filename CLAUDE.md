@@ -75,6 +75,14 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
 - **`x-cloak` butuh aturan CSS** — sudah ada di `app.css`. Jangan hapus.
 - Kolom isian tinggi 48px, tombol aksi ikon 36px (meja) / 40px (sentuh), semua wadah di
   dalam formulir memakai garis rambut `border-line` — bukan latar berwarna.
+- **SEMUA daftar berhalaman 10 baris, dan angkanya TIDAK pernah diketik di komponen**:
+  pakai `config('nampan.per_halaman')`. Daftar yang panjangnya berbeda-beda membuat orang
+  kehilangan pegangan — ia menghitung "tinggal satu halaman lagi" dari kebiasaan di layar
+  sebelumnya lalu keliru di layar berikutnya. `PenjagaPerHalamanTest` memeriksa SUMBERNYA,
+  jadi komponen baru yang menuliskan angkanya sendiri akan gagal di situ.
+  Konsekuensi yang harus ditangani, bukan diabaikan: 10 baris berarti lembar panjang
+  (opname 120 barang = 12 halaman), jadi nilai yang sudah diketik WAJIB bertahan
+  antar-halaman.
 
 ## Menulis uji
 
@@ -89,17 +97,22 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
 Klaim "rapi" dan "responsif" tidak diterima tanpa angka. Alurnya:
 
 ```bash
-PRATINJAU=1 php artisan test --filter=PratinjauTest     # tulis HTML ke storage/pratinjau
-rm -rf public/pratinjau && mkdir -p public/pratinjau
-cp storage/pratinjau/*.html public/pratinjau/
-sed -i '' -e 's|http://localhost/|/|g' -e 's|http:\\/\\/localhost\\/|\\/|g' public/pratinjau/*.html
-php artisan serve --port=8123 &
-node tests/browser/ukur.mjs <url> <lebar> <keluaran.png> [ukur.js] [tinggi]
+php artisan serve --port=8000 &                          # asetnya dari sini
+PRATINJAU=1 php artisan test --filter=PratinjauTest      # tulis HTML ke storage/pratinjau
+tests/browser/ukur-pratinjau.sh owner-stok owner-opname  # tanpa argumen = semuanya
 ```
 
-`sed` itu wajib: `@vite` dan Livewire menulis URL absolut dari APP_URL, dan tanpa
-penulisan ulang halaman pratinjau memuat aset dari host yang tidak melayani apa pun —
-Alpine tidak jalan dan seluruh `x-show` terpotret salah.
+**Jangan menyusun langkah itu sendiri, pakai skripnya.** `@vite` dan Livewire menulis URL
+absolut dari APP_URL (`http://localhost`, tanpa porta), jadi tangkapannya harus ditulis
+ulang ke porta server DAN disajikan dari origin yang sama — kalau tidak, skripnya
+diblokir (porta salah, atau CORS kalau dibuka lewat `file://`), Alpine tidak jalan, dan
+seluruh `x-show` terpotret salah.
+
+Yang membuat ini berbahaya: halaman yang JS-nya mati **tetap melaporkan tujuh angka nol
+dan lolos sebagai BERSIH**. Salah-lulus, bukan salah-gagal. Karena itu `ukur.mjs` sekarang
+mencatat berkas yang gagal dimuat, menandai barisnya `TIDAK SAH — ` di DEPAN, dan keluar
+dengan kode 2. Kalau tanda itu muncul, angkanya jangan dipakai — betulkan penyiapannya
+dulu, jangan mulai memperbaiki tata letak yang sebenarnya tidak apa-apa.
 
 Yang harus diukur, bukan dilihat: `scrollHeight > clientHeight` (menggulir?),
 `documentElement.scrollWidth > innerWidth` (gulir mendatar?), ukuran & posisi tombol
@@ -197,9 +210,18 @@ Kabar singkat tidak menjalankan suite (cepat); laporan lengkap menjalankannya.
 Bukan pendapat — dijalankan dan angkanya dicantumkan:
 
 ```bash
+# Untuk tangkapan pratinjau, PAKAI SKRIPNYA — ia menulis ulang URL aset & menyajikan
+# dari origin yang sama. Menyusun langkahnya sendiri membuat skrip halaman diblokir,
+# Alpine mati, dan hasilnya lolos sebagai BERSIH padahal tidak terukur.
+tests/browser/ukur-pratinjau.sh [nama-tangkapan ...]
+
+# Untuk URL hidup biasa (server jalan), langsung saja:
 node tests/browser/ukur.mjs <url> 390  /tmp/a.png tests/browser/periksa-rapi.js 844
 node tests/browser/ukur.mjs <url> 768  /tmp/b.png tests/browser/periksa-rapi.js 900
 node tests/browser/ukur.mjs <url> 1280 /tmp/c.png tests/browser/periksa-rapi.js 720
+
+# Baris hasil yang berawalan "TIDAK SAH — " berarti alat ukurnya yang rusak, bukan
+# tampilannya. Betulkan penyiapannya; jangan perbaiki tata letak berdasarkan angka itu.
 ```
 
 Tujuh angka harus **0**, dan semuanya pernah lolos dari mata di proyek ini:

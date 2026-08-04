@@ -47,18 +47,31 @@ class LaporTelegramTest extends TestCase
 
         $this->artisan('lapor:telegram --tanpa-uji --kirim')->assertSuccessful();
 
-        Http::assertSent(function ($permintaan) {
-            $teks = (string) $permintaan['text'];
+        /*
+         * Diperiksa atas GABUNGAN semua potongan, bukan per pesan.
+         *
+         * Laporannya satu pesan secara logika, tapi Telegram membatasi 4096 karakter
+         * sehingga PengirimTelegram memecahnya. Memeriksa "satu pesan memuat semua bagian"
+         * pernah membuat uji ini merah hanya karena bagian Catatan bertambah panjang
+         * (4471 karakter → 2 pesan) — laporannya sendiri utuh dan benar. Uji yang menyala
+         * merah untuk perubahan yang tidak merusak apa pun akan diabaikan atau dilonggarkan
+         * suatu hari, dan setelah itu ia tidak menjaga apa-apa lagi.
+         *
+         * Yang benar-benar penting: seluruh bagian sampai ke Telegram, tidak ada yang hilang
+         * di titik pemotongan.
+         */
+        $terkirim = collect(Http::recorded())
+            ->map(fn (array $rekaman) => (string) ($rekaman[0]['text'] ?? ''))
+            ->implode("\n");
 
-            foreach (['Nampan POS', 'pekerjaan', 'Sedang dikerjakan', 'Belum mulai', 'Catatan', 'Cabang'] as $bagian) {
-                if (! str_contains($teks, $bagian)) {
-                    return false;
-                }
-            }
+        $this->assertNotSame('', $terkirim, 'tidak ada satu pun pesan yang terkirim');
 
-            // Bilah progres: penanda visual yang terbaca tanpa gambar.
-            return preg_match('/[▰▱]{10}/u', $teks) === 1;
-        });
+        foreach (['Nampan POS', 'pekerjaan', 'Sedang dikerjakan', 'Belum mulai', 'Catatan', 'Cabang'] as $bagian) {
+            $this->assertStringContainsString($bagian, $terkirim, "bagian '{$bagian}' tidak sampai ke Telegram");
+        }
+
+        // Bilah progres: penanda visual yang terbaca tanpa gambar.
+        $this->assertMatchesRegularExpression('/[▰▱]{10}/u', $terkirim);
     }
 
     /**

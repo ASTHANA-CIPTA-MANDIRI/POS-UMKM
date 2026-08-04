@@ -4,10 +4,18 @@ namespace Tests\Feature;
 
 use App\Actions\Kas\BukaSesiKasAction;
 use App\Actions\Kas\KoreksiModalAwalAction;
+use App\Actions\Stock\AdjustStockAction;
+use App\Enums\AlasanOpname;
+use App\Enums\Satuan;
+use App\Enums\StockMovementType;
+use App\Livewire\Pages\Owner\Opname;
 use App\Livewire\Pages\Owner\Produk;
+use App\Livewire\Pages\Owner\Stok;
 use App\Models\CashSession;
 use App\Models\Outlet;
 use App\Models\Product;
+use App\Models\RawMaterial;
+use App\Models\Stock;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Support\TenantContext;
@@ -290,6 +298,189 @@ class PratinjauTest extends TestCase
         }
 
         $this->assertFileExists("{$tujuan}/masuk.html");
+    }
+
+    /**
+     * Layar stok & lembar opname.
+     *
+     * Datanya SENGAJA dibengkokkan lebih dulu. Seeder demo meninggalkan stok yang
+     * hampir seluruhnya aman, dan halaman stok dalam keadaan itu tidak membuktikan
+     * apa pun: blok "Harus belanja" kosong, penanda "perlu dihitung ulang" tidak ada,
+     * dan tiga keadaan yang paling mudah tercampur (belum pernah dicatat / habis tanpa
+     * ambang / minus) tidak pernah terpotret sama sekali.
+     */
+    public function test_menangkap_stok_dan_opname(): void
+    {
+        if (env('PRATINJAU') !== '1') {
+            $this->markTestSkipped('Jalankan dengan PRATINJAU=1 untuk menangkap HTML.');
+        }
+
+        $this->seed(PlanSeeder::class);
+        $this->seed(WartegSeeder::class);
+
+        $tujuan = base_path('storage/pratinjau');
+
+        if (! is_dir($tujuan)) {
+            mkdir($tujuan, 0755, true);
+        }
+
+        $owner = User::withoutGlobalScopes()->where('role', 'owner')->firstOrFail();
+
+        // Outlet yang sama dengan pilihan bawaan komponen (urut nama, tenant owner ini).
+        $outlet = Outlet::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->orderBy('outlet_name')
+            ->firstOrFail();
+
+        $kunci = $this->siapkanStokPratinjau($owner, $outlet);
+
+        file_put_contents("{$tujuan}/owner-stok.html", $this->ambil('owner.stok', $owner));
+        file_put_contents("{$tujuan}/owner-opname.html", $this->ambil('owner.stok.opname', $owner));
+
+        /*
+         * Keadaan yang hanya ada SETELAH sesuatu diklik dipotret lewat fragmen komponen,
+         * lalu disuntikkan ke halaman yang sama supaya CSS, font, dan Alpine-nya ikut.
+         * Penanda Livewire dilepas dulu — dua komponen dengan wire:id yang sama membuat
+         * Livewire gagal boot, dan karena Alpine dimulai oleh Livewire, seluruh x-show
+         * dan x-cloak ikut mati (halaman terpotret dalam keadaan yang tidak pernah terjadi).
+         */
+        $fragmenStok = Livewire::actingAs($owner)->test(Stok::class)
+            ->call('bukaKartu', $kunci['beras'])
+            ->call('ubahAmbang', $kunci['gula'])
+            ->html();
+
+        file_put_contents(
+            "{$tujuan}/owner-stok-kartu.html",
+            $this->suntik($this->ambil('owner.stok', $owner), $fragmenStok),
+        );
+
+        /*
+         * Lembar opname dengan angka yang sudah diketik DAN galat yang tertahan.
+         *
+         * Baris beras diberi selisih tanpa alasan, jadi simpan() ditolak — dan justru
+         * keadaan itulah yang harus terbaca: ringkasan galat seluruh lembar, baris berwarna
+         * sebelum disimpan, kolom catatan yang muncul untuk alasan "Lainnya", dan bar bawah
+         * yang menyebut berapa baris terisi.
+         */
+        $fragmenOpname = Livewire::actingAs($owner)->test(Opname::class)
+            ->set('fisik.'.$kunci['beras'], '58')
+            ->set('fisik.'.$kunci['gula'], '3')
+            ->set('fisik.'.$kunci['teh'], '0')
+            ->set('alasan.'.$kunci['teh'], AlasanOpname::Lainnya->value)
+            ->call('simpan')
+            ->html();
+
+        file_put_contents(
+            "{$tujuan}/owner-opname-terisi.html",
+            $this->suntik($this->ambil('owner.stok.opname', $owner), $fragmenOpname),
+        );
+
+        $this->assertFileExists("{$tujuan}/owner-stok.html");
+    }
+
+    /**
+     * Membengkokkan stok outlet ini supaya SETIAP keadaan yang harus dibedakan di layar
+     * benar-benar ada datanya.
+     *
+     * @return array<string, string> kunci baris (id barang) yang dipakai fragmen
+     */
+    private function siapkanStokPratinjau(User $owner, Outlet $outlet): array
+    {
+        $cariStok = fn (string $kolom, string $id): ?Stock => Stock::withoutGlobalScopes()
+            ->where('outlet_id', $outlet->getKey())
+            ->where($kolom, $id)
+            ->first();
+
+        $bahan = RawMaterial::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->get()
+            ->keyBy('nama');
+
+        $produk = Product::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->get()
+            ->keyBy('nama_produk');
+
+        // 1. Konversi satuan: kekurangan dinyatakan dalam DUS, bukan 50 pcs. Ini satu-satunya
+        //    bentuk yang bisa dibawa ke grosir.
+        $air = $produk['Air Mineral 600ml'];
+        $air->forceFill([
+            'satuan' => Satuan::Dus,
+            'satuan_dasar' => Satuan::Pcs,
+            'isi_per_satuan' => 24,
+        ])->save();
+        $cariStok('product_id', $air->getKey())?->forceFill([
+            'jumlah_saat_ini' => 10,
+            'stok_minimum' => 60,
+        ])->save();
+
+        // 2. Habis TANPA ambang: tetap masuk daftar belanja (rak kosong tetap rak kosong),
+        //    tapi labelnya harus berbunyi lain daripada "kurang 3 dus".
+        $cariStok('product_id', $produk['Kerupuk']->getKey())?->forceFill([
+            'jumlah_saat_ini' => 0,
+            'stok_minimum' => 0,
+        ])->save();
+
+        // 3. Minus: masalah pencatatan, bukan masalah belanja.
+        $cariStok('raw_material_id', $bahan['Teh Tubruk']->getKey())?->forceFill([
+            'jumlah_saat_ini' => -2,
+            'stok_minimum' => 1,
+        ])->save();
+
+        // 4. Menipis biasa.
+        $cariStok('raw_material_id', $bahan['Gula Pasir']->getKey())?->forceFill([
+            'jumlah_saat_ini' => 3,
+            'stok_minimum' => 4,
+        ])->save();
+
+        // 5. Saldo aman TAPI perlu dihitung ulang: penjualan offline tiba sesudah opname,
+        //    jadi saldonya mungkin terpotong dua kali. Ini satu-satunya penanda yang
+        //    memberitahu pemilik, dan ia tidak selalu berbarengan dengan status di bawah ambang.
+        $cariStok('raw_material_id', $bahan['Ayam Potong']->getKey())?->forceFill([
+            'perlu_diperiksa' => true,
+            'opname_terakhir_pada' => now()->subDays(2),
+        ])->save();
+
+        // 6. Belum pernah dicatat sama sekali: barisnya dihapus, jadi punya_baris = false.
+        //    Di layar harus terbaca "belum dihitung", bukan "0".
+        $cariStok('raw_material_id', $bahan['Telur Ayam']->getKey())?->delete();
+
+        // 7. Riwayat pergerakan untuk kartu stok — tanpa ini panelnya terpotret kosong dan
+        //    tidak membuktikan apa pun tentang tampilan mutasinya.
+        $stokBeras = $cariStok('raw_material_id', $bahan['Beras']->getKey());
+        $adjust = app(AdjustStockAction::class);
+
+        if ($stokBeras !== null) {
+            $stokBeras->forceFill(['opname_terakhir_pada' => now()->subDays(6)])->save();
+
+            $adjust->execute($stokBeras, StockMovementType::Masuk, 25, null, $owner->getKey(), 'Penerimaan PO-20260701-004');
+            $adjust->execute($stokBeras->fresh(), StockMovementType::Keluar, -3.5, null, null, 'Terjual 14 porsi');
+            $adjust->execute($stokBeras->fresh(), StockMovementType::Opname, 2, null, $owner->getKey(),
+                'Hitung fisik: sistem 78,5 → fisik 80,5', AlasanOpname::TemuanLebih);
+            $adjust->execute($stokBeras->fresh(), StockMovementType::Keluar, -1.25, null, null, null);
+            $adjust->execute($stokBeras->fresh(), StockMovementType::Transfer, -5, null, $owner->getKey(), 'Kirim ke cabang');
+        }
+
+        return [
+            'beras' => $bahan['Beras']->getKey(),
+            'gula' => $bahan['Gula Pasir']->getKey(),
+            'teh' => $bahan['Teh Tubruk']->getKey(),
+        ];
+    }
+
+    /**
+     * Menyuntikkan fragmen komponen ke dalam halaman yang sudah utuh.
+     *
+     * Penanda Livewire dibuang: dibiarkan utuh, halaman berisi dua komponen dengan wire:id
+     * yang sama dan Livewire gagal saat boot — dan karena Alpine dimulai oleh Livewire,
+     * pratinjaunya memperlihatkan halaman yang mati. (Mengganti wire:id saja tidak cukup:
+     * snapshotnya bersegel checksum.)
+     */
+    private function suntik(string $halaman, string $fragmen): string
+    {
+        $fragmen = preg_replace('/\s(wire:id|wire:snapshot|wire:effects)="[^"]*"/', '', $fragmen);
+
+        return str_replace('</body>', $fragmen.'</body>', $halaman);
     }
 
     /**

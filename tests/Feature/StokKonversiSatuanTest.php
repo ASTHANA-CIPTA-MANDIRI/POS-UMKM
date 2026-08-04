@@ -16,6 +16,7 @@ use App\Models\Transaction;
 use App\Models\TransactionItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\MembuatDataUji;
 use Tests\TestCase;
 
@@ -208,6 +209,74 @@ class StokKonversiSatuanTest extends TestCase
         $this->assertNull($stok->fresh()->kekuranganDalamSatuanBeli());
     }
 
+    /* ── Pembulatan satuan beli: penjaga dua arah ────────────────────────── */
+
+    /**
+     * PENJAGA — jangan "rapikan" jadi round().
+     *
+     * Perbaikan cacat presisi float di kekuranganDalamSatuanBeli() (dulu
+     * `ceil($kekurangan / $isi)` mentah, lihat StokQaTemuanTest) mudah kebablasan menjadi
+     * pembulatan biasa. Kalau itu terjadi, kekurangan 3,2 dus dijawab 3 dus — pemiliknya
+     * pulang dari grosir dan barangnya tetap kurang, yaitu kerugian yang justru ingin
+     * dicegah oleh blok "Harus belanja".
+     *
+     * Ketiga kombinasi di bawah dipilih karena round() dan pembulatan-ke-atas memberi
+     * jawaban BERBEDA di situ (3,2 → 3 vs 4; 2,083 → 2 vs 3; 0,0014 → 0 vs 1), jadi uji
+     * ini merah begitu ceil-nya diganti round.
+     *
+     * @return array<string, array{0: float, 1: float, 2: float}>
+     */
+    public static function kasusPembulatanKeAtas(): array
+    {
+        return [
+            // kekurangan (satuan dasar), isi per satuan, jumlah kemasan yang benar
+            'kurang 2,24 kg kemasan 0,7 kg = 3,2 dus' => [2.24, 0.7, 4.0],
+            'kurang 25 pcs kemasan 12 pcs = 2,08 dus' => [25.0, 12.0, 3.0],
+            'kurang 0,001 kg kemasan 0,7 kg — sehelai pun tetap satu kemasan' => [0.001, 0.7, 1.0],
+        ];
+    }
+
+    #[DataProvider('kasusPembulatanKeAtas')]
+    public function test_kekurangan_tidak_bulat_tetap_dibulatkan_ke_atas(float $kekurangan, float $isi, float $harusBeli): void
+    {
+        $belanja = $this->stokKonversi($isi, $kekurangan)->kekuranganDalamSatuanBeli();
+
+        $this->assertNotNull($belanja);
+        $this->assertSame($harusBeli, $belanja['jumlah'],
+            'kekurangan '.$kekurangan.' dengan isi '.$isi.' harus dibulatkan ke ATAS, bukan ke terdekat — membeli kurang berarti barangnya tetap habis');
+    }
+
+    /**
+     * Sisi sebaliknya: yang secara matematis BULAT tidak boleh naik satu.
+     *
+     * Cacat aslinya (app/Models/Stock.php, `ceil($kekurangan / $isi)`): 2,1 / 0,7 tepat 3,
+     * tapi float PHP menghitungnya 3,00000000000000044409 dan ceil() menjadikannya 4 —
+     * satu dus ekstra dari uang pemilik warung, tiap kali kombinasi angkanya jatuh di
+     * titik presisi yang meleset. 4,2 / 1,4 adalah kombinasi kedua dengan gejala yang sama;
+     * 0,3 / 0,1 meleset ke arah sebaliknya (2,99999999999999955) dan tetap harus 3.
+     *
+     * @return array<string, array{0: float, 1: float, 2: float}>
+     */
+    public static function kasusHasilBulat(): array
+    {
+        return [
+            'kurang 2,1 kemasan 0,7' => [2.1, 0.7, 3.0],
+            'kurang 4,2 kemasan 1,4' => [4.2, 1.4, 3.0],
+            'kurang 0,3 kemasan 0,1' => [0.3, 0.1, 3.0],
+            'kurang 2,8 kemasan 0,7' => [2.8, 0.7, 4.0],
+        ];
+    }
+
+    #[DataProvider('kasusHasilBulat')]
+    public function test_kekurangan_yang_bulat_tidak_dinaikkan_karena_presisi_float(float $kekurangan, float $isi, float $harusBeli): void
+    {
+        $belanja = $this->stokKonversi($isi, $kekurangan)->kekuranganDalamSatuanBeli();
+
+        $this->assertNotNull($belanja);
+        $this->assertSame($harusBeli, $belanja['jumlah'],
+            $kekurangan.' / '.$isi.' pas secara matematis, jadi tidak boleh ada kemasan tambahan');
+    }
+
     /* ── Alasan opname ───────────────────────────────────────────────────── */
 
     /**
@@ -276,6 +345,33 @@ class StokKonversiSatuanTest extends TestCase
     }
 
     /* ── Pembantu ────────────────────────────────────────────────────────── */
+
+    /**
+     * Baris stok kosong dengan ambang = $kekurangan, jadi kekurangan()-nya tepat angka itu,
+     * pada produk yang 1 satuan jualnya berisi $isi satuan dasar.
+     */
+    private function stokKonversi(float $isi, float $kekurangan): Stock
+    {
+        $produk = Product::create([
+            'nama_produk' => 'Barang Isi '.$isi.' '.str()->random(5),
+            'harga_default' => 1000,
+            'satuan' => Satuan::Dus,
+            'satuan_dasar' => Satuan::Pcs,
+            'isi_per_satuan' => $isi,
+        ]);
+
+        $stok = Stock::create([
+            'outlet_id' => $this->outlet->getKey(),
+            'product_id' => $produk->getKey(),
+            'jumlah_saat_ini' => 0,
+            'stok_minimum' => $kekurangan,
+        ]);
+
+        $this->assertEqualsWithDelta($kekurangan, $stok->kekurangan(), 0.0001,
+            'pembanding: kekurangannya memang sebesar itu sebelum dikonversi ke satuan beli');
+
+        return $stok;
+    }
 
     private function stokDengan(float $jumlah, float $minimum): Stock
     {

@@ -24,6 +24,8 @@ stok, dan offline di sana bukan saran.
 2. Apakah kolomnya sudah ada di migrasi? Beberapa kolom sudah disiapkan tapi belum
    dipakai (`stok_minimum`, `satuan_dasar`, `isi_per_satuan`, `pantau_kadaluarsa`).
 3. Apakah ini uang? Kalau ya, validasinya wajib dan ujinya wajib.
+4. Ada daftar? Pakai `config('nampan.per_halaman')` — JANGAN mengetik angkanya.
+   `PenjagaPerHalamanTest` memeriksa sumber kode, jadi angka langsung akan gagal.
 
 ## Uji
 

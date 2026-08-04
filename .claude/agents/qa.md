@@ -26,8 +26,13 @@ Mulai dari yang tidak tertangkap uji satuan:
 2. **Offline**: transaksi menumpuk lalu dikirim ulang — ada penjualan ganda? Stok
    berkurang dua kali?
 3. **Multi-tenant**: bisakah data tenant lain terlihat? Coba uji dengan dua tenant.
-4. **Tampilan**: ukur lewat `tests/browser/ukur.mjs` di 390/768/1280 — gulir mendatar,
-   panel yang menggulir, tombol tidak seragam, teks tertimpa, `[x-cloak]` yang tertinggal.
+4. **Tampilan**: ukur di 390/768/1280 — gulir mendatar, panel yang menggulir, tombol tidak
+   seragam, teks tertimpa, `[x-cloak]` yang tertinggal. Untuk tangkapan pratinjau pakai
+   `tests/browser/ukur-pratinjau.sh`, jangan menyusun langkahnya sendiri. Kalau baris
+   hasilnya berawalan `TIDAK SAH — `, **jangan laporkan angkanya sebagai temuan**: itu
+   berarti skrip halamannya gagal dimuat dan Alpine tidak jalan, jadi yang rusak alat
+   ukurnya. Halaman dengan JS mati bahkan bisa lolos sebagai BERSIH — jadi tanda TIDAK SAH
+   itu satu-satunya yang membedakan hasil terukur dari hasil kosong.
 5. **Keadaan kosong & ekstrem**: nol produk, 500 produk, nama sangat panjang, angka
    sangat besar, jaringan mati di tengah proses.
 

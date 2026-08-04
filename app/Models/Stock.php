@@ -148,11 +148,40 @@ class Stock extends Model
         }
 
         return [
-            'jumlah' => (float) ceil($kekurangan / $isi),
+            'jumlah' => $this->bulatkanKemasanKeAtas($kekurangan, $isi),
             'satuan' => $produk->satuan,
             'satuan_dasar' => $produk->satuan_dasar,
             'isi_per_satuan' => $isi,
         ];
+    }
+
+    /**
+     * Berapa kemasan yang harus dibeli untuk menutup $kekurangan satuan dasar.
+     *
+     * `ceil($kekurangan / $isi)` mentah TIDAK boleh dipakai di sini. 2,1 kg dengan kemasan
+     * 0,7 kg secara matematis tepat 3 kemasan, tapi dalam float biner PHP hasil
+     * pembagiannya 3,00000000000000044409 — dan ceil() menaikkannya jadi 4. Blok
+     * "Harus belanja" lalu menyuruh pemilik warung membeli satu dus lebih banyak daripada
+     * yang benar-benar kurang, tiap kali kombinasi angkanya jatuh di titik yang meleset.
+     *
+     * Karena itu yang diperiksa bukan pecahan pada hasil bagi, melainkan SISA dalam satuan
+     * dasar: ambil bagian bulatnya, lalu naikkan satu HANYA kalau masih ada sisa yang nyata.
+     *
+     * Ambang "nyata" = 0,0005 satuan dasar, dan angkanya bukan asal pilih: `stocks.jumlah_saat_ini`,
+     * `stocks.stok_minimum`, dan `products.isi_per_satuan` semuanya decimal(15,3), jadi
+     * jumlah terkecil yang bisa benar-benar tercatat adalah 0,001. Toleransinya diambil
+     * setengah dari itu — cukup besar untuk menelan galat representasi float (yang
+     * besarnya di orde 1e-16), dan tetap jauh lebih kecil daripada selisih terkecil yang
+     * bisa sungguh-sungguh ada di data. Kekurangan yang memang tidak bulat tetap
+     * dibulatkan ke ATAS: butuh 3,2 dus berarti beli 4, karena membeli 3 berarti pulang
+     * dari grosir tetap kurang barang.
+     */
+    private function bulatkanKemasanKeAtas(float $kekurangan, float $isi): float
+    {
+        $utuh = floor($kekurangan / $isi);
+        $sisa = $kekurangan - ($utuh * $isi);
+
+        return $sisa > 0.0005 ? $utuh + 1 : $utuh;
     }
 
     /**

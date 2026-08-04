@@ -58,7 +58,7 @@ class Stok extends Component
     #[Url(as: 'jenis')]
     public string $jenis = 'semua';
 
-    /** semua|minus|habis|menipis|aman|perlu_diperiksa */
+    /** semua|minus|habis|menipis|aman|belum_dihitung|perlu_diperiksa */
     #[Url(as: 'status')]
     public string $status = 'semua';
 
@@ -288,7 +288,11 @@ class Stok extends Component
             return $baris->filter(fn (array $b) => $b['perlu_diperiksa'])->values();
         }
 
-        if (in_array($this->status, ['minus', 'habis', 'menipis', 'aman'], true)) {
+        // `belum_dihitung` ikut di sini, bukan jadi cabang sendiri: ia adalah nilai
+        // `status` yang setara dengan yang lain, dan lencana yang bisa dilihat tapi tidak
+        // bisa disaring adalah lencana yang tidak bisa ditindaklanjuti — pemilik yang
+        // melihat "37 belum dihitung" harus bisa membuka daftar 37-nya.
+        if (in_array($this->status, ['minus', 'habis', 'menipis', 'aman', 'belum_dihitung'], true)) {
             return $baris->filter(fn (array $b) => $b['status'] === $this->status)->values();
         }
 
@@ -296,12 +300,25 @@ class Stok extends Component
     }
 
     /**
-     * Blok "Harus belanja": semua yang statusnya bukan aman, paling parah dulu.
+     * Blok "Harus belanja": yang angkanya menyatakan kurang, paling parah dulu.
      *
      * Urutannya `jumlah − ambang` menaik, bukan kekurangan menurun: yang minus paling
      * dalam harus berada di baris pertama, dan barang tanpa ambang (kekurangan 0) tetap
      * ikut ditampilkan kalau saldonya habis — rak kosong tetap rak kosong walaupun tidak
      * ada ambang yang disetel untuknya.
+     *
+     * Statusnya disebut SATU-SATU, bukan `!== 'aman'`. Bedanya besar dan tidak kelihatan:
+     * `belum_dihitung` juga bukan 'aman', jadi bentuk lama menariknya masuk ke sini. Blok
+     * ini hanya menampilkan sembilan kartu dan diurut `sistem − minimum` menaik, sementara
+     * barang belum-dihitung SELALU bernilai 0 pada kunci itu (tidak punya ambang) — maka di
+     * warung yang baru memasukkan 300 barang, kesembilan slotnya habis dipakai barang yang
+     * mungkin masih ada di rak, dan kartunya bahkan tidak bisa menyebut jumlah belanja
+     * (`kekurangan` 0, `beli` null). Yang benar-benar kurang tersingkir dari layar oleh
+     * barang yang belum pernah dihitung.
+     *
+     * Peringatannya tidak hilang, hanya pindah tempat: layar stok memasang spanduk
+     * agregat "N barang belum pernah dihitung" dengan tautan ke lembar opname — tindakan
+     * yang benar untuk barang tanpa angka adalah menghitungnya, bukan membelinya.
      *
      * @param  Collection<int, array<string, mixed>>  $baris
      * @return Collection<int, array<string, mixed>>
@@ -309,7 +326,7 @@ class Stok extends Component
     private function harusBelanja(Collection $baris): Collection
     {
         return $baris
-            ->filter(fn (array $b) => $b['status'] !== 'aman')
+            ->filter(fn (array $b) => in_array($b['status'], ['minus', 'habis', 'menipis'], true))
             ->sortBy([
                 fn (array $a, array $b) => ($a['sistem'] - $a['minimum']) <=> ($b['sistem'] - $b['minimum']),
                 fn (array $a, array $b) => strcasecmp($a['nama'], $b['nama']),
@@ -321,8 +338,12 @@ class Stok extends Component
      * @param  Collection<int, array<string, mixed>>  $baris
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
-    private function halamankan(Collection $baris, int $perHalaman = 25): LengthAwarePaginator
+    private function halamankan(Collection $baris, int $perHalaman = 0): LengthAwarePaginator
     {
+        // 0 = pakai setelan bersama. Angkanya tidak diketik ulang di sini supaya
+        // seluruh daftar di aplikasi berpindah bersamaan kalau nanti diubah.
+        $perHalaman = $perHalaman > 0 ? $perHalaman : (int) config('nampan.per_halaman');
+
         // Dipaginasi di PHP, bukan SQL: barisnya gabungan dua tabel (produk + bahan baku)
         // dan statusnya diputuskan oleh Stock::statusStok(), bukan oleh kondisi SQL. UNION
         // dengan aturan status yang ditulis ulang sebagai SQL akan menjadi definisi kedua
@@ -355,11 +376,19 @@ class Stok extends Component
         return view('livewire.pages.owner.stok', [
             'daftar' => $this->halamankan($tersaring),
             'harusBelanja' => $this->harusBelanja($baris),
+            // `semua` diambil dari jumlah baris yang sebenarnya, BUKAN dari menjumlahkan
+            // chip-chip di bawahnya. Penjumlahan manual sudah pernah membuat chip berkata
+            // empat sementara tabelnya menampilkan lima, dan chip yang tidak cocok dengan
+            // isi tabel membuat orang berhenti mempercayai keduanya. `perlu_diperiksa`
+            // memang tidak boleh ikut dijumlahkan — ia bendera, bukan status, jadi satu
+            // baris bisa terhitung di situ DAN di salah satu status.
             'ringkasan' => [
+                'semua' => $baris->count(),
                 'minus' => $baris->where('status', 'minus')->count(),
                 'habis' => $baris->where('status', 'habis')->count(),
                 'menipis' => $baris->where('status', 'menipis')->count(),
                 'aman' => $baris->where('status', 'aman')->count(),
+                'belum_dihitung' => $baris->where('status', 'belum_dihitung')->count(),
                 'perlu_diperiksa' => $baris->where('perlu_diperiksa', true)->count(),
             ],
             'barisKartu' => $barisKartu,
