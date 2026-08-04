@@ -36,8 +36,21 @@ sesudah pekerja selesai — bukan pekerjanya.
 
 ## Menugaskan
 
-- Paling banyak **3 pekerja paralel**. Lebih dari itu, waktu penggabungan lebih besar
-  daripada waktu yang dihemat.
+- **Yang membatasi paralelisme adalah TABRAKAN BERKAS, bukan jumlah agen.** Menjalankan
+  lima agen pada berkas yang sama justru lebih lambat daripada satu: pekerjaan yang saling
+  menimpa harus diulang. Jadi hitung dulu berapa wilayah berkas yang benar-benar terpisah,
+  baru tentukan berapa agen.
+- **Sampai 5 pekerja paralel** kalau wilayahnya memang terpisah. Untuk itu ada varian yang
+  wilayahnya sudah dibagi — pakai varian ini, jangan menjalankan lima `frontend` umum:
+  - Tampilan per wilayah: `fe-kasir`, `fe-owner`, `fe-admin` — aman berbarengan.
+    `fe-komponen` (components/app.css/layouts/partials/pagination) **dijalankan SENDIRI**,
+    karena berkasnya dipakai semua layar. `fe-mobile` untuk audit 390px, satu layar per
+    pemanggilan.
+  - QA per jenis risiko: `qa-uang`, `qa-stok`, `qa-keamanan`, `qa-offline`, `qa-tampilan`.
+    Kelimanya boleh sekaligus — QA tidak menyunting kode aplikasi, dan masing-masing sudah
+    punya nama berkas ujinya sendiri (`tests/Feature/QaUang*`, `QaStok*`, dst).
+- QA adalah tempat paralelisme paling menguntungkan: lima agen QA pada satu fitur besar
+  hampir tidak punya biaya penggabungan, sementara lima agen tampilan punya banyak.
 - Dua pekerja paralel hanya boleh untuk fitur yang **tidak beririsan berkas**. Kalau
   beririsan, jalankan berurutan.
 - Untuk paralel, beri tiap pekerja `isolation: "worktree"` supaya mereka tidak saling

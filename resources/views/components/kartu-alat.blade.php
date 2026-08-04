@@ -31,9 +31,15 @@
         </div>
 
         {{-- min-w-0, bukan shrink-0: dua kontrol berdampingan yang menolak menyusut
-             akan mendorong lebar halaman di ponsel. --}}
+             akan mendorong lebar halaman di ponsel.
+
+             `max-sm:w-full` hanya MEMBUKA ruangnya, tidak memaksa isinya melebar: di ponsel
+             wadah ini selebar kartu, sehingga halaman yang mau memasang tombol utamanya
+             selebar layar (`w-full`) bisa melakukannya — tanpa itu, `w-full` di dalam wadah
+             selebar-isi tidak pernah melebar. Isi yang memang harus tetap seukuran teksnya
+             (mis. lencana rentang tanggal di layar laporan) tidak berubah sama sekali. --}}
         @if (isset($aksi))
-            <div class="flex min-w-0 flex-wrap items-center gap-2">{{ $aksi }}</div>
+            <div class="flex min-w-0 flex-wrap items-center gap-2 max-sm:w-full">{{ $aksi }}</div>
         @endif
     </div>
 

@@ -91,17 +91,125 @@
 @endphp
 
 <div>
+    {{-- ── Angka ringkasan ─────────────────────────────────────────────────
+         Layar ini dulu dibuka tanpa satu pun angka: yang pertama terbaca hanyalah prosa
+         penjelasan, sementara pertanyaan yang benar-benar dibawa pemilik warung ke sini
+         ("berapa uang saya yang sedang berbentuk barang", "berapa yang harus diurus hari
+         ini") harus dikumpulkan sendiri dari tabel.
+
+         Gayanya SAMA dengan kartu mini-statistik dasbor — baris mendatar setinggi 90px,
+         lencana bundar netral di kiri, label kecil di atas angka besar. Tidak ada gaya baru
+         di sini; dua layar yang memakai dua bentuk kartu angka terbaca seperti dua aplikasi.
+
+         Tiga kartu terakhir adalah TOMBOL saringan, bukan angka mati: angka yang tidak bisa
+         diklik cuma memberi tahu ada masalah tanpa membawa siapa pun ke barangnya. --}}
+    @php
+        $rupiah = fn (float $nilai) => 'Rp '.number_format($nilai, 0, ',', '.');
+    @endphp
+
+    {{-- Kolom pertama lebih lebar daripada tiga sisanya: isinya nominal rupiah, dan di
+         petak empat kolom yang sama lebar "Rp 1.929.800" terpotong menjadi "Rp 1.929.8…".
+         Angka uang yang terpotong lebih buruk daripada tidak ditampilkan — pembacanya
+         menduga digit yang hilang. --}}
+    {{-- mt-2/sm:mt-3 menambal jarak ke kartu judul di atasnya: navbar mengapung dengan
+         `sticky top-4 mb-2`, jadi tanpa ini sisa jaraknya hanya ±8px — kartu pertama
+         halaman terlihat MENEMPEL ke kartu judul, sementara jarak antar-bagian di bawahnya
+         16/20px. Nilainya bukan angka baru, hanya melengkapi irama yang sudah ada. --}}
+    <div class="mt-2 mb-4 grid gap-3 sm:mt-3 sm:mb-5 sm:grid-cols-2 xl:grid-cols-[1.35fr_repeat(3,minmax(0,1fr))]">
+        <div class="kartu flex min-h-[5.625rem] items-center gap-4 pr-5 pl-[1.125rem]">
+            <span class="lencana-ikon bg-cream-deep text-terracotta">
+                <svg viewBox="0 0 24 24" class="size-6" fill="none" aria-hidden="true">
+                    <path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5v-9Zm0 0 8 3.5m0 0 8-3.5M12 11v9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </span>
+            <div class="min-w-0">
+                <p class="truncate text-[0.875rem] font-medium text-umber">Nilai persediaan</p>
+                <p class="tabular truncate text-[1.25rem] leading-tight font-bold text-ink">
+                    {{ $rupiah($nilaiPersediaan['nilai']) }}
+                </p>
+                {{-- Barang tanpa harga beli disebut APA ADANYA. Menghitungnya nol diam-diam
+                     membuat angka di atas terbaca lebih kecil daripada kenyataan, dan pemilik
+                     yang membandingkannya dengan uang belanjanya menyimpulkan pencatatannya
+                     kacau — padahal yang kurang hanya harga belinya. --}}
+                <p class="mt-0.5 truncate text-[0.6875rem] {{ $nilaiPersediaan['tanpa_harga'] > 0 ? 'text-jingga-tua' : 'text-umber-soft' }}">
+                    @if ($nilaiPersediaan['tanpa_harga'] > 0)
+                        {{ $nilaiPersediaan['tanpa_harga'] }} barang belum ada harga belinya
+                    @else
+                        jumlah sistem × harga beli
+                    @endif
+                </p>
+            </div>
+        </div>
+
+        {{-- Tiga kartu berikut memetakan SATU-SATU ke chip saringan di bawahnya. Kartu yang
+             menggabungkan dua status (mis. "minus & habis") akan membawa ke daftar yang
+             jumlahnya lebih kecil daripada angka di kartunya, dan angka yang tidak cocok
+             dengan isi tabel membuat orang berhenti memercayai keduanya. --}}
+        @foreach ([
+            [
+                'nilai' => 'minus',
+                'label' => 'Minus',
+                'jumlah' => $ringkasan['minus'],
+                'ket' => 'pencatatannya bermasalah, bukan raknya',
+                'warna' => 'text-merah-deep',
+                'ikon' => 'M12 4.5 21 19.5H3L12 4.5Zm0 5.5v4.5m0 2.7v.3',
+            ],
+            [
+                'nilai' => 'habis',
+                'label' => 'Habis',
+                'jumlah' => $ringkasan['habis'],
+                'ket' => 'raknya kosong sekarang',
+                'warna' => 'text-merah-deep',
+                'ikon' => 'M5 6.5h14l-1.2 13H6.2L5 6.5Zm3.5 0V4.5h7v2',
+            ],
+            [
+                'nilai' => 'menipis',
+                'label' => 'Menipis',
+                'jumlah' => $ringkasan['menipis'],
+                'ket' => 'sudah di bawah ambang minimum',
+                'warna' => 'text-jingga-tua',
+                'ikon' => 'M5 19.5h14M7 16V9.5M12 16V6M17 16v-4.5',
+            ],
+        ] as $kartuAngka)
+            <button type="button" wire:click="$set('status', '{{ $kartuAngka['nilai'] }}')"
+                    aria-pressed="{{ $status === $kartuAngka['nilai'] ? 'true' : 'false' }}"
+                    @class([
+                        'kartu flex min-h-[5.625rem] cursor-pointer items-center gap-4 pr-5 pl-[1.125rem] text-left transition',
+                        'ring-2 ring-terracotta' => $status === $kartuAngka['nilai'],
+                        'hover:shadow-md' => $status !== $kartuAngka['nilai'],
+                    ])>
+                <span class="lencana-ikon bg-cream-deep {{ $kartuAngka['warna'] }}">
+                    <svg viewBox="0 0 24 24" class="size-6" fill="none" aria-hidden="true">
+                        <path d="{{ $kartuAngka['ikon'] }}" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </span>
+                <div class="min-w-0">
+                    <p class="truncate text-[0.875rem] font-medium text-umber">{{ $kartuAngka['label'] }}</p>
+                    <p class="tabular truncate text-[1.25rem] leading-tight font-bold text-ink">
+                        {{ $kartuAngka['jumlah'] }} barang
+                    </p>
+                    <p class="mt-0.5 truncate text-[0.6875rem] {{ $kartuAngka['jumlah'] > 0 ? $kartuAngka['warna'] : 'text-umber-soft' }}">
+                        {{ $kartuAngka['ket'] }}
+                    </p>
+                </div>
+            </button>
+        @endforeach
+    </div>
+
     <x-kartu-alat
         judul="Stok per outlet"
         jumlah="{{ $daftar->total() }}"
-        keterangan="Stok dicatat per outlet, jadi daftar ini selalu tentang satu outlet — angka gabungan cabang tidak bisa dibelanjakan maupun dihitung fisik."
+        keterangan="Selalu satu outlet — angka gabungan cabang tidak bisa dibelanjakan."
     >
         <x-slot:aksi>
             {{-- Tautan, bukan tombol wire:click: opname adalah halaman tersendiri, dan
                  tautan bisa dibuka di tab lain saat lembar hitungnya dipegang orang kedua. --}}
+            {{-- Tindakan utama layar ini, dan di ponsel ia dibuat selebar kartu dengan tinggi
+                 48px: itu tombol yang paling sering ditekan dari layar ini, dan sebagai kotak
+                 kecil menempel di kanan judul ia terbaca setara dengan tautan biasa. --}}
             <a href="{{ route('owner.stok.opname', $outletDipakai !== null ? ['outlet' => $outletDipakai] : []) }}"
                wire:navigate
-               class="flex h-11 items-center gap-2 rounded-xl bg-terracotta px-5 text-[0.875rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
+               class="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-terracotta px-5 text-[0.9375rem] font-bold text-white transition-colors hover:bg-terracotta-deep sm:h-11 sm:w-auto sm:text-[0.875rem]">
                 <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                     <path d="M6 4h8v12H6V4Zm2.5 3.5h3M8.5 10h3M8.5 12.5h1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
                 </svg>
@@ -152,7 +260,11 @@
                      tanpa membawa siapa pun ke barangnya. Barisnya digulir mendatar di
                      ponsel alih-alih melebarkan halaman. --}}
                 <div class="-m-px max-w-full overflow-x-auto p-px lg:col-span-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <div class="inline-flex w-fit items-center gap-1 rounded-xl bg-white p-1 ring-1 ring-line">
+                    {{-- Di layar lebar deretnya MENGISI lebar penuh (setiap pil `flex-1`);
+                         menggerombol di kiri, ia menyisakan bidang kosong selebar sepertiga
+                         kartu di kanannya. Di ponsel tetap `w-fit` supaya bisa digulir
+                         mendatar di dalam wadah ini — bukan melebarkan halaman. --}}
+                    <div class="inline-flex w-fit items-center gap-1 rounded-xl bg-white p-1 ring-1 ring-line lg:flex lg:w-full">
                         {{-- 'Semua' memakai $ringkasan['semua'] — jumlah baris yang SEBENARNYA,
                              bukan penjumlahan chip di sebelahnya. Bentuk lama menjumlah empat
                              status manual, jadi status kelima membuatnya kurang secara diam-diam:
@@ -172,12 +284,22 @@
                             <button type="button" wire:click="$set('status', '{{ $nilai }}')"
                                     aria-pressed="{{ $status === $nilai ? 'true' : 'false' }}"
                                     @class([
-                                        'flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[0.8125rem] whitespace-nowrap transition',
+                                        'flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[0.8125rem] whitespace-nowrap transition lg:flex-1',
                                         'bg-terracotta font-semibold text-white' => $status === $nilai,
                                         'font-medium text-umber hover:bg-cream hover:text-ink' => $status !== $nilai,
                                     ])>
                                 {{ $teks }}
-                                <span class="tabular text-[0.6875rem] opacity-70">{{ $jumlah }}</span>
+                                {{-- Angkanya diberi PIL sendiri, bukan diredupkan dengan opacity.
+                                     Bentuk lama `text-white opacity-70` di atas terracotta
+                                     menghasilkan kontras ±4,2:1 — di bawah 4,5:1, dan angka
+                                     itulah isi utama chip-nya. Terukur di peramban: pil putih
+                                     dengan tulisan terracotta 7,10:1, dan keadaan tidak aktif
+                                     (cream-deep + tinta umber) 9,65:1. --}}
+                                <span @class([
+                                    'tabular rounded-full px-1.5 py-px text-[0.6875rem] font-semibold',
+                                    'bg-white text-terracotta' => $status === $nilai,
+                                    'bg-cream-deep text-umber' => $status !== $nilai,
+                                ])>{{ $jumlah }}</span>
                             </button>
                         @endforeach
                     </div>
@@ -191,7 +313,25 @@
          komponen; di sini tidak diurut ulang supaya tidak ada dua definisi untuk hal
          yang sama. --}}
     @if ($harusBelanja->isNotEmpty())
-        @php $tampil = $harusBelanja->take(9); @endphp
+        {{-- Jumlah kartu yang ditampilkan dipilih supaya PETAKNYA SELALU PENUH.
+             Grid tiga kolom berisi empat kartu meninggalkan lubang dua kolom di kanan bawah
+             — tidak terhitung sebagai cacat oleh alat ukur mana pun, tapi itulah yang
+             membuat halaman terbaca setengah jadi. Yang tidak muat disebut di kaki blok,
+             jadi tidak ada barang yang hilang tanpa keterangan. --}}
+        @php
+            $muat = $harusBelanja->count();
+            $muat = match (true) {
+                $muat >= 6 => 6,
+                $muat >= 4 => 4,
+                default => $muat,
+            };
+            $tampil = $harusBelanja->take($muat);
+            $kolomBelanja = match (true) {
+                $muat % 3 === 0 => 'lg:grid-cols-3',
+                $muat % 2 === 0 => 'lg:grid-cols-2',
+                default => '',
+            };
+        @endphp
 
         <div class="kartu mb-4 overflow-hidden sm:mb-5">
             <div class="border-b border-line-soft px-5 py-4 sm:px-6">
@@ -201,13 +341,14 @@
                         {{ $harusBelanja->count() }} barang
                     </span>
                 </div>
-                <p class="mt-1 max-w-3xl text-[0.875rem] text-umber">
-                    Paling parah di urutan pertama. Jumlahnya dibulatkan ke ATAS ke satuan beli —
-                    dibulatkan ke bawah, pulang dari pasar tetap kurang barang.
+                {{-- Satu kalimat. Yang WAJIB tetap tertulis adalah pembulatan ke ATAS:
+                     itu keterangan yang mengubah keputusan di pasar, bukan hiasan. --}}
+                <p class="mt-1 text-[0.875rem] text-umber">
+                    Paling parah dulu · jumlah belanja dibulatkan ke <span class="font-semibold text-ink">ATAS</span>.
                 </p>
             </div>
 
-            <div class="grid gap-3 px-5 py-4 sm:px-6 lg:grid-cols-2 xl:grid-cols-3">
+            <div class="grid gap-3 px-5 py-4 sm:px-6 {{ $kolomBelanja }}">
                 @foreach ($tampil as $b)
                     @php [$judulTindakan, $ketTindakan] = $tindakan($b); @endphp
 
@@ -254,26 +395,34 @@
          kesembilan slotnya habis dipakai barang yang mungkin masih ada di rak, dan kartunya
          bahkan tidak bisa menyebut jumlah belanja. Peringatannya tidak hilang, hanya pindah ke
          bentuk yang lebih jujur: satu kalimat + jalan ke pekerjaan yang benar, yaitu menghitung. --}}
+    {{-- Tata letaknya BERTUMPUK di ponsel, sebaris hanya dari 640px ke atas.
+         Bentuk lama satu baris flex-wrap dengan dua tombol shrink-0: di 390px kedua tombol
+         merebut hampir seluruh lebar, kolom teksnya tergencet jadi ±30px, dan kalimatnya
+         jatuh SATU KATA PER BARIS selama belasan baris. Tujuh angka pemeriksa tidak
+         menangkapnya — bukan gulir mendatar, bukan tumpang tindih, wadahnya pun tidak
+         kosong — jadi cacat ini hanya bisa dilihat di potretnya. --}}
     @if ($ringkasan['belum_dihitung'] > 0 && $status !== 'belum_dihitung')
-        <div class="kartu mb-4 flex flex-wrap items-center justify-between gap-3 border border-line px-5 py-4 sm:mb-5 sm:px-6">
-            <div class="flex min-w-0 flex-1 items-start gap-3">
+        <div class="kartu mb-4 flex flex-col gap-3 border border-line px-5 py-4 sm:mb-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div class="flex min-w-0 items-start gap-3 sm:flex-1">
                 <svg viewBox="0 0 20 20" class="mt-0.5 size-4 shrink-0 text-umber-soft" fill="none" aria-hidden="true">
                     <rect x="3.25" y="3.25" width="13.5" height="13.5" rx="3" stroke="currentColor" stroke-width="1.5" />
                     <path d="M7 10h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                 </svg>
                 <p class="min-w-0 text-[0.875rem] text-ink">
                     <span class="font-bold">{{ $ringkasan['belum_dihitung'] }} barang belum pernah dihitung di outlet ini.</span>
-                    Angkanya belum ada, jadi jumlah belanjanya belum bisa dihitung — hitung fisiknya dulu.
+                    Jumlah belanjanya belum bisa dihitung — hitung fisiknya dulu.
                 </p>
             </div>
-            <div class="flex shrink-0 items-center gap-2">
+            {{-- 44px, dan pasangannya sama lebar (flex-1) di layar sempit: tombol sebaris yang
+                 lebarnya mengikuti panjang teks terbaca sebagai dua hal yang tidak setara. --}}
+            <div class="flex items-center gap-2 sm:shrink-0">
                 <button type="button" wire:click="$set('status', 'belum_dihitung')"
-                        class="h-10 shrink-0 cursor-pointer rounded-lg border border-line px-3.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                        class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-3.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:h-10 sm:flex-none">
                     Lihat barangnya
                 </button>
                 <a href="{{ route('owner.stok.opname', ['outlet' => $outletDipakai, 'status' => 'belum_pernah']) }}"
                    wire:navigate
-                   class="flex h-10 shrink-0 items-center rounded-lg bg-terracotta px-3.5 text-[0.8125rem] font-semibold text-white transition-colors hover:bg-terracotta-deep">
+                   class="flex h-11 flex-1 items-center justify-center rounded-xl bg-terracotta px-3.5 text-[0.8125rem] font-bold text-white transition-colors hover:bg-terracotta-deep sm:h-10 sm:flex-none">
                     Hitung fisik
                 </a>
             </div>
@@ -284,19 +433,19 @@
          dengan status di bawah ambang, jadi barang yang saldonya masih aman tapi mungkin
          terpotong dua kali tidak akan pernah terlihat di blok harus-belanja. --}}
     @if ($ringkasan['perlu_diperiksa'] > 0 && $status !== 'perlu_diperiksa')
-        <div class="kartu mb-4 flex flex-wrap items-center justify-between gap-3 border border-jingga/30 px-5 py-4 sm:mb-5 sm:px-6">
-            <div class="flex min-w-0 flex-1 items-start gap-3">
+        <div class="kartu mb-4 flex flex-col gap-3 border border-jingga/30 px-5 py-4 sm:mb-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div class="flex min-w-0 items-start gap-3 sm:flex-1">
                 <svg viewBox="0 0 20 20" class="mt-0.5 size-4 shrink-0 text-jingga-tua" fill="none" aria-hidden="true">
                     <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5" />
                     <path d="M10 6.5v4M10 13.4v.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                 </svg>
                 <p class="min-w-0 text-[0.875rem] text-ink">
                     <span class="font-bold">{{ $ringkasan['perlu_diperiksa'] }} barang perlu dihitung ulang.</span>
-                    Ada penjualan offline yang masuk setelah opname terakhirnya, jadi saldonya mungkin sudah terpotong dua kali.
+                    Ada penjualan offline yang masuk setelah opname terakhirnya — saldonya mungkin terpotong dua kali.
                 </p>
             </div>
             <button type="button" wire:click="$set('status', 'perlu_diperiksa')"
-                    class="h-10 shrink-0 cursor-pointer rounded-lg border border-line px-3.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                    class="h-11 w-full cursor-pointer rounded-xl border border-line px-3.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:h-10 sm:w-auto sm:shrink-0">
                 Lihat barangnya
             </button>
         </div>
@@ -308,22 +457,94 @@
          padahal justru baris terakhir yang menjelaskan angka sekarang. --}}
     @if ($barisKartu !== null)
         <div class="kartu mb-4 overflow-hidden sm:mb-5" wire:key="kartu-{{ $barisKartu['kunci'] }}">
-            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
-                <div class="min-w-0">
+            {{-- Kepala panel: identitas barang di kiri, tiga keterangan barang di kanan,
+                 tombol tutup di ujung. Sebelumnya seluruh kepala ini memakai sepertiga kiri
+                 saja dan menyisakan bidang kosong selebar dua pertiga panel — sementara
+                 pertanyaan yang dibawa orang saat membuka kartu stok ("satuannya apa,
+                 ambangnya berapa, terakhir dihitung kapan") tidak terjawab di mana pun tanpa
+                 menggulir kembali ke tabel.
+
+                 Kotak-kotaknya memakai POLA YANG SAMA dengan kotak "Sistem"/"Ambang" pada
+                 kartu barang di layar sempit: garis rambut, label kecil huruf besar, lalu
+                 angkanya di bawah — label dan nilai rata kiri pada satu garis dasar yang
+                 sama. Satu kebiasaan untuk hal yang sama, bukan dua.
+
+                 Datanya seluruhnya dari $barisKartu yang sudah ada; tidak ada kueri baru.
+
+                 Jumlah pergerakan TIDAK disebut di sini lagi. Kalimat lamanya berbunyi
+                 "30 pergerakan terakhir" sementara daftarnya berhalaman 10 baris dari 31
+                 mutasi — keterangan yang salah, dan angka yang benar sudah dicetak oleh
+                 navigasi halaman di kakinya. --}}
+            @php
+                $satuanKartu = $barisKartu['satuan_dasar'] ?? '';
+                $konversiKartu = $barisKartu['beli'] !== null
+                    ? '1 '.mb_strtolower($barisKartu['beli']['satuan']?->label() ?? '').' = '
+                        .$angka($barisKartu['beli']['isi_per_satuan']).' '.$satuanKartu
+                    : ($barisKartu['isi_per_satuan'] !== null && $barisKartu['satuan'] !== null
+                        ? '1 '.mb_strtolower($barisKartu['satuan']).' = '.$angka($barisKartu['isi_per_satuan']).' '.$satuanKartu
+                        : null);
+            @endphp
+
+            <div class="flex flex-wrap items-start gap-4 border-b border-line px-5 py-4 sm:px-6">
+                <div class="min-w-0 flex-1">
                     <p class="eyebrow text-umber-soft">Kartu stok</p>
-                    <h2 class="mt-1 text-[1.0625rem] font-bold text-ink">{{ $barisKartu['nama'] }}</h2>
-                    <p class="tabular mt-0.5 text-[0.8125rem] text-umber">
-                        Sekarang
-                        <span class="font-semibold text-ink">
-                            {{ $barisKartu['punya_baris']
-                                ? trim($angka($barisKartu['sistem']).' '.($barisKartu['satuan_dasar'] ?? ''))
-                                : 'belum dihitung' }}
-                        </span>
-                        · 30 pergerakan terakhir, terbaru di atas
+                    <div class="mt-1 flex flex-wrap items-center gap-2">
+                        <h2 class="text-[1.0625rem] font-bold text-ink">{{ $barisKartu['nama'] }}</h2>
+                        <x-lencana :warna="$warnaStatus($barisKartu['status'])" :denyut="$barisKartu['status'] !== 'belum_dihitung'">
+                            {{ $labelStatus($barisKartu['status']) }}
+                        </x-lencana>
+                    </div>
+                    <p class="mt-0.5 text-[0.75rem] text-umber-soft">
+                        {{ $barisKartu['jenis'] === 'produk' ? 'Produk' : 'Bahan baku' }}
+                        · {{ $barisKartu['kode'] ?: 'tanpa kode' }}
+                        @if ($konversiKartu !== null)
+                            · {{ $konversiKartu }}
+                        @endif
+                        · pergerakan terbaru di atas
                     </p>
                 </div>
+
+                <div class="grid min-w-0 flex-1 grid-cols-3 gap-2 lg:max-w-lg">
+                    <div class="min-w-0 rounded-xl border border-line px-3 py-2">
+                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Saldo sekarang</p>
+                        @if ($barisKartu['punya_baris'])
+                            <p class="tabular text-[0.9375rem] font-bold text-ink">
+                                {{ $angka($barisKartu['sistem']) }}
+                                <span class="text-[0.75rem] font-medium text-umber">{{ $satuanKartu }}</span>
+                            </p>
+                        @else
+                            <p class="text-[0.8125rem] font-semibold text-umber-soft">— belum dihitung</p>
+                        @endif
+                    </div>
+
+                    <div class="min-w-0 rounded-xl border border-line px-3 py-2">
+                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Ambang</p>
+                        <p class="tabular text-[0.9375rem] font-bold text-ink">
+                            {{ $barisKartu['minimum'] > 0 ? $angka($barisKartu['minimum']) : '—' }}
+                            <span class="text-[0.75rem] font-medium text-umber">
+                                {{ $barisKartu['minimum'] > 0 ? $satuanKartu : 'tidak dipantau' }}
+                            </span>
+                        </p>
+                    </div>
+
+                    <div class="min-w-0 rounded-xl border border-line px-3 py-2">
+                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Opname terakhir</p>
+                        @if ($barisKartu['opname_terakhir_pada'] !== null)
+                            <p class="tabular text-[0.8125rem] font-semibold text-ink">
+                                {{ $barisKartu['opname_terakhir_pada']->locale('id')->translatedFormat('j M Y') }}
+                                <span class="block text-[0.75rem] font-medium text-umber">
+                                    {{ $barisKartu['opname_terakhir_pada']->translatedFormat('H:i') }}
+                                    {{ $barisKartu['perlu_diperiksa'] ? '· perlu ulang' : '' }}
+                                </span>
+                            </p>
+                        @else
+                            <p class="text-[0.8125rem] font-semibold text-umber-soft">belum pernah</p>
+                        @endif
+                    </div>
+                </div>
+
                 <button type="button" wire:click="tutupKartu" aria-label="Tutup kartu stok"
-                        class="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-umber transition-colors hover:bg-cream">
+                        class="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-line text-umber transition-colors hover:bg-cream hover:text-ink">
                     <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                         <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
                     </svg>
@@ -331,11 +552,11 @@
             </div>
 
             @if ($kartu->isEmpty())
-                <div class="px-5 py-6 sm:px-6">
-                    <p class="text-[0.875rem] font-semibold text-ink">Belum ada pergerakan tercatat.</p>
-                    <p class="mt-1 max-w-xl text-[0.8125rem] text-umber">
-                        Kartu stok terisi sendiri begitu ada penjualan, penerimaan barang, atau hasil hitung fisik yang disimpan.
-                    </p>
+                {{-- Keadaan kosong memakai x-kosong, komponen yang sama dengan daftar utama:
+                     dua bentuk "tidak ada data" di satu halaman terbaca seperti dua aplikasi. --}}
+                <div class="px-5 py-5 sm:px-6">
+                    <x-kosong judul="Belum ada pergerakan tercatat"
+                              keterangan="Kartu stok terisi sendiri begitu ada penjualan, penerimaan barang, atau hasil hitung fisik yang disimpan." />
                 </div>
             @else
                 {{-- Kartu di layar sempit, tabel di layar lebar — pola yang sama dengan
@@ -363,20 +584,31 @@
                                     <p class="tabular text-[0.75rem] text-umber-soft">sisa {{ $angka($m->saldo_sesudah) }}</p>
                                 </div>
                             </div>
-                            <p class="mt-1 text-[0.75rem] text-umber">
-                                {{ $m->alasan?->label() ?? '—' }} · {{ $m->catatan ?: '—' }}
+                            {{-- Catatan hanya ditulis kalau ada. "— · —" pada baris penjualan
+                                 (yang memang tidak punya alasan maupun catatan) menambah satu
+                                 baris teks di setiap kartu tanpa mengatakan apa pun. --}}
+                            <p class="mt-1 text-[0.75rem] text-umber-soft">
+                                {{ $m->alasan?->label() ?? '—' }}@if ($m->catatan) · <span class="text-umber">{{ $m->catatan }}</span>@endif
                             </p>
                         </li>
                     @endforeach
                 </ul>
 
+                {{-- Enam kolom, bukan tujuh. ALASAN dulu berdiri sendiri dan hampir seluruh
+                     barisnya "—" (penjualan & penerimaan tidak punya alasan opname), jadi satu
+                     kolom penuh dipakai untuk memajang tanda hubung. Sekarang ia menempel di
+                     bawah JENIS — tempatnya memang di situ: ia keterangan atas jenis
+                     pergerakannya, bukan kategori yang sejajar.
+
+                     WAKTU dipecah dua baris: tanggal lalu jamnya. Satu baris "4 Agt 2026,
+                     18:09" yang terulang sepuluh kali membuat kolom pertama jadi tembok teks
+                     yang berat sama dengan angka di sebelahnya. --}}
                 <div class="hidden lg:block">
                     <table class="w-full text-left">
                         <thead>
                             <tr class="border-b border-line">
-                                <th class="w-44 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Waktu</th>
-                                <th class="w-36 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Jenis</th>
-                                <th class="w-32 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Alasan</th>
+                                <th class="w-36 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Waktu</th>
+                                <th class="w-44 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Pergerakan</th>
                                 <th class="w-28 px-5 py-3 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Jumlah</th>
                                 <th class="w-28 px-5 py-3 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Saldo</th>
                                 <th class="w-36 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Oleh</th>
@@ -385,23 +617,30 @@
                         </thead>
                         <tbody class="divide-y divide-line-soft">
                             @foreach ($kartu as $m)
-                                <tr>
-                                    <td class="tabular px-5 py-3 text-[0.8125rem] text-umber">
-                                        {{ $m->created_at?->locale('id')->translatedFormat('j M Y, H:i') ?? '—' }}
+                                <tr class="transition-colors hover:bg-cream/60">
+                                    <td class="tabular px-5 py-3 text-[0.8125rem]">
+                                        <span class="block text-umber">
+                                            {{ $m->created_at?->locale('id')->translatedFormat('j M Y') ?? '—' }}
+                                        </span>
+                                        <span class="block text-[0.75rem] text-umber-soft">
+                                            {{ $m->created_at?->translatedFormat('H:i') ?? '—' }}
+                                        </span>
                                     </td>
-                                    <td class="px-5 py-3 text-[0.8125rem] font-semibold text-ink">{{ $m->tipe->label() }}</td>
-                                    <td class="px-5 py-3 text-[0.8125rem] text-umber">{{ $m->alasan?->label() ?? '—' }}</td>
+                                    <td class="px-5 py-3 text-[0.8125rem]">
+                                        <span class="block font-semibold text-ink">{{ $m->tipe->label() }}</span>
+                                        <span class="block text-[0.75rem] text-umber-soft">{{ $m->alasan?->label() ?? '—' }}</span>
+                                    </td>
                                     <td @class([
-                                        'tabular px-5 py-3 text-right text-[0.875rem] font-bold',
+                                        'tabular px-5 py-3 text-right text-[0.9375rem] font-bold',
                                         'text-hijau-tua' => (float) $m->jumlah > 0,
                                         'text-merah-deep' => (float) $m->jumlah < 0,
-                                        'text-umber' => (float) $m->jumlah === 0.0,
+                                        'text-umber-soft' => (float) $m->jumlah === 0.0,
                                     ])>
                                         {{ (float) $m->jumlah > 0 ? '+' : '' }}{{ $angka($m->jumlah) }}
                                     </td>
-                                    <td class="tabular px-5 py-3 text-right text-[0.875rem] text-ink">{{ $angka($m->saldo_sesudah) }}</td>
+                                    <td class="tabular px-5 py-3 text-right text-[0.8125rem] text-umber">{{ $angka($m->saldo_sesudah) }}</td>
                                     <td class="px-5 py-3 text-[0.8125rem] text-umber">{{ $m->olehUser?->name ?? 'sistem' }}</td>
-                                    <td class="px-5 py-3 text-[0.8125rem] text-umber">{{ $m->catatan ?: '—' }}</td>
+                                    <td class="px-5 py-3 text-[0.75rem] text-umber-soft">{{ $m->catatan ?: '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -423,7 +662,7 @@
     {{-- ── Daftar ──────────────────────────────────────────────────────────── --}}
     @if ($daftar->isEmpty())
         <x-kosong judul="Tidak ada barang yang cocok"
-                  keterangan="Coba ubah kata pencarian atau saringannya. Produk tanpa pelacakan stok dan menu berbasis resep memang tidak muncul di sini — yang berkurang saat menu terjual adalah bahan bakunya.">
+                  keterangan="Coba ubah kata pencarian atau saringannya. Menu berbasis resep tidak muncul di sini — yang berkurang saat menu terjual adalah bahan bakunya.">
             <x-slot:aksi>
                 <button type="button" wire:click="$set('status', 'semua')"
                         class="h-11 cursor-pointer rounded-xl bg-terracotta px-5 text-[0.875rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
@@ -504,26 +743,36 @@
                             @error('ambangNilai')
                                 <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
                             @enderror
+                            {{-- Tinggi 44px, bukan 40: sepasang tombol selebar kartu ditekan
+                                 dengan jempol sambil memegang lembar hitung, dan 40px baru
+                                 cukup untuk tombol ikon yang berdiri sendiri. --}}
                             <div class="mt-3 flex gap-2">
                                 <button type="button" wire:click="simpanAmbang"
-                                        class="h-10 flex-1 cursor-pointer rounded-lg bg-terracotta px-3 text-[0.8125rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
+                                        class="h-11 flex-1 cursor-pointer rounded-xl bg-terracotta px-3 text-[0.8125rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
                                     Simpan ambang
                                 </button>
                                 <button type="button" wire:click="batalUbahAmbang"
-                                        class="h-10 flex-1 cursor-pointer rounded-lg border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                                        class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
                                     Batal
                                 </button>
                             </div>
                         </div>
                     @else
+                        {{-- HIERARKI: "Kartu stok" tindakan utama (isian penuh), "Setel ambang"
+                             tindakan kedua (garis rambut). Dua tombol bergaya sama membuat
+                             keduanya terbaca sama penting, padahal yang dicari saat sebuah
+                             angka terasa aneh selalu riwayatnya — dan itu pula satu-satunya
+                             tombol berwarna di baris tabel versi layar lebar, jadi kedua
+                             tampilan sekarang menunjuk tindakan utama yang sama.
+                             Lebarnya seragam (flex-1) dan tingginya 44px untuk sentuhan. --}}
                         <div class="mt-3 flex gap-2">
-                            <button type="button" wire:click="ubahAmbang('{{ $b['kunci'] }}')"
-                                    class="h-10 flex-1 cursor-pointer rounded-lg border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
-                                Setel ambang
-                            </button>
                             <button type="button" wire:click="bukaKartu('{{ $b['kunci'] }}')"
-                                    class="h-10 flex-1 cursor-pointer rounded-lg border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                                    class="h-11 flex-1 cursor-pointer rounded-xl bg-terracotta px-3 text-[0.8125rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
                                 {{ $kartuKunci === $b['kunci'] ? 'Tutup kartu stok' : 'Kartu stok' }}
+                            </button>
+                            <button type="button" wire:click="ubahAmbang('{{ $b['kunci'] }}')"
+                                    class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                                Setel ambang
                             </button>
                         </div>
                     @endif
@@ -540,7 +789,10 @@
                         <th class="w-56 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Ambang</th>
                         <th class="w-28 px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
                         <th class="w-44 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Opname terakhir</th>
-                        <th class="w-20 px-5 py-3.5"><span class="sr-only">Aksi</span></th>
+                        {{-- Kolom terakhir DIBERI NAMA. Ikon tanpa keterangan di ujung baris
+                             membuat orang harus mengklik untuk tahu apa yang akan terjadi;
+                             judul kolomnya cukup untuk menjelaskannya sekali untuk semua baris. --}}
+                        <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide whitespace-nowrap text-umber uppercase">Kartu stok</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line-soft">
@@ -607,8 +859,13 @@
                                         <p class="mt-1.5 text-right text-[0.75rem] text-merah-deep">{{ $message }}</p>
                                     @enderror
                                 @else
+                                    {{-- Garisnya baru muncul saat disentuh. Kotak bergaris di
+                                         setiap baris membuat kolom ini terbaca sebagai
+                                         formulir, dan seluruh tabelnya terlihat seperti
+                                         lembar isian — padahal ini daftar yang kebetulan
+                                         satu nilainya bisa disunting. --}}
                                     <button type="button" wire:click="ubahAmbang('{{ $b['kunci'] }}')"
-                                            class="tabular ml-auto flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-line px-3 text-[0.875rem] text-ink transition-colors hover:border-terracotta hover:text-terracotta"
+                                            class="tabular group ml-auto flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-3 text-[0.875rem] text-ink transition-colors hover:border-line hover:bg-cream"
                                             title="Setel ambang minimum {{ $b['nama'] }}">
                                         @if ($b['minimum'] > 0)
                                             <span class="font-semibold">{{ $angka($b['minimum']) }}</span>
@@ -616,7 +873,7 @@
                                         @else
                                             <span class="text-[0.8125rem] text-umber">Setel ambang</span>
                                         @endif
-                                        <svg viewBox="0 0 20 20" class="size-3.5 shrink-0 text-umber-soft" fill="none" aria-hidden="true">
+                                        <svg viewBox="0 0 20 20" class="size-3.5 shrink-0 text-umber-soft opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" fill="none" aria-hidden="true">
                                             <path d="M13 3.5 16.5 7 8 15.5H4.5V12L13 3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                                         </svg>
                                     </button>
@@ -627,10 +884,18 @@
                                 <x-lencana :warna="$warnaStatus($b['status'])" :denyut="$b['status'] !== 'belum_dihitung'">{{ $labelStatus($b['status']) }}</x-lencana>
                             </td>
 
+                            {{-- "belum pernah" MEREDUP, tanggal sungguhan tetap penuh.
+                                 Dengan satu warna untuk keduanya, kata yang terulang di enam
+                                 baris punya berat yang sama dengan keterangan yang sebenarnya
+                                 membawa informasi — dan mata berhenti membedakan keduanya. --}}
                             <td class="px-5 py-3.5 text-[0.8125rem]">
-                                <span class="tabular block text-umber">
-                                    {{ $b['opname_terakhir_pada']?->locale('id')->translatedFormat('j M Y, H:i') ?? 'belum pernah' }}
-                                </span>
+                                @if ($b['opname_terakhir_pada'] !== null)
+                                    <span class="tabular block text-umber">
+                                        {{ $b['opname_terakhir_pada']->locale('id')->translatedFormat('j M Y, H:i') }}
+                                    </span>
+                                @else
+                                    <span class="block text-umber-soft/80">belum pernah</span>
+                                @endif
                                 @if ($b['perlu_diperiksa'])
                                     <span class="mt-1 inline-block rounded-full bg-jingga/15 px-2 py-0.5 text-[0.6875rem] font-semibold text-jingga-tua">
                                         perlu dihitung ulang

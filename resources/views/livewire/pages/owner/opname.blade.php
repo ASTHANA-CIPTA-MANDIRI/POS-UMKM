@@ -65,15 +65,23 @@
 @endphp
 
 <div>
+    {{-- mt-2/sm:mt-3: navbar mengapung (`sticky top-4 mb-2`), jadi tanpa ini kartu pertama
+         halaman menempel ke kartu judul sementara jarak antar-bagian di bawahnya 16/20px. --}}
     <x-kartu-alat
+        class="mt-2 sm:mt-3"
         judul="Lembar hitung fisik"
         jumlah="{{ $daftar->total() }}"
-        keterangan="Isi jumlah yang benar-benar ada di rak. Baris yang dikosongkan berarti belum dihitung — bukan nol, karena nol berarti raknya kosong."
+        keterangan="Isi jumlah yang benar-benar ada di rak. Kolom kosong berarti belum dihitung, bukan nol · desimal pakai titik (1.5)."
     >
         <x-slot:aksi>
+            {{-- Selebar kartu di ponsel, 48px: ini satu-satunya jalan keluar dari lembar
+                 hitung, dan sebagai kotak kecil di pojok kanan judul ia hampir tidak
+                 terlihat di layar 390px. Tetap bergaris rambut, bukan isian penuh — tombol
+                 utama layar ini adalah SIMPAN di bar bawah, dan dua tombol berwarna penuh di
+                 satu layar membuat keduanya berhenti berarti. --}}
             <a href="{{ route('owner.stok', $outletDipakai !== null ? ['outlet' => $outletDipakai] : []) }}"
                wire:navigate
-               class="flex h-11 items-center gap-2 rounded-xl border border-line bg-white px-5 text-[0.875rem] font-semibold text-ink transition-colors hover:bg-cream">
+               class="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-line bg-white px-5 text-[0.9375rem] font-semibold text-ink transition-colors hover:bg-cream sm:h-11 sm:w-auto sm:text-[0.875rem]">
                 <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                     <path d="M11.5 5.5 7 10l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
@@ -82,7 +90,11 @@
         </x-slot:aksi>
 
         <x-slot:saringan>
-            <div class="grid gap-3 lg:grid-cols-[1fr_11rem_13rem]">
+            {{-- Empat kolom di layar lebar, bukan tiga + satu yang menggantung.
+                 Dengan dropdown outlet dipaksa ke barisnya sendiri (`col-span-full w-64`),
+                 baris kedua kartu ini berisi satu kontrol dan bidang kosong seluas tiga
+                 perempat lebarnya. --}}
+            <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_11rem_12rem] xl:grid-cols-[minmax(0,1fr)_11rem_12rem_14rem]">
                 <div class="min-w-0">
                     <label for="cari" class="sr-only">Cari barang</label>
                     <div class="relative">
@@ -122,7 +134,7 @@
                 </div>
 
                 @if ($outletTersedia !== [])
-                    <div class="min-w-0 lg:col-span-full lg:w-64">
+                    <div class="min-w-0 lg:col-span-full xl:col-span-1">
                         <label for="outlet" class="sr-only">Outlet</label>
                         <select id="outlet" wire:model.live="outletId"
                                 class="h-11 w-full rounded-xl border border-line bg-white px-3 text-[0.875rem] font-medium text-ink focus:border-terracotta focus:outline-none">
@@ -232,9 +244,21 @@
         </div>
     @endif
 
+    {{-- RUANG BAWAH sebesar bar simpan, dan itu bukan hiasan: bar di bawah menempel
+         (sticky), jadi tanpa ruang ini ia berdiri tepat di atas dua baris terakhir tabel —
+         terukur di 1280: baris "Minyak Goreng" dan "Kerupuk" tidak bisa dibaca maupun
+         diketik. Bar-nya menarik dirinya kembali ke dalam ruang ini lewat margin negatif,
+         jadi halaman tidak menjadi lebih panjang dan tidak ada lubang kosong di kakinya.
+
+         Angkanya DIUKUR, bukan dikira — tinggi bar itu berubah menurut lebar layar karena
+         tombol dan kalimatnya berpindah baris: 177px di 390, 127px di 768, 71px di 1280.
+         Ruangnya dibuat sedikit lebih besar daripada masing-masing (192 / 144 / 88), dan
+         margin negatifnya sedikit lebih kecil daripada ruangnya supaya barnya tetap DI DALAM
+         ruang itu. Kalau nanti isi barnya bertambah, ukur ulang di tiga lebar itu. --}}
+    <div class="pb-[12rem] sm:pb-36 xl:pb-[5.5rem]">
     @if ($daftar->isEmpty())
         <x-kosong judul="Tidak ada barang yang cocok"
-                  keterangan="Coba ubah kata pencarian atau saringannya. Produk tanpa pelacakan stok dan menu berbasis resep tidak dihitung di sini — yang dihitung adalah bahan bakunya.">
+                  keterangan="Coba ubah kata pencarian atau saringannya. Menu berbasis resep tidak dihitung di sini — yang dihitung adalah bahan bakunya.">
             <x-slot:aksi>
                 <button type="button" wire:click="$set('status', 'semua')"
                         class="h-11 cursor-pointer rounded-xl bg-terracotta px-5 text-[0.875rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
@@ -276,33 +300,51 @@
                         @endif
                     </div>
 
-                    <div class="mt-3 grid gap-3 sm:grid-cols-[1fr_7rem]">
-                        <div class="min-w-0">
-                            <label for="fisik-hp-{{ $kunci }}" class="block text-[0.8125rem] font-semibold text-ink">
+                    {{-- Selisih dulu berupa KOTAK setinggi 48px di samping kolom isian, dan di
+                         lembar yang belum diketik seluruhnya berisi "—": delapan kotak besar
+                         yang tidak mengatakan apa pun. Sekarang ia satu baris kecil di bawah
+                         kolomnya — tetap ada sebelum satu tombol pun ditekan, tapi tidak lagi
+                         menuntut ruang sebesar kolom yang benar-benar diisi. --}}
+                    <div class="mt-3">
+                        <div class="flex items-baseline justify-between gap-2">
+                            <label for="fisik-hp-{{ $kunci }}" class="text-[0.8125rem] font-semibold text-ink">
                                 Jumlah fisik {{ $satuan !== '' ? '('.$satuan.')' : '' }}
                             </label>
-                            <input id="fisik-hp-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
-                                   wire:model.blur="fisik.{{ $kunci }}"
-                                   x-on:input="ketik($event.target)"
-                                   placeholder="belum dihitung"
-                                   class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
-                            @error('fisik.'.$kunci)
-                                <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
-                            @enderror
+                            <span class="text-[0.75rem] text-umber-soft">
+                                selisih
+                                <span class="tabular font-bold"
+                                      x-bind:class="selisih ? 'text-jingga-tua' : 'text-umber-soft'"
+                                      x-text="teksBeda">{{ $beda === null ? '—' : ($beda > 0 ? '+' : '').$angka($beda) }}</span>
+                            </span>
                         </div>
-
-                        <div class="min-w-0">
-                            <span class="block text-[0.8125rem] font-semibold text-ink">Selisih</span>
-                            <p class="tabular mt-1.5 flex h-12 items-center justify-end rounded-xl border border-line px-4 text-[0.9375rem] font-bold"
-                               x-bind:class="selisih ? 'text-jingga-tua' : 'text-umber-soft'"
-                               x-text="teksBeda">{{ $beda === null ? '—' : ($beda > 0 ? '+' : '').$angka($beda) }}</p>
-                        </div>
+                        <input id="fisik-hp-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
+                               wire:model.blur="fisik.{{ $kunci }}"
+                               x-on:input="ketik($event.target)"
+                               placeholder="belum dihitung"
+                               class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
+                        @error('fisik.'.$kunci)
+                            <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
+                        @enderror
                     </div>
 
-                    <div class="mt-3">
+                    {{-- Alasan hanya MUNCUL kalau ada selisih.
+                         Dirender selalu, ia delapan dropdown "Belum dipilih" berjajar di lembar
+                         yang belum punya satu pun selisih — pekerjaan yang tidak diminta,
+                         dipajang sebagai kewajiban. Elemennya tetap ada di DOM (Alpine yang
+                         menyembunyikannya), jadi begitu angka fisik diketik ia langsung
+                         terlihat TANPA menunggu jaringan, dan kemampuan memilih alasan tidak
+                         pernah hilang. Server tetap yang mewajibkannya saat selisih ≠ 0.
+
+                         SENGAJA tanpa kelas `hidden` dari server: x-show hanya melepas style
+                         inline-nya, jadi kelas itu akan menyembunyikan kolomnya SELAMANYA
+                         walau Alpine sudah menyatakan ada selisih. x-cloak sudah menutup
+                         kedipan sebelum Alpine hidup, dan galat alasan hanya bisa lahir dari
+                         baris yang fisiknya terisi & berselisih — jadi keadaan itu selalu
+                         membuat x-show bernilai benar. --}}
+                    <div class="mt-3" x-cloak x-show="selisih || alasan !== ''">
                         <label for="alasan-hp-{{ $kunci }}" class="block text-[0.8125rem] font-semibold text-ink">
                             Alasan selisih
-                            <span class="font-normal text-umber-soft" x-cloak x-show="selisih">— wajib dipilih</span>
+                            <span class="font-normal text-jingga-tua" x-cloak x-show="selisih">— wajib dipilih</span>
                         </label>
                         <select id="alasan-hp-{{ $kunci }}" wire:model.blur="alasan.{{ $kunci }}"
                                 x-on:change="alasan = $event.target.value"
@@ -343,7 +385,7 @@
                         <th class="w-28 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sistem</th>
                         <th class="w-36 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Fisik</th>
                         <th class="w-28 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Selisih</th>
-                        <th class="w-72 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Alasan selisih</th>
+                        <th class="w-60 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Alasan selisih</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line-soft">
@@ -411,22 +453,40 @@
                                       x-text="teksBeda">{{ $beda === null ? '—' : ($beda > 0 ? '+' : '').$angka($beda) }}</span>
                             </td>
 
+                            {{-- Kolom ini dulu berisi DELAPAN dropdown "Belum dipilih" pada
+                                 lembar yang belum punya satu pun selisih — dan itulah "banyak
+                                 yang kosong" secara harfiah: pekerjaan yang belum diminta,
+                                 dipajang penuh sebagai kewajiban.
+
+                                 Yang belum relevan sekarang cuma satu tanda tenang "—".
+                                 Dropdownnya TETAP ada di DOM dan hanya disembunyikan Alpine,
+                                 jadi ia terbuka seketika begitu angka fisiknya diketik, tanpa
+                                 menunggu jaringan — dan kemampuan memilih alasan tidak pernah
+                                 hilang. Yang mewajibkannya tetap server (selisih ≠ 0). --}}
                             <td class="px-5 py-3">
-                                <label for="alasan-{{ $kunci }}" class="sr-only">Alasan selisih {{ $b['nama'] }}</label>
-                                <select id="alasan-{{ $kunci }}" wire:model.blur="alasan.{{ $kunci }}"
-                                        x-on:change="alasan = $event.target.value"
-                                        class="h-12 w-full rounded-xl border border-line bg-white px-3 text-[0.875rem] text-ink focus:border-terracotta focus:outline-none">
-                                    <option value="">Belum dipilih</option>
-                                    @foreach ($alasanTersedia as $a)
-                                        <option value="{{ $a['nilai'] }}">{{ $a['label'] }}</option>
-                                    @endforeach
-                                </select>
-                                <p class="mt-1 text-[0.75rem] text-jingga-tua" x-cloak x-show="selisih && alasan === ''">
-                                    Wajib dipilih karena fisiknya berbeda dari sistem.
-                                </p>
-                                @error('alasan.'.$kunci)
-                                    <p class="mt-1 text-[0.75rem] text-merah-deep">{{ $message }}</p>
-                                @enderror
+                                {{-- Kata, bukan tanda hubung kedua. Kolom Selisih di sebelahnya
+                                     sudah berisi "—", dan dua strip berdampingan tidak
+                                     mengatakan apa-apa; "tidak perlu" menjawab pertanyaan yang
+                                     sebenarnya dibawa pembacanya ke kolom ini. --}}
+                                <p class="text-[0.8125rem] text-umber-soft" x-cloak x-show="! selisih && alasan === ''">tidak perlu</p>
+
+                                <div x-cloak x-show="selisih || alasan !== ''">
+                                    <label for="alasan-{{ $kunci }}" class="sr-only">Alasan selisih {{ $b['nama'] }}</label>
+                                    <select id="alasan-{{ $kunci }}" wire:model.blur="alasan.{{ $kunci }}"
+                                            x-on:change="alasan = $event.target.value"
+                                            class="h-12 w-full rounded-xl border border-line bg-white px-3 text-[0.875rem] text-ink focus:border-terracotta focus:outline-none">
+                                        <option value="">Belum dipilih</option>
+                                        @foreach ($alasanTersedia as $a)
+                                            <option value="{{ $a['nilai'] }}">{{ $a['label'] }}</option>
+                                        @endforeach
+                                    </select>
+                                    <p class="mt-1 text-[0.75rem] text-jingga-tua" x-cloak x-show="selisih && alasan === ''">
+                                        Wajib dipilih karena fisiknya berbeda dari sistem.
+                                    </p>
+                                    @error('alasan.'.$kunci)
+                                        <p class="mt-1 text-[0.75rem] text-merah-deep">{{ $message }}</p>
+                                    @enderror
+                                </div>
 
                                 <div class="mt-2" x-cloak x-show="butuhCatatan">
                                     <label for="catatan-{{ $kunci }}" class="sr-only">Catatan {{ $b['nama'] }}</label>
@@ -446,18 +506,23 @@
 
         <div class="mt-4">{{ $daftar->links() }}</div>
     @endif
+    </div>
 
     {{-- ── Bar simpan ──────────────────────────────────────────────────────
          sticky, bukan fixed: ia tetap terlihat selama menggulir, tapi tetap punya tempat
          sendiri di alur halaman sehingga tidak pernah menutupi baris terakhir saat lembar
-         sudah digulir sampai bawah. --}}
+         sudah digulir sampai bawah.
+
+         Margin negatifnya memasangkan diri dengan `pb-[5.5rem]` di wadah daftar: barnya
+         berdiri DI DALAM ruang bawah itu, jadi baris terakhir tetap bisa dibaca saat lembar
+         digulir sampai habis, sekaligus tidak menambah ekor kosong di bawah halaman. --}}
     {{-- Nama cabangnya disebut DI SINI, dan itu bukan pengulangan yang berlebihan: bar ini
          satu-satunya elemen yang selalu terlihat. Dropdown outlet duduk di baris saringan
          paling atas dan sudah berada di luar layar begitu lembarnya digulir, jadi kalimat
          ini pertahanan terakhir sebelum tombol simpan ditekan tanpa cabangnya pernah dibaca.
          Tanpa nama hanya untuk peran yang terkunci satu outlet — di situ dropdownnya tidak
          ada, jadi tidak ada cabang yang bisa tertukar. --}}
-    <div class="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-line bg-white/95 px-4 py-3 backdrop-blur sm:px-5">
+    <div class="sticky bottom-0 z-10 -mt-[11.25rem] flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-line bg-white/95 px-4 py-2.5 backdrop-blur sm:-mt-32 sm:px-5 xl:-mt-[4.5rem]">
         <div class="min-w-0">
             {{-- Dua bentuk utuh, bukan satu kalimat dengan @if di tengahnya: Blade TIDAK
                  mengenali direktif yang menempel di belakang huruf (`terisi@if` dibaca
@@ -477,18 +542,31 @@
                     <span class="tabular">{{ $jumlahTerisi }}</span> baris terisi, belum disimpan
                 </p>
             @endif
+            {{-- SATU baris di semua lebar. Dua kalimat penuh di sini membuat barnya 131px di
+                 1280 dan 197px di 390 — dan bar setinggi itu menutupi dua baris tabel setiap
+                 kali lembarnya digulir. Kedua keterangan yang mengubah keputusan tetap ada,
+                 hanya dipendekkan: angkanya milik seluruh lembar (jadi pindah halaman aman),
+                 dan desimal ditulis dengan titik. --}}
             <p class="text-[0.75rem] text-umber">
-                Angka ini seluruh lembar, bukan hanya halaman ini — pindah halaman tidak menghapus yang sudah diketik.
-                Desimal ditulis dengan titik, mis. 1.5.
+                Seluruh lembar · desimal pakai titik (1.5)
             </p>
         </div>
 
-        {{-- Lebar penuh di ponsel, dan tingginya minimum bukan tetap: teks tombol memuat nama
-             cabang, jadi ia bisa jatuh ke dua baris di 390px. Tombol lebar-tetap di situ
-             melebarkan halaman. --}}
+        {{-- Lebar penuh di ponsel, dan tingginya minimum bukan tetap: teks tombol bisa jatuh
+             ke dua baris. Tombol lebar-tetap di situ melebarkan halaman.
+
+             DUA bentuk teks, dan bukan demi kerapian saja: "Simpan hasil hitung — Benjamin
+             Cabang Seturan" itu 44 karakter, di 390px ia terbelah dua baris dan menjadikan
+             tombol utama layar ini kotak tinggi bertumpuk. Bentuk pendeknya hanya dipakai di
+             bawah 640px, dan nama cabangnya TIDAK hilang dari bar ini — kalimat di atas
+             tombol ("… baris terisi untuk <cabang>, belum disimpan") menyebutnya, dan itulah
+             pertahanan terakhir sebelum hitungan tersimpan ke cabang yang salah. --}}
         <button type="button" wire:click="simpan" wire:loading.attr="disabled"
                 class="min-h-12 w-full cursor-pointer rounded-xl bg-terracotta px-6 py-3 text-[0.9375rem] font-bold text-white transition-colors hover:bg-terracotta-deep disabled:opacity-60 sm:w-auto sm:shrink-0">
-            <span wire:loading.remove wire:target="simpan">Simpan hasil hitung{{ $namaDipakai !== null ? ' — '.$namaDipakai : '' }}</span>
+            <span wire:loading.remove wire:target="simpan">
+                <span class="sm:hidden">Simpan hasil hitung</span>
+                <span class="hidden sm:inline">Simpan hasil hitung{{ $namaDipakai !== null ? ' — '.$namaDipakai : '' }}</span>
+            </span>
             <span wire:loading wire:target="simpan">Menyimpan…</span>
         </button>
     </div>

@@ -109,7 +109,15 @@
 
             <ul>
                 @foreach ($butir as [$label, $rute, $namaIkon])
-                    @php $aktif = $rute !== null && request()->routeIs($rute); @endphp
+                    {{-- Sub-rute ikut menyalakan induknya: `owner.stok.opname` harus membuat
+                         "Stok & opname" tetap aktif. Tanpa pola `.*`, membuka lembar opname
+                         membuat SELURUH menu mati — orang kehilangan petunjuk sedang berada
+                         di mana, dan itu paling terasa justru di halaman kerja panjang yang
+                         butuh 12 kali pindah halaman. Titik di depan `*` disengaja supaya
+                         nama rute yang cuma berawalan sama (mis. `owner.stok-lain`) tidak
+                         ikut tersulut — belum ada menu seperti itu, jadi bagian ini
+                         kehati-hatian yang belum berpenjaga uji. --}}
+                    @php $aktif = $rute !== null && request()->routeIs($rute, $rute.'.*'); @endphp
                     <li class="relative">
                         @if ($rute === null)
                             <span class="flex min-h-11 items-center gap-4 px-8 text-[0.875rem] text-umber-soft">

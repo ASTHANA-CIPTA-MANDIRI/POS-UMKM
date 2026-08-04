@@ -7,6 +7,8 @@ use App\Actions\Stock\SusunBarisStokAction;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;
 use App\Models\Outlet;
+use App\Models\Product;
+use App\Models\RawMaterial;
 use App\Models\Stock;
 use App\Models\StockMovement;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -396,6 +398,73 @@ class Stok extends Component
         return rtrim(rtrim(number_format($nilai, 3, ',', '.'), '0'), ',');
     }
 
+    /**
+     * Nilai persediaan: jumlah × harga beli, dan JUMLAH BARANG YANG TIDAK BISA DIHITUNG.
+     *
+     * Angka ini yang paling dicari pemilik warung saat membuka layar stok — "berapa uang
+     * saya yang sekarang berbentuk barang" — dan sebelumnya tidak ada di layar mana pun.
+     *
+     * Dua keputusan yang menjaganya tetap jujur:
+     *
+     * 1. Barang tanpa harga beli TIDAK dihitung nol diam-diam. Nol berarti "barangnya tidak
+     *    ada nilainya", dan itu pernyataan yang lain sekali dari "harganya belum diisi".
+     *    Jumlahnya dikembalikan terpisah supaya layar bisa menyebutnya apa adanya; tanpa itu
+     *    pemilik membandingkan angka ini dengan uang belanjanya dan menyimpulkan
+     *    pencatatannya kacau.
+     * 2. Saldo minus tidak dijadikan uang negatif. Minus berarti PENCATATANNYA bermasalah
+     *    (penjualan offline yang masuk dua kali), bukan bahwa raknya berutang barang — jadi
+     *    barisnya dihitung nol untuk nilai, dan tetap terhitung di kartu "Minus & habis"
+     *    yang mengajak memperbaikinya.
+     *
+     * Ikut saringan `cari`/`jenis`, sama seperti chip di atasnya: dua angka di satu layar
+     * yang menghitung himpunan berbeda membuat orang berhenti memercayai keduanya.
+     *
+     * @param  Collection<int, array<string, mixed>>  $baris
+     * @return array{nilai: float, tanpa_harga: int}
+     */
+    private function nilaiPersediaan(Collection $baris): array
+    {
+        $idProduk = $baris->where('jenis', 'produk')->pluck('product_id')->filter()->all();
+        $idBahan = $baris->where('jenis', 'bahan')->pluck('raw_material_id')->filter()->all();
+
+        $harga = collect();
+
+        if ($idProduk !== []) {
+            $harga = $harga->merge(
+                Product::query()->whereKey($idProduk)->pluck('harga_beli', 'id'),
+            );
+        }
+
+        if ($idBahan !== []) {
+            $harga = $harga->merge(
+                RawMaterial::query()->whereKey($idBahan)->pluck('harga_beli_terakhir', 'id'),
+            );
+        }
+
+        $nilai = 0.0;
+        $tanpaHarga = 0;
+
+        foreach ($baris as $b) {
+            $jumlah = max(0.0, (float) $b['sistem']);
+
+            if (! $b['punya_baris'] || $jumlah <= 0.0) {
+                continue;
+            }
+
+            $satuan = (float) ($harga[$b['kunci']] ?? 0);
+
+            if ($satuan <= 0.0) {
+                $tanpaHarga++;
+
+                continue;
+            }
+
+            $nilai += $jumlah * $satuan;
+        }
+
+        return ['nilai' => $nilai, 'tanpa_harga' => $tanpaHarga];
+    }
+
     public function render()
     {
         $baris = $this->baris();
@@ -422,6 +491,7 @@ class Stok extends Component
             ],
             'barisKartu' => $barisKartu,
             'kartu' => $this->kartu($barisKartu),
+            'nilaiPersediaan' => $this->nilaiPersediaan($baris),
             'outletTersedia' => auth()->user()->scopedOutletId() === null ? $this->outletTersedia() : [],
             'outletDipakai' => $this->outletTerpakai(),
         ]);
