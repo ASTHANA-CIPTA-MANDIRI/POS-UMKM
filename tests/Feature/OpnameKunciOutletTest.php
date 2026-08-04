@@ -759,9 +759,20 @@ class OpnameKunciOutletTest extends TestCase
         $komponen->assertSeeHtml('wire:key="kartu-'.$this->cabangB->getKey().'-'.$kunci.'"');
         $komponen->assertDontSeeHtml('wire:key="baris-'.$this->cabangA->getKey().'-'.$kunci.'"');
 
-        // Nama ikatannya tetap id barang saja: nilai yang sudah diketik tidak boleh
-        // bergantung pada cabang yang sedang tampil.
-        $komponen->assertSeeHtml('wire:model.blur="fisik.'.$kunci.'"');
+        /*
+         * Nama ikatannya tetap id barang saja: nilai yang sudah diketik tidak boleh
+         * bergantung pada cabang yang sedang tampil.
+         *
+         * Yang diperiksa NAMA ikatannya (`fisik.<kunci>`), bukan modifiernya. Versi lama
+         * memaku `wire:model.blur=` dan langsung merah ketika modifiernya diganti ke
+         * `.live.debounce` — padahal ikatannya tidak berubah sama sekali dan tidak ada yang
+         * rusak. Uji yang merah untuk perubahan yang tidak merusak apa pun akan dilonggarkan
+         * suatu hari, dan sesudah itu ia tidak menjaga apa-apa.
+         */
+        $this->assertMatchesRegularExpression(
+            '/wire:model[^=]*="fisik\.'.preg_quote($kunci, '/').'"/',
+            $komponen->html(),
+            'ikatan fisik.<kunci> harus tetap memakai id barang, apa pun modifiernya');
     }
 
     /**

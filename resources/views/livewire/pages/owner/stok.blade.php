@@ -625,7 +625,15 @@
                         <thead>
                             <tr class="border-b border-line">
                                 <th class="w-36 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Waktu</th>
-                                <th class="w-44 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Pergerakan</th>
+                                {{-- Pergerakan TIDAK diberi lebar tetap, sama seperti Catatan.
+                                     Dengan lima kolom berlebar tetap, seluruh sisa lebar panel
+                                     tertumpuk di satu kolom terakhir — dan karena catatan
+                                     biasanya pendek, sisi kanan tabel jadi bidang kosong lebar.
+                                     Dua kolom tanpa lebar tetap membuat sisa itu terbagi ke
+                                     kolom yang isinya memang bisa panjang ("Transfer Antar
+                                     Outlet", "Pemakaian bahan baku dari penjualan TRX-…"),
+                                     bukan menumpuk di tepi. --}}
+                                <th class="px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Pergerakan</th>
                                 <th class="w-28 px-5 py-3 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Jumlah</th>
                                 <th class="w-28 px-5 py-3 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Saldo</th>
                                 <th class="w-36 px-5 py-3 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Oleh</th>

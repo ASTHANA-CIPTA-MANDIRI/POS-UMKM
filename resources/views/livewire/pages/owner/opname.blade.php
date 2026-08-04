@@ -319,8 +319,25 @@
                                       x-text="teksBeda">{{ $beda === null ? '—' : ($beda > 0 ? '+' : '').$angka($beda) }}</span>
                             </span>
                         </div>
+                        {{-- .live.debounce, BUKAN .blur.
+                             Dengan .blur angkanya baru sampai ke server saat kolomnya
+                             ditinggalkan — dan sampai itu terjadi, bar bawah berkata
+                             "0 baris terisi" sementara kotak-kotaknya sudah berisi angka.
+                             Layar yang membantah dirinya sendiri membuat orang berhenti
+                             memercayai angkanya, dan angka itu justru pengaman terakhir
+                             sebelum hasil hitung tersimpan ke cabang yang salah.
+
+                             Dihitung di server, bukan di Alpine: menaruh penghitung kedua di
+                             klien berarti dua sumber untuk satu angka, dan lembar ini
+                             berhalaman — baris di halaman lain hanya diketahui server. Dua
+                             angka yang bisa berbeda adalah cacat yang sudah kita perbaiki
+                             dua kali hari ini (chip vs tabel).
+
+                             Harganya satu permintaan kecil per baris yang diketik, ditunda
+                             500ms. Layar ini milik pemilik dan daring; yang wajib jalan tanpa
+                             jaringan adalah layar kasir, bukan lembar opname. --}}
                         <input id="fisik-hp-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
-                               wire:model.blur="fisik.{{ $kunci }}"
+                               wire:model.live.debounce.500ms="fisik.{{ $kunci }}"
                                x-on:input="ketik($event.target)"
                                placeholder="belum dihitung"
                                class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
@@ -441,7 +458,7 @@
                             <td class="px-5 py-3">
                                 <label for="fisik-{{ $kunci }}" class="sr-only">Jumlah fisik {{ $b['nama'] }}</label>
                                 <input id="fisik-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
-                                       wire:model.blur="fisik.{{ $kunci }}"
+                                       wire:model.live.debounce.500ms="fisik.{{ $kunci }}"
                                        x-on:input="ketik($event.target)"
                                        placeholder="—"
                                        class="tabular h-12 w-full rounded-xl border border-line bg-white px-3 text-right text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
