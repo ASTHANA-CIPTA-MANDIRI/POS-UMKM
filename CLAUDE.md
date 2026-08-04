@@ -89,6 +89,30 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
   terbuka kosong dan terbaca sebagai "tidak ada data". `->links()` selalu dirender;
   `limit(n)` tanpa penunjuk halaman adalah pemotongan diam-diam.
 
+## Bahasa layar: pakai kata orang warung, bukan kata akuntansi
+
+Pemilik proyek meminta ini tegas untuk layar Stok & hitung stok, dan berlaku untuk layar
+berikutnya juga. Yang dilihat pengguna memakai kata sehari-hari; nama kolom basis data,
+properti Livewire, dan identifier Alpine TETAP memakai istilah domain — menggantinya berarti
+migrasi dan menyentuh uji JS tanpa menambah satu pun kejelasan bagi orang yang tidak pernah
+melihat nama itu.
+
+| Jangan tampilkan | Tampilkan |
+|---|---|
+| Ambang, ambang minimum | Batas minimal |
+| Saldo, saldo sekarang | Sisa, Sisa sekarang |
+| Sistem (angka menurut aplikasi) | Tercatat |
+| Fisik, jumlah fisik | Hasil hitung |
+| Selisih | Beda |
+| Alasan selisih | Kenapa beda |
+| Opname | Hitung stok / hitung fisik |
+| Kartu stok | Riwayat barang |
+| Mutasi | Pergerakan |
+| Opname terakhir | Terakhir dihitung |
+
+Kalau ragu: bacakan kalimatnya seolah kepada pemilik warteg yang belum pernah memakai
+aplikasi kasir. Kalau ia perlu bertanya "itu apa", gantilah.
+
 ## Menulis uji
 
 - PHP: `tests/Feature/*Test.php`, pakai `MembuatDataUji` + `RefreshDatabase`.

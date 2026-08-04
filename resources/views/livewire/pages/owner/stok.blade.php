@@ -64,7 +64,7 @@
 
             return [
                 'Beli '.$angka($b['beli']['jumlah']).' '.$satuanBeli,
-                'kurang '.$angka($b['kekurangan']).' '.$satuanDasar.' dari ambang '.$angka($b['minimum']).' '.$satuanDasar
+                'kurang '.$angka($b['kekurangan']).' '.$satuanDasar.' dari batas minimal '.$angka($b['minimum']).' '.$satuanDasar
                     .' · 1 '.$satuanBeli.' = '.$angka($b['beli']['isi_per_satuan']).' '.$satuanDasar,
             ];
         }
@@ -72,7 +72,7 @@
         if ($b['kekurangan'] > 0) {
             return [
                 'Beli '.$angka($b['kekurangan']).' '.$dasar,
-                'sisa '.$angka($b['sistem']).' '.$dasar.', ambang '.$angka($b['minimum']).' '.$dasar,
+                'sisa '.$angka($b['sistem']).' '.$dasar.', batas minimal '.$angka($b['minimum']).' '.$dasar,
             ];
         }
 
@@ -84,8 +84,8 @@
         }
 
         return [
-            'Habis, ambang belum disetel',
-            'Raknya kosong, tapi jumlah belanjanya belum bisa dihitung. Setel ambang minimumnya di daftar bawah.',
+            'Habis, batas minimal belum diatur',
+            'Raknya kosong, tapi jumlah belanjanya belum bisa dihitung. Atur batas minimumnya di daftar bawah.',
         ];
     };
 @endphp
@@ -115,7 +115,11 @@
          `sticky top-4 mb-2`, jadi tanpa ini sisa jaraknya hanya ±8px — kartu pertama
          halaman terlihat MENEMPEL ke kartu judul, sementara jarak antar-bagian di bawahnya
          16/20px. Nilainya bukan angka baru, hanya melengkapi irama yang sudah ada. --}}
-    <div class="mt-2 mb-4 grid gap-3 sm:mt-3 sm:mb-5 sm:grid-cols-2 xl:grid-cols-[1.35fr_repeat(3,minmax(0,1fr))]">
+    {{-- DUA kolom sejak ponsel, alasan yang sama dengan kartu "Harus belanja": empat
+         kartu yang menumpuk satu per baris menghabiskan hampir satu layar penuh di HP,
+         sehingga isi layar yang sebenarnya — daftar barangnya — baru mulai jauh di bawah
+         lipatan. --}}
+    <div class="mt-2 mb-4 grid grid-cols-2 gap-3 sm:mt-3 sm:mb-5 xl:grid-cols-[1.35fr_repeat(3,minmax(0,1fr))]">
         <div class="kartu flex min-h-[5.625rem] items-center gap-4 pr-5 pl-[1.125rem]">
             <span class="lencana-ikon bg-cream-deep text-terracotta">
                 <svg viewBox="0 0 24 24" class="size-6" fill="none" aria-hidden="true">
@@ -171,7 +175,7 @@
                 'nilai' => 'menipis',
                 'label' => 'Menipis',
                 'jumlah' => $ringkasan['menipis'],
-                'ket' => 'sudah di bawah ambang minimum',
+                'ket' => 'sudah di bawah batas minimal',
                 'warna' => 'text-jingga-tua',
                 'ikon' => 'M5 19.5h14M7 16V9.5M12 16V6M17 16v-4.5',
             ],
@@ -226,13 +230,18 @@
                         <path d="M6 4h8v12H6V4Zm2.5 3.5h3M8.5 10h3M8.5 12.5h1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
                     </svg>
                 </span>
-                Hitung fisik (opname)
+                Hitung stok sekarang
             </a>
         </x-slot:aksi>
 
         <x-slot:saringan>
-            <div class="grid gap-3 lg:grid-cols-[1fr_11rem_13rem]">
-                <div class="min-w-0">
+            {{-- Pencarian selebar penuh, lalu KEDUA dropdown berbagi satu baris di ponsel —
+                 bukan tiga kontrol yang menumpuk jadi tiga baris. Di ≥lg ketiganya sebaris.
+                 Tidak dipaksa satu baris di 390px: tiga kontrol di situ menyisakan ±120px
+                 masing-masing, dan nama cabang ("Benjamin Cabang Seturan") tidak terbaca
+                 sama sekali di kotak sesempit itu. --}}
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-[1fr_11rem_13rem]">
+                <div class="col-span-2 min-w-0 lg:col-span-1">
                     <label for="cari" class="sr-only">Cari barang</label>
                     <div class="relative">
                         <svg viewBox="0 0 20 20" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-umber-soft"
@@ -339,10 +348,16 @@
                 default => $muat,
             };
             $tampil = $harusBelanja->take($muat);
+            // DUA kolom sejak ponsel, bukan menumpuk satu per baris. Empat kartu yang
+            // menumpuk membuat blok ini setinggi satu layar penuh di HP, dan barang keempat
+            // — yang justru paling parah kalau urutannya dibaca dari atas — jatuh di bawah
+            // lipatan. Dua kolom membuat keempatnya terlihat sekaligus.
+            //
+            // Di layar lebar barisnya dipilih supaya tidak ada kartu yatim: 3 kolom kalau
+            // jumlahnya habis dibagi 3, kalau tidak 2 kolom.
             $kolomBelanja = match (true) {
-                $muat % 3 === 0 => 'lg:grid-cols-3',
-                $muat % 2 === 0 => 'lg:grid-cols-2',
-                default => '',
+                $muat % 3 === 0 => 'grid-cols-2 lg:grid-cols-3',
+                default => 'grid-cols-2',
             };
         @endphp
 
@@ -392,7 +407,7 @@
 
             @if ($harusBelanja->count() > $tampil->count())
                 <p class="border-t border-line-soft px-5 py-3 text-[0.8125rem] text-umber sm:px-6">
-                    {{ $harusBelanja->count() - $tampil->count() }} barang lain juga di bawah ambang.
+                    {{ $harusBelanja->count() - $tampil->count() }} barang lain juga di bawah batas minimal.
                     Pakai saringan <span class="font-semibold text-ink">Minus</span>,
                     <span class="font-semibold text-ink">Habis</span>, atau
                     <span class="font-semibold text-ink">Menipis</span> di atas untuk melihat semuanya.
@@ -504,7 +519,7 @@
                  Di ≥1024px mereka kembali ke sisi kanan judul — bidang yang tadinya kosong. --}}
             <div class="flex flex-wrap items-start gap-4 border-b border-line px-5 py-4 sm:px-6">
                 <div class="order-1 min-w-0 flex-1">
-                    <p class="eyebrow text-umber-soft">Kartu stok</p>
+                    <p class="eyebrow text-umber-soft">Riwayat barang</p>
                     <div class="mt-1 flex flex-wrap items-center gap-2">
                         <h2 class="text-[1.0625rem] font-bold text-ink">{{ $barisKartu['nama'] }}</h2>
                         <x-lencana :warna="$warnaStatus($barisKartu['status'])" :denyut="$barisKartu['status'] !== 'belum_dihitung'">
@@ -523,7 +538,7 @@
 
                 <div class="order-3 grid w-full min-w-0 grid-cols-3 gap-2 lg:order-2 lg:w-auto lg:max-w-lg lg:flex-1">
                     <div class="min-w-0 rounded-xl border border-line px-3 py-2">
-                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Saldo sekarang</p>
+                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Sisa sekarang</p>
                         @if ($barisKartu['punya_baris'])
                             <p class="tabular text-[0.9375rem] font-bold text-ink">
                                 {{ $angka($barisKartu['sistem']) }}
@@ -535,7 +550,7 @@
                     </div>
 
                     <div class="min-w-0 rounded-xl border border-line px-3 py-2">
-                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Ambang</p>
+                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Batas minimal</p>
                         <p class="tabular text-[0.9375rem] font-bold text-ink">
                             {{ $barisKartu['minimum'] > 0 ? $angka($barisKartu['minimum']) : '—' }}
                             <span class="text-[0.75rem] font-medium text-umber">
@@ -545,7 +560,7 @@
                     </div>
 
                     <div class="min-w-0 rounded-xl border border-line px-3 py-2">
-                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Opname terakhir</p>
+                        <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Terakhir dihitung</p>
                         @if ($barisKartu['opname_terakhir_pada'] !== null)
                             <p class="tabular text-[0.8125rem] font-semibold text-ink">
                                 {{ $barisKartu['opname_terakhir_pada']->locale('id')->translatedFormat('j M Y') }}
@@ -573,7 +588,7 @@
                      dua bentuk "tidak ada data" di satu halaman terbaca seperti dua aplikasi. --}}
                 <div class="px-5 py-5 sm:px-6">
                     <x-kosong judul="Belum ada pergerakan tercatat"
-                              keterangan="Kartu stok terisi sendiri begitu ada penjualan, penerimaan barang, atau hasil hitung fisik yang disimpan." />
+                              keterangan="Riwayat barang terisi sendiri begitu ada penjualan, penerimaan barang, atau hasil hitung stok yang disimpan." />
                 </div>
             @else
                 {{-- Kartu di layar sempit, tabel di layar lebar — pola yang sama dengan
@@ -639,7 +654,7 @@
                                 <th class="w-[18%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Waktu</th>
                                 <th class="w-[38%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Pergerakan</th>
                                 <th class="w-[12%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Jumlah</th>
-                                <th class="w-[12%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Saldo</th>
+                                <th class="w-[12%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sisa</th>
                                 <th class="w-[20%] px-5 py-3 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Oleh</th>
                             </tr>
                         </thead>
@@ -728,7 +743,7 @@
 
                     <div class="mt-3 grid grid-cols-2 gap-3">
                         <div class="min-w-0 rounded-xl border border-line px-3 py-2">
-                            <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Sistem</p>
+                            <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Tercatat</p>
                             @if ($b['punya_baris'])
                                 <p class="tabular text-[0.9375rem] font-bold text-ink">
                                     {{ $angka($b['sistem']) }}
@@ -740,7 +755,7 @@
                         </div>
 
                         <div class="min-w-0 rounded-xl border border-line px-3 py-2">
-                            <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Ambang</p>
+                            <p class="text-[0.6875rem] font-semibold tracking-wide text-umber-soft uppercase">Batas minimal</p>
                             <p class="tabular text-[0.9375rem] font-bold text-ink">
                                 {{ $b['minimum'] > 0 ? $angka($b['minimum']) : '—' }}
                                 <span class="text-[0.75rem] font-medium text-umber">
@@ -751,7 +766,7 @@
                     </div>
 
                     <p class="mt-2 text-[0.75rem] text-umber">
-                        Opname terakhir:
+                        Terakhir dihitung:
                         {{ $b['opname_terakhir_pada']?->locale('id')->translatedFormat('j M Y, H:i') ?? 'belum pernah' }}
                         @if ($b['perlu_diperiksa'])
                             <span class="ml-1 rounded-full bg-jingga/15 px-2 py-0.5 text-[0.6875rem] font-semibold text-jingga-tua">
@@ -763,7 +778,7 @@
                     @if ($ambangKunci === $b['kunci'])
                         <div class="mt-3 rounded-xl border border-line p-3">
                             <label for="ambang-hp-{{ $b['kunci'] }}" class="block text-[0.8125rem] font-semibold text-ink">
-                                Ambang minimum ({{ $b['satuan_dasar'] ?? 'satuan dasar' }})
+                                Batas minimal ({{ $b['satuan_dasar'] ?? 'satuan' }})
                             </label>
                             {{-- value= WAJIB ditulis sendiri: Livewire tidak mencetak nilai
                                  awal untuk kolom ber-wire:model, jadi tanpa ini kolomnya
@@ -785,7 +800,7 @@
                             <div class="mt-3 flex gap-2">
                                 <button type="button" wire:click="simpanAmbang"
                                         class="h-11 flex-1 cursor-pointer rounded-xl bg-terracotta px-3 text-[0.8125rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
-                                    Simpan ambang
+                                    Simpan batas
                                 </button>
                                 <button type="button" wire:click="batalUbahAmbang"
                                         class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
@@ -804,11 +819,11 @@
                         <div class="mt-3 flex gap-2">
                             <button type="button" wire:click="bukaKartu('{{ $b['kunci'] }}')"
                                     class="h-11 flex-1 cursor-pointer rounded-xl bg-terracotta px-3 text-[0.8125rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
-                                {{ $kartuKunci === $b['kunci'] ? 'Tutup kartu stok' : 'Kartu stok' }}
+                                {{ $kartuKunci === $b['kunci'] ? 'Tutup kartu stok' : 'Riwayat barang' }}
                             </button>
                             <button type="button" wire:click="ubahAmbang('{{ $b['kunci'] }}')"
                                     class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
-                                Setel ambang
+                                Atur batas
                             </button>
                         </div>
                     @endif
@@ -835,14 +850,14 @@
                              lebar panel, dan lubangnya cuma berpindah tempat. Dibagi persen,
                              sisanya tersebar rata dan jarak antar kolom terbaca seragam. --}}
                         <th class="w-[22%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Barang</th>
-                        <th class="w-[12%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sistem</th>
-                        <th class="w-[20%] py-3.5 pr-8 pl-5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Ambang</th>
+                        <th class="w-[12%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Tercatat</th>
+                        <th class="w-[20%] py-3.5 pr-8 pl-5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Batas minimal</th>
                         <th class="w-[16%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
-                        <th class="w-[20%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Opname terakhir</th>
+                        <th class="w-[20%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Terakhir dihitung</th>
                         {{-- Kolom terakhir DIBERI NAMA. Ikon tanpa keterangan di ujung baris
                              membuat orang harus mengklik untuk tahu apa yang akan terjadi;
                              judul kolomnya cukup untuk menjelaskannya sekali untuk semua baris. --}}
-                        <th class="w-[10%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Kartu stok</th>
+                        <th class="w-[10%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Riwayat</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line-soft">
@@ -885,20 +900,20 @@
                                     <div class="flex items-start justify-end gap-2">
                                         <div class="w-28 min-w-0">
                                             <label for="ambang-{{ $b['kunci'] }}" class="sr-only">
-                                                Ambang minimum {{ $b['nama'] }}
+                                                Batas minimal {{ $b['nama'] }}
                                             </label>
                                             <input id="ambang-{{ $b['kunci'] }}" type="text" inputmode="decimal"
                                                    wire:model="ambangNilai" wire:keydown.enter="simpanAmbang"
                                                    placeholder="0" value="{{ $ambangNilai }}"
                                                    class="tabular h-10 w-full rounded-lg border border-line bg-white px-3 text-center text-[0.875rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
                                         </div>
-                                        <x-aksi warna="utama" label="Simpan ambang {{ $b['nama'] }}"
+                                        <x-aksi warna="utama" label="Simpan batas minimal {{ $b['nama'] }}"
                                                 class="size-10" wire:click="simpanAmbang">
                                             <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                                                 <path d="m5 10.5 3.5 3.5L15 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                                             </svg>
                                         </x-aksi>
-                                        <x-aksi warna="netral" label="Batal ubah ambang" class="size-10"
+                                        <x-aksi warna="netral" label="Batal ubah batas" class="size-10"
                                                 wire:click="batalUbahAmbang">
                                             <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                                                 <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
@@ -933,8 +948,8 @@
                                          dengan pembaca layar. --}}
                                     <button type="button" wire:click="ubahAmbang('{{ $b['kunci'] }}')"
                                             class="tabular mx-auto flex h-10 cursor-pointer items-center gap-2 rounded-lg bg-cream px-3 text-[0.875rem] text-ink transition-colors hover:bg-cream-deep"
-                                            aria-label="Ubah ambang minimum {{ $b['nama'] }}"
-                                            title="Ubah ambang minimum {{ $b['nama'] }}">
+                                            aria-label="Ubah batas minimal {{ $b['nama'] }}"
+                                            title="Ubah batas minimal {{ $b['nama'] }}">
                                         <svg viewBox="0 0 20 20" class="size-4 shrink-0 text-terracotta" fill="none" aria-hidden="true">
                                             <path d="M13 3.5 16.5 7 8 15.5H4.5V12L13 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                                         </svg>
@@ -942,7 +957,7 @@
                                             <span class="font-semibold">{{ $angka($b['minimum']) }}</span>
                                             <span class="text-[0.75rem] text-umber-soft">{{ $b['satuan_dasar'] ?? '' }}</span>
                                         @else
-                                            <span class="text-[0.8125rem] font-semibold text-terracotta">Setel ambang</span>
+                                            <span class="text-[0.8125rem] font-semibold text-terracotta">Atur batas</span>
                                         @endif
                                     </button>
                                 @endif
@@ -974,7 +989,7 @@
                             <td class="px-5 py-3.5">
                                 <div class="flex items-center justify-end">
                                     <x-aksi warna="utama"
-                                            label="{{ $kartuKunci === $b['kunci'] ? 'Tutup kartu stok '.$b['nama'] : 'Kartu stok '.$b['nama'] }}"
+                                            label="{{ $kartuKunci === $b['kunci'] ? 'Tutup kartu stok '.$b['nama'] : 'Riwayat barang '.$b['nama'] }}"
                                             wire:click="bukaKartu('{{ $b['kunci'] }}')">
                                         <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                                             <path d="M4 5.5h12M4 10h12M4 14.5h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />

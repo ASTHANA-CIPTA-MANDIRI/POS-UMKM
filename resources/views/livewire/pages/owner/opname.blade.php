@@ -69,7 +69,7 @@
          halaman menempel ke kartu judul sementara jarak antar-bagian di bawahnya 16/20px. --}}
     <x-kartu-alat
         class="mt-2 sm:mt-3"
-        judul="Lembar hitung fisik"
+        judul="Lembar hitung stok"
         jumlah="{{ $daftar->total() }}"
         keterangan="Isi jumlah yang benar-benar ada di rak. Kolom kosong berarti belum dihitung, bukan nol · desimal pakai titik (1.5)."
     >
@@ -96,8 +96,12 @@
                  Dengan dropdown outlet dipaksa ke barisnya sendiri (`col-span-full w-64`),
                  baris kedua kartu ini berisi satu kontrol dan bidang kosong seluas tiga
                  perempat lebarnya. --}}
-            <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_11rem_12rem] xl:grid-cols-[minmax(0,1fr)_11rem_12rem_14rem]">
-                <div class="min-w-0">
+            {{-- Pencarian selebar penuh, dropdown berbagi baris DUA-DUA di ponsel — bukan
+                 empat kontrol yang menumpuk jadi empat baris setinggi separuh layar.
+                 Tidak dipaksa satu baris di 390px: empat kontrol di situ menyisakan ±90px
+                 masing-masing, dan nama cabang tidak terbaca sama sekali. --}}
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(0,1fr)_11rem_12rem] xl:grid-cols-[minmax(0,1fr)_11rem_12rem_14rem]">
+                <div class="col-span-2 min-w-0 lg:col-span-1">
                     <label for="cari" class="sr-only">Cari barang</label>
                     <div class="relative">
                         <svg viewBox="0 0 20 20" class="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-umber-soft"
@@ -310,7 +314,7 @@
                     <div class="mt-3">
                         <div class="flex items-baseline justify-between gap-2">
                             <label for="fisik-hp-{{ $kunci }}" class="text-[0.8125rem] font-semibold text-ink">
-                                Jumlah fisik {{ $satuan !== '' ? '('.$satuan.')' : '' }}
+                                Hasil hitung {{ $satuan !== '' ? '('.$satuan.')' : '' }}
                             </label>
                             <span class="text-[0.75rem] text-umber-soft">
                                 selisih
@@ -410,10 +414,10 @@
                              lurus ke bawah. Ini keputusan pemilik proyek yang disampaikan
                              eksplisit, bukan kelalaian — jangan "dibetulkan" diam-diam. --}}
                         <th class="w-[30%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Barang</th>
-                        <th class="w-[14%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sistem</th>
-                        <th class="w-[16%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Fisik</th>
-                        <th class="w-[14%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Selisih</th>
-                        <th class="w-[26%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Alasan selisih</th>
+                        <th class="w-[14%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Tercatat</th>
+                        <th class="w-[16%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Hasil hitung</th>
+                        <th class="w-[14%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Beda</th>
+                        <th class="w-[26%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Kenapa beda</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line-soft">
@@ -465,7 +469,7 @@
                             </td>
 
                             <td class="px-5 py-3">
-                                <label for="fisik-{{ $kunci }}" class="sr-only">Jumlah fisik {{ $b['nama'] }}</label>
+                                <label for="fisik-{{ $kunci }}" class="sr-only">Hasil hitung {{ $b['nama'] }}</label>
                                 <input id="fisik-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
                                        wire:model.live.debounce.500ms="fisik.{{ $kunci }}"
                                        x-on:input="ketik($event.target)"
