@@ -43,6 +43,15 @@ class Stok extends Component
 
     private const NAMA_HALAMAN = 'page';
 
+    /*
+     * Kartu stok punya nomor halamannya SENDIRI.
+     *
+     * Kalau ikut 'page', membuka riwayat mutasi di halaman 3 daftar akan melompatkan
+     * daftarnya, dan menggeser halaman riwayat akan menggeser daftarnya juga — dua daftar
+     * berbeda memakai satu penunjuk.
+     */
+    private const HALAMAN_KARTU = 'kartu';
+
     /**
      * Outlet yang stoknya dilihat. Stok dicatat PER OUTLET, jadi layar ini selalu
      * bekerja atas satu outlet — tidak ada tampilan "gabungan semua cabang" di sini,
@@ -224,6 +233,11 @@ class Stok extends Component
     public function bukaKartu(string $kunci): void
     {
         $this->kartuKunci = $this->kartuKunci === $kunci ? null : $kunci;
+
+        // Riwayatnya selalu mulai dari halaman 1. Tanpa ini, halaman 7 dari barang
+        // sebelumnya terbawa ke barang yang riwayatnya hanya 3 baris, dan panelnya
+        // terbuka KOSONG — terbaca sebagai "tidak ada mutasi", padahal ada.
+        $this->resetPage(self::HALAMAN_KARTU);
     }
 
     public function tutupKartu(): void
@@ -232,27 +246,42 @@ class Stok extends Component
     }
 
     /**
-     * 30 mutasi terakhir baris yang kartunya dibuka.
+     * Riwayat mutasi baris yang kartunya dibuka, berhalaman.
      *
-     * Dibatasi 30 dengan sengaja: yang dibutuhkan saat menjelaskan selisih adalah
-     * pergerakan terakhir, dan memuat seluruh riwayat satu barang laris berarti ribuan
-     * baris penjualan yang membuat halaman berhenti terpakai.
+     * Dulu `limit(30)`. Itu memotong riwayat tanpa memberi tahu, dan justru menghapus
+     * jawaban yang dicari: pemilik membuka kartu stok untuk menelusuri KE BELAKANG, mencari
+     * kapan angkanya mulai salah. Barang laris di kelontong bisa punya ratusan mutasi dalam
+     * sebulan, jadi 30 baris terakhir membuatnya menyimpulkan tidak ada apa-apa sebelum itu.
      *
-     * @return Collection<int, StockMovement>
+     * Kekhawatiran lama tetap sah — memuat ribuan baris sekaligus membuat halaman berhenti
+     * terpakai — dan halaman menjawabnya lebih baik daripada memotong: barisnya tetap
+     * sedikit per muatan, tapi tidak ada yang disembunyikan.
+     *
+     * @return LengthAwarePaginator<int, StockMovement>|Collection<int, StockMovement>
      */
-    private function kartu(?array $baris): Collection
+    private function kartu(?array $baris): LengthAwarePaginator|Collection
     {
         if ($baris === null || $baris['stock_id'] === null) {
             return collect();
         }
 
+        /*
+         * Dihalamankan, bukan `limit(30)`.
+         *
+         * `limit` memotong riwayat TANPA memberi tahu: barang yang laku di kelontong bisa
+         * punya ratusan mutasi dalam sebulan, dan pemilik yang mencari "kapan stok ini mulai
+         * salah" melihat 30 baris terakhir lalu menyimpulkan tidak ada apa-apa sebelum itu.
+         * Kartu stok gunanya justru menelusuri ke belakang; memotongnya diam-diam menghapus
+         * satu-satunya jawaban yang dicari.
+         *
+         * Jumlah barisnya memakai setelan bersama supaya sama dengan seluruh daftar lain.
+         */
         return StockMovement::query()
             ->where('stock_id', $baris['stock_id'])
             ->with('olehUser:id,name')
             ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->limit(30)
-            ->get();
+            ->paginate(config('nampan.per_halaman'), ['*'], self::HALAMAN_KARTU);
     }
 
     /* ── Daftar ──────────────────────────────────────────────────────────── */

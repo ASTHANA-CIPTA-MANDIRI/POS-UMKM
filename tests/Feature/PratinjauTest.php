@@ -375,6 +375,32 @@ class PratinjauTest extends TestCase
             $this->suntik($this->ambil('owner.stok.opname', $owner), $fragmenOpname),
         );
 
+        /*
+         * Lembar dengan PERGANTIAN CABANG YANG DITOLAK.
+         *
+         * Blok peringatannya — judul, kalimat sebab-akibat, dan TIGA tombol keputusan yang
+         * teksnya memuat nama cabang — hanya ada di DOM dalam keadaan ini. Tanpa tangkapan
+         * ini, satu-satunya jalan keluar pemilik dari lembar yang terkunci tidak pernah
+         * terukur di lebar mana pun, padahal justru tiga tombol berteks panjang itulah yang
+         * paling mungkin melebarkan halaman di 390px.
+         */
+        $outletLain = Outlet::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->whereKeyNot($outlet->getKey())
+            ->orderBy('outlet_name')
+            ->firstOrFail();
+
+        $fragmenTolak = Livewire::actingAs($owner)->test(Opname::class)
+            ->set('fisik.'.$kunci['beras'], '58')
+            ->set('fisik.'.$kunci['gula'], '3')
+            ->set('outletId', $outletLain->getKey())
+            ->html();
+
+        file_put_contents(
+            "{$tujuan}/owner-opname-tolak.html",
+            $this->suntik($this->ambil('owner.stok.opname', $owner), $fragmenTolak),
+        );
+
         $this->assertFileExists("{$tujuan}/owner-stok.html");
     }
 

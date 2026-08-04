@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Stock\AdjustStockAction;
 use App\Enums\AlasanOpname;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
@@ -388,5 +389,46 @@ class StokLayarTest extends TestCase
             'jumlah_saat_ini' => $jumlah,
             'stok_minimum' => $minimum,
         ]);
+    }
+
+    /* ── Kartu stok: riwayat berhalaman ──────────────────────────────────── */
+
+    /**
+     * Riwayat mutasi dihalamankan, bukan dipotong `limit(30)`.
+     *
+     * Pemotongan diam-diam justru menghapus jawaban yang dicari: kartu stok dibuka untuk
+     * menelusuri KE BELAKANG — "kapan angka ini mulai salah". Barang laris di kelontong bisa
+     * punya ratusan mutasi dalam sebulan, jadi 30 baris terakhir membuat pemiliknya
+     * menyimpulkan tidak ada apa-apa sebelum itu.
+     */
+    public function test_riwayat_kartu_stok_berhalaman_sepuluh_bukan_dipotong(): void
+    {
+        $produk = Product::create([
+            'nama_produk' => 'Beras Laris', 'harga_default' => 12000, 'satuan' => Satuan::Kg,
+        ]);
+
+        $stok = Stock::create([
+            'outlet_id' => $this->outlet->getKey(), 'product_id' => $produk->getKey(),
+            'jumlah_saat_ini' => 500, 'stok_minimum' => 10,
+        ]);
+
+        $adjust = app(AdjustStockAction::class);
+
+        for ($i = 0; $i < 34; $i++) {
+            $adjust->execute($stok->fresh(), StockMovementType::Keluar, -1, null, null, 'Terjual '.$i);
+        }
+
+        $komponen = Livewire::actingAs($this->owner)->test(LayarStok::class);
+        $kunci = collect($komponen->viewData('daftar')->items())->firstWhere('nama', 'Beras Laris')['kunci'];
+
+        $kartu = $komponen->call('bukaKartu', $kunci)->viewData('kartu');
+
+        $this->assertSame(config('nampan.per_halaman'), $kartu->perPage());
+        $this->assertSame(34, $kartu->total(), 'seluruh riwayat terjangkau, tidak dipotong');
+        $this->assertCount(10, $kartu->items());
+
+        // Halaman kartu punya penunjuk SENDIRI: kalau ikut 'page', membuka riwayat di
+        // halaman 3 daftar akan melompatkan daftarnya, dan sebaliknya.
+        $this->assertSame('kartu', $kartu->getPageName());
     }
 }

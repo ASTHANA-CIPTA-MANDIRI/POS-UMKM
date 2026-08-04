@@ -408,6 +408,15 @@
                     </table>
                 </div>
             @endif
+
+            {{-- Navigasi halaman riwayat WAJIB dirender: kartu stok dipakai untuk
+                 menelusuri ke belakang, dan daftar yang memotong diam-diam tanpa penunjuk
+                 halaman membuat orang menyimpulkan tidak ada mutasi sebelum itu. --}}
+            @if (! $kartu->isEmpty() && method_exists($kartu, 'hasPages') && $kartu->hasPages())
+                <div class="border-t border-line-soft px-5 py-3 sm:px-6">
+                    {{ $kartu->links() }}
+                </div>
+            @endif
         </div>
     @endif
 

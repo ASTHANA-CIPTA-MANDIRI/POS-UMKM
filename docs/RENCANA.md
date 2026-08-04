@@ -38,11 +38,11 @@ tidak sesuai** — sekarang masih perkiraan.
 - [x] Alat: agen tim, laporan Telegram, pemeriksa kerapian | 2026-08-01 | infra | 6j
 - [x] Perbaikan uang kasir: bayar terpisah & validasi sinkronisasi | 2026-08-03 | kasir | 6j
 - [x] Stok & opname: konversi satuan, ambang minimum, hitung fisik, status "belum dihitung" | 2026-08-04 | owner | 12j
-- [x] Pagination 10 baris seluruh aplikasi (satu setelan + uji penjaga sumber) | 2026-08-04 | infra | 2j
+- [x] Pagination 10 baris seluruh aplikasi termasuk riwayat kartu stok | 2026-08-04 | infra | 2j
+- [x] Opname terkunci ke cabang tempat angkanya dihitung + jejak audit jujur | 2026-08-04 | owner | 3j
 
 ## Wajib sebelum deploy
 
-- [ ] Opname: ganti cabang di tengah hitung menyimpan angka ke cabang yang salah | 2026-08-05 | owner | 3j
 - [ ] Baris `stocks` kembar: `SiapkanBarisStokAction` tidak atomik | | data | 2j
 - [ ] Sisa stok tampil di layar kasir (lencana di petak produk) | | kasir | 4j
 - [ ] Pembelian: stok masuk, supplier, harga beli | | owner | 8j
@@ -104,18 +104,17 @@ menunggu jawaban.
   peringatannya sudah tidak berarti apa-apa. Yang SENGAJA belum dibedakan: baris yang ada
   tapi belum pernah dihitung fisik (mis. lahir dari penyetelan ambang) — di situ pemilik
   sudah menyatakan harapannya sendiri, jadi meminta beli sebanyak ambang bukan mengarang.
-- **Ganti cabang di tengah opname menyimpan ke cabang yang salah** (terbukti 2026-08-04,
-  belum diperbaiki). Owner berhak atas semua outletnya dan lembar opname punya dropdown
-  outlet, tapi `Opname::updated()` hanya mereset nomor halaman — `$fisik` dibiarkan utuh.
-  Karena kuncinya `product_id` dan produknya ada di kedua cabang, angka yang dihitung di
-  Cabang A ditemukan cocok di Cabang B lalu disimpan ke situ. Reproduksi: Beras A=100,
-  B=20; ketik 50 di A, ganti ke B, Simpan ⇒ **B jadi 50** (mutasi +30 di cabang salah),
-  A tidak tersentuh, tanpa peringatan apa pun. Terjangkau dalam pemakaian biasa: hitung
-  sebagian di gudang A, tersela, buka dropdown untuk melihat B, tekan Simpan.
-  Arahnya BUKAN sekadar "bersihkan saat ganti outlet" — itu menghapus hasil menghitung
-  120 barang tanpa bertanya. Lembar sebaiknya MENGUNCI outlet begitu angka pertama
-  diketik, supaya simpan selalu masuk ke outlet tempat angkanya dihitung, bukan ke outlet
-  yang sedang dipilih — pengaman di lapisan yang tidak bisa dilewati payload Livewire.
+- **Lembar opname terkunci ke cabang tempat angkanya dihitung** (selesai 2026-08-04).
+  Sebelumnya angka hasil hitung Cabang A bisa tersimpan ke Cabang B lewat dropdown, dan
+  catatan mutasinya bahkan memberi alasan yang terbaca wajar. Sekarang kunci lahir dari
+  ANGKA yang diketik (bukan halaman yang dibuka), simpan menolak kalau layar menampilkan
+  cabang lain, dan pemilik diberi tiga pilihan bernama. Yang menolak dibersihkan otomatis:
+  `<select>` berpindah nilai hanya dengan satu tombol panah, jadi menghapus hasil hitung
+  120 barang tanpa bertanya menukar cacat dengan cacat.
+- **Yang masih BELUM terbukti** di lembar opname, jangan dianggap aman maupun cacat:
+  kebocoran antar-tab (dua tab, dua cabang, owner yang sama), dan perilaku `wire:key` di
+  peramban hidup — yang terbukti baru bahwa kuncinya berubah per outlet plus alasan
+  morph-nya; sisanya butuh sesi login dan klik nyata.
 - Yang QA jujur belum buktikan di lembar opname, jangan dianggap aman maupun cacat: angka
   fisik notasi ilmiah (`1e10`), dan `alasan`/`catatan` dikirim sebagai array lewat payload
   Livewire mentah.

@@ -45,6 +45,23 @@
     // $namaPerKunci datang dari komponen, BUKAN dari $daftar->items(): baris yang gagal
     // bisa berada di halaman lain, dan nama yang diambil dari halaman ini saja akan
     // menampilkannya sebagai "Baris lain". Lihat Opname::namaPerKunci().
+
+    /*
+     * Nama outlet per id — dipakai blok peringatan kunci outlet DAN bar simpan.
+     *
+     * Sumbernya $outletTersedia, yaitu daftar yang SAMA dengan isi dropdown: hanya outlet
+     * yang memang boleh dilihat pengguna ini yang punya nama di sini. Sengaja tidak mencari
+     * nama lewat model — $outletDiminta lahir dari nilai yang dikirim klien dan bisa berisi
+     * id apa pun, jadi pencarian langsung akan mencetak nama usaha tenant lain di layar
+     * pemilik ini (lihat Opname::namaOutletDiminta(), yang menjaga hal yang sama).
+     *
+     * Untuk peran yang terkunci ke satu outlet, $outletTersedia memang kosong: dropdownnya
+     * tidak dirender, tidak ada cabang yang bisa tertukar, dan kalimatnya jatuh ke bentuk
+     * tanpa nama.
+     */
+    $namaOutlet = collect($outletTersedia)->pluck('nama', 'id');
+    $namaTerkunci = $namaOutlet[$outletTerkunci] ?? null;
+    $namaDipakai = $namaOutlet[$outletDipakai] ?? null;
 @endphp
 
 <div>
@@ -119,6 +136,68 @@
         </x-slot:saringan>
     </x-kartu-alat>
 
+    {{-- ── Pergantian cabang yang DITOLAK ─────────────────────────────────────
+         MENETAP di halaman, bukan toast, dan itu bukan pilihan gaya: blok ini membawa
+         tombol keputusannya. Toast hilang sendiri sesudah beberapa detik, dan bersama
+         toast itu ikut hilang satu-satunya jalan pemilik untuk benar-benar pindah cabang —
+         yang tersisa hanyalah mengosongkan 120 kolom satu per satu.
+
+         Tombol "buang" WAJIB ada di sini. Satu angka nyasar (nol tersenggol di baris yang
+         tidak sedang dilihat) tidak boleh membekukan dropdown selamanya, karena dengan 10
+         baris per halaman pemiliknya harus menyisir 12 halaman untuk menemukan barisnya.
+
+         Jumlah barisnya disebut DI TOMBOLNYA. Itu langkah konfirmasinya — pola dua langkah
+         yang sama dengan hapus produk, jadi tidak ada dialog tambahan di atasnya. --}}
+    @if ($outletDiminta !== null)
+        @php
+            // Dua bentuk kalimat, dan yang tanpa nama bukan kelalaian: id di luar
+            // outletTersedia() sengaja tidak diberi nama supaya nama outlet tenant lain
+            // tidak bocor ke layar. Yang dicetak dalam keadaan itu adalah kalimat tanpa
+            // nama — BUKAN id mentahnya, yang berupa UUID dan tidak berarti apa pun.
+            $sebutTerkunci = $namaTerkunci ?? 'cabang tempat angkanya dihitung';
+            $sebutDiminta = $namaOutletDiminta ?? 'cabang yang baru dipilih';
+        @endphp
+
+        <div role="alert" class="kartu mb-4 border border-jingga/30 px-5 py-4 sm:mb-5 sm:px-6">
+            <div class="flex items-start gap-3">
+                <svg viewBox="0 0 20 20" class="mt-0.5 size-4 shrink-0 text-jingga-tua" fill="none" aria-hidden="true">
+                    <circle cx="10" cy="10" r="7.5" stroke="currentColor" stroke-width="1.5" />
+                    <path d="M10 6.5v4M10 13.4v.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                </svg>
+                <div class="min-w-0">
+                    <p class="text-[0.875rem] font-bold text-jingga-tua">
+                        Lembar ini masih berisi hitungan {{ $namaTerkunci ?? 'cabang lain' }}
+                    </p>
+                    <p class="mt-0.5 text-[0.8125rem] text-umber">
+                        <span class="tabular font-semibold text-ink">{{ $jumlahTerisi }}</span>
+                        baris sudah dihitung untuk {{ $sebutTerkunci }}, sedangkan yang tadi dipilih {{ $sebutDiminta }}.
+                        Jumlah di rak {{ $sebutTerkunci }} tidak berlaku untuk {{ $sebutDiminta }}: kalau tersimpan ke
+                        cabang yang salah, stok kedua cabang jadi salah dan tidak ada catatan yang menunjukkan kenapa.
+                    </p>
+                </div>
+            </div>
+
+            {{-- Grid satu kolom di ponsel, sebaris di ≥sm: teksnya panjang karena memuat nama
+                 cabang, dan tombol lebar-tetap di 390px melebarkan halaman. --}}
+            <div class="mt-3 grid gap-2 sm:flex sm:flex-wrap">
+                <button type="button" wire:click="simpan" wire:loading.attr="disabled"
+                        class="min-h-11 cursor-pointer rounded-xl bg-terracotta px-4 py-2.5 text-[0.8125rem] font-bold text-white transition-colors hover:bg-terracotta-deep disabled:opacity-60">
+                    Simpan hitungan {{ $sebutTerkunci }} dulu
+                </button>
+
+                <button type="button" wire:click="pindahOutlet('{{ $outletDiminta }}')" wire:loading.attr="disabled"
+                        class="min-h-11 cursor-pointer rounded-xl bg-merah-deep px-4 py-2.5 text-[0.8125rem] font-bold text-white transition hover:brightness-110 disabled:opacity-60">
+                    Buang {{ $jumlahTerisi }} baris, pindah ke {{ $sebutDiminta }}
+                </button>
+
+                <button type="button" wire:click="tetapDiOutlet"
+                        class="min-h-11 cursor-pointer rounded-xl border border-line px-4 py-2.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                    Tetap di {{ $sebutTerkunci }}
+                </button>
+            </div>
+        </div>
+    @endif
+
     {{-- Ringkasan galat SELURUH lembar.
          Validasi berjalan atas semua baris terisi, termasuk yang sedang tidak tampak —
          jadi tanpa ringkasan ini, satu baris di halaman 3 bisa menahan simpan tanpa
@@ -173,7 +252,8 @@
                     $satuan = $b['satuan_dasar'] ?? $b['satuan'] ?? '';
                 @endphp
 
-                <div wire:key="kartu-{{ $kunci }}"
+                {{-- Kuncinya memuat outlet — lihat alasan lengkapnya di wire:key baris tabel. --}}
+                <div wire:key="kartu-{{ $outletDipakai }}-{{ $kunci }}"
                      x-data="barisOpname(@js((string) ($fisik[$kunci] ?? '')), @js((float) $b['sistem']), @js((string) ($alasan[$kunci] ?? '')))"
                      x-bind:class="selisih ? 'border-jingga bg-jingga/5' : 'border-transparent'"
                      @class(['kartu border p-4', 'border-jingga bg-jingga/5' => $beda !== null && $beda !== 0.0, 'border-transparent' => $beda === null || $beda === 0.0])>
@@ -276,8 +356,18 @@
 
                         {{-- Baris yang fisiknya ≠ sistem berwarna SEBELUM disimpan: itu satu
                              satunya cara pemilik melihat berapa baris yang akan menghasilkan
-                             mutasi, saat lembarnya masih bisa diperbaiki. --}}
-                        <tr wire:key="baris-{{ $kunci }}"
+                             mutasi, saat lembarnya masih bisa diperbaiki.
+
+                             wire:key MEMUAT OUTLET, dan itu bukan kehati-hatian: x-data di
+                             bawah menangkap `sistem` SEKALI saat Alpine menghidupkan
+                             elemennya. Dengan kunci yang sama di kedua cabang, morph Livewire
+                             memakai ulang elemen yang sama saat outlet berganti, Alpine tidak
+                             pernah dihidupkan ulang, dan `sistem` tetap milik cabang lama —
+                             kolom Selisih dan lencana "wajib pilih alasan" lalu berbicara
+                             tentang cabang yang salah. PHPUnit tidak pernah melihat ini:
+                             servernya merender angka yang benar, Alpine-lah yang menimpanya
+                             di peramban. Nama ikatannya (fisik.<kunci>) tidak berubah. --}}
+                        <tr wire:key="baris-{{ $outletDipakai }}-{{ $kunci }}"
                             x-data="barisOpname(@js((string) ($fisik[$kunci] ?? '')), @js((float) $b['sistem']), @js((string) ($alasan[$kunci] ?? '')))"
                             x-bind:class="selisih ? 'bg-jingga/10' : ''"
                             @class(['bg-jingga/10' => $beda !== null && $beda !== 0.0])>
@@ -361,20 +451,44 @@
          sticky, bukan fixed: ia tetap terlihat selama menggulir, tapi tetap punya tempat
          sendiri di alur halaman sehingga tidak pernah menutupi baris terakhir saat lembar
          sudah digulir sampai bawah. --}}
+    {{-- Nama cabangnya disebut DI SINI, dan itu bukan pengulangan yang berlebihan: bar ini
+         satu-satunya elemen yang selalu terlihat. Dropdown outlet duduk di baris saringan
+         paling atas dan sudah berada di luar layar begitu lembarnya digulir, jadi kalimat
+         ini pertahanan terakhir sebelum tombol simpan ditekan tanpa cabangnya pernah dibaca.
+         Tanpa nama hanya untuk peran yang terkunci satu outlet — di situ dropdownnya tidak
+         ada, jadi tidak ada cabang yang bisa tertukar. --}}
     <div class="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-line bg-white/95 px-4 py-3 backdrop-blur sm:px-5">
         <div class="min-w-0">
-            <p class="text-[0.9375rem] font-bold text-ink">
-                <span class="tabular">{{ $jumlahTerisi }}</span> baris terisi, belum disimpan
-            </p>
+            {{-- Dua bentuk utuh, bukan satu kalimat dengan @if di tengahnya: Blade TIDAK
+                 mengenali direktif yang menempel di belakang huruf (`terisi@if` dibaca
+                 sebagai teks biasa, lalu @endif-nya menjadi galat sintaks). --}}
+            @if ($namaDipakai !== null)
+                <p class="text-[0.9375rem] font-bold text-ink">
+                    <span class="tabular">{{ $jumlahTerisi }}</span> baris terisi untuk
+                    {{-- inline-block + max-w-full, bukan span biasa: nama cabang yang panjang
+                         terbelah dua baris membuat kotak span-nya menjadi gabungan kedua
+                         barisnya, dan kotak itu MENIMPA angka di baris pertama (terukur:
+                         tumpangTindih=1 di 390px). Sebagai kotak utuh ia pindah ke barisnya
+                         sendiri, dan max-w-full menjaganya tidak melebarkan halaman. --}}
+                    <span class="inline-block max-w-full text-terracotta">{{ $namaDipakai }}</span>, belum disimpan
+                </p>
+            @else
+                <p class="text-[0.9375rem] font-bold text-ink">
+                    <span class="tabular">{{ $jumlahTerisi }}</span> baris terisi, belum disimpan
+                </p>
+            @endif
             <p class="text-[0.75rem] text-umber">
                 Angka ini seluruh lembar, bukan hanya halaman ini — pindah halaman tidak menghapus yang sudah diketik.
                 Desimal ditulis dengan titik, mis. 1.5.
             </p>
         </div>
 
+        {{-- Lebar penuh di ponsel, dan tingginya minimum bukan tetap: teks tombol memuat nama
+             cabang, jadi ia bisa jatuh ke dua baris di 390px. Tombol lebar-tetap di situ
+             melebarkan halaman. --}}
         <button type="button" wire:click="simpan" wire:loading.attr="disabled"
-                class="h-12 shrink-0 cursor-pointer rounded-xl bg-terracotta px-6 text-[0.9375rem] font-bold text-white transition-colors hover:bg-terracotta-deep disabled:opacity-60">
-            <span wire:loading.remove wire:target="simpan">Simpan hasil hitung</span>
+                class="min-h-12 w-full cursor-pointer rounded-xl bg-terracotta px-6 py-3 text-[0.9375rem] font-bold text-white transition-colors hover:bg-terracotta-deep disabled:opacity-60 sm:w-auto sm:shrink-0">
+            <span wire:loading.remove wire:target="simpan">Simpan hasil hitung{{ $namaDipakai !== null ? ' — '.$namaDipakai : '' }}</span>
             <span wire:loading wire:target="simpan">Menyimpan…</span>
         </button>
     </div>
