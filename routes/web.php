@@ -11,7 +11,9 @@ use App\Livewire\Pages\Kasir\Transaksi as TransaksiKasir;
 use App\Livewire\Pages\Owner\Dasbor as DasborOwner;
 use App\Livewire\Pages\Owner\Langganan;
 use App\Livewire\Pages\Owner\Laporan as LaporanOwner;
+use App\Livewire\Pages\Owner\Opname as OpnameOwner;
 use App\Livewire\Pages\Owner\Produk as ProdukOwner;
+use App\Livewire\Pages\Owner\Stok as StokOwner;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -67,6 +69,18 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
         Route::middleware('tenant-aktif')->group(function () {
             Route::get('/', DasborOwner::class)->name('dasbor');
             Route::get('/produk', ProdukOwner::class)->name('produk');
+
+            /*
+             * Stok & opname sengaja HANYA di grup back office ini.
+             *
+             * Kasir tidak boleh membukanya: menghitung fisik adalah wewenang pemilik, dan
+             * membukanya untuk kasir berarti selisih bisa ditutup sendiri oleh orang yang
+             * memegang uangnya — laci kurang seratus ribu tinggal dicatat sebagai "rusak"
+             * dan tidak ada yang bisa membedakannya dari barang yang benar-benar rusak.
+             */
+            Route::get('/stok', StokOwner::class)->name('stok');
+            Route::get('/stok/opname', OpnameOwner::class)->name('stok.opname');
+
             Route::get('/laporan', LaporanOwner::class)->name('laporan');
         });
     });

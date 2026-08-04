@@ -2,6 +2,7 @@
 
 namespace App\Actions\Stock;
 
+use App\Enums\AlasanOpname;
 use App\Enums\StockMovementType;
 use App\Models\Stock;
 use App\Models\StockMovement;
@@ -18,6 +19,13 @@ use Illuminate\Support\Facades\DB;
  */
 class AdjustStockAction
 {
+    /**
+     * @param  ?AlasanOpname  $alasan  Hanya untuk mutasi opname/penyesuaian manual.
+     *                                 Penjualan, pembelian, dan transfer TIDAK punya alasan —
+     *                                 tipenya sendiri sudah menjelaskan sebabnya, dan mengisi
+     *                                 kolom ini untuk mereka membuat laporan selisih penuh
+     *                                 baris yang bukan selisih.
+     */
     public function execute(
         Stock $stock,
         StockMovementType $tipe,
@@ -25,8 +33,9 @@ class AdjustStockAction
         ?Model $referensi = null,
         ?string $olehUserId = null,
         ?string $catatan = null,
+        ?AlasanOpname $alasan = null,
     ): StockMovement {
-        return DB::transaction(function () use ($stock, $tipe, $delta, $referensi, $olehUserId, $catatan) {
+        return DB::transaction(function () use ($stock, $tipe, $delta, $referensi, $olehUserId, $catatan, $alasan) {
             // Lock baris supaya dua transaksi bersamaan tidak saling menimpa saldo.
             $terkunci = Stock::query()->whereKey($stock->getKey())->lockForUpdate()->first() ?? $stock;
 
@@ -39,6 +48,7 @@ class AdjustStockAction
                 'outlet_id' => $terkunci->outlet_id,
                 'stock_id' => $terkunci->getKey(),
                 'tipe' => $tipe,
+                'alasan' => $alasan,
                 'jumlah' => $delta,
                 'saldo_sesudah' => $saldoBaru,
                 'oleh_user_id' => $olehUserId,

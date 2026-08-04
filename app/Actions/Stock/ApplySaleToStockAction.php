@@ -20,6 +20,9 @@ use App\Models\Transaction;
  * Stok DIBIARKAN menjadi negatif kalau catatan awalnya kurang. Penjualan offline
  * yang baru masuk belakangan sudah benar-benar terjadi secara fisik, jadi menolak
  * mutasinya akan membuat kartu stok bohong; selisihnya diselesaikan lewat opname.
+ *
+ * Penjualan yang tiba SESUDAH opname tapi terjadi SEBELUMNYA tetap diterapkan, dengan
+ * penanda perlu_diperiksa + catatan — lihat catatanMutasi().
  */
 class ApplySaleToStockAction
 {
@@ -58,7 +61,11 @@ class ApplySaleToStockAction
                         -$recipeItem->kebutuhanUntuk($qty),
                         $transaction,
                         $olehUserId,
-                        "Pemakaian bahan baku dari penjualan {$transaction->nomor_transaksi}",
+                        $this->catatanMutasi(
+                            $stock,
+                            $transaction,
+                            "Pemakaian bahan baku dari penjualan {$transaction->nomor_transaksi}",
+                        ),
                     );
                 }
 
@@ -81,11 +88,52 @@ class ApplySaleToStockAction
                 -$this->qtyDalamSatuanDasar($product, $qty),
                 $transaction,
                 $olehUserId,
-                "Penjualan {$transaction->nomor_transaksi}",
+                $this->catatanMutasi($stock, $transaction, "Penjualan {$transaction->nomor_transaksi}"),
             );
         }
 
         return $movements;
+    }
+
+    /**
+     * Penanda "penjualan datang setelah opname".
+     *
+     * Mutasinya TETAP diterapkan. Penjualannya sungguh terjadi — barangnya sudah keluar
+     * dari rak dan uangnya sudah masuk — jadi menolaknya akan membuat kartu stok bohong
+     * (aturan 5 CLAUDE.md: stok boleh minus, penjualan jangan pernah diblokir).
+     *
+     * Tapi ada satu keadaan yang berbahaya justru karena tidak kelihatan salah:
+     * transaksi offline jam 09.00 yang baru disinkronkan jam 11.00, sedangkan opname
+     * dilakukan jam 10.00. Barang yang terjual jam 09.00 SUDAH tidak ada di rak saat
+     * dihitung, jadi opname sudah memotongnya sekali; mutasi penjualan ini
+     * memotongnya lagi. Stok berakhir kurang sebanyak barang yang terjual pagi itu,
+     * tanpa galat, tanpa angka minus yang mencolok, dan tanpa satu pun jejak yang
+     * menjelaskannya. Selisihnya baru muncul di opname berikutnya sebagai "hilang".
+     *
+     * Karena itu barisnya ditandai perlu_diperiksa dan mutasinya membawa penanda di
+     * catatan — dua-duanya, karena bendera memberi tahu "periksa ini" sedangkan catatan
+     * memberi tahu "kenapa".
+     */
+    private function catatanMutasi(Stock $stock, Transaction $transaction, string $catatan): string
+    {
+        $opname = $stock->opname_terakhir_pada;
+        $waktu = $transaction->waktu_transaksi;
+
+        if ($opname === null || $waktu === null || ! $waktu->lt($opname)) {
+            return $catatan;
+        }
+
+        // Hanya kolom bendera yang ikut tersimpan (jumlah_saat_ini tidak pernah disentuh
+        // di sini), jadi ini bukan jalur kedua yang mengubah saldo.
+        $stock->perlu_diperiksa = true;
+        $stock->save();
+
+        return $catatan.sprintf(
+            ' [PERLU DIPERIKSA] Transaksi terjadi %s, SEBELUM opname terakhir %s, dan baru disinkronkan sekarang. '
+            .'Barangnya kemungkinan sudah ikut terhitung saat opname, jadi stok bisa terpotong dua kali.',
+            $waktu->format('d/m/Y H:i'),
+            $opname->format('d/m/Y H:i'),
+        );
     }
 
     private function qtyDalamSatuanDasar(Product $product, float $qty): float
