@@ -42,6 +42,7 @@ tidak sesuai** — sekarang masih perkiraan.
 
 ## Wajib sebelum deploy
 
+- [ ] Opname: ganti cabang di tengah hitung menyimpan angka ke cabang yang salah | 2026-08-05 | owner | 3j
 - [ ] Baris `stocks` kembar: `SiapkanBarisStokAction` tidak atomik | | data | 2j
 - [ ] Sisa stok tampil di layar kasir (lencana di petak produk) | | kasir | 4j
 - [ ] Pembelian: stok masuk, supplier, harga beli | | owner | 8j
@@ -103,6 +104,18 @@ menunggu jawaban.
   peringatannya sudah tidak berarti apa-apa. Yang SENGAJA belum dibedakan: baris yang ada
   tapi belum pernah dihitung fisik (mis. lahir dari penyetelan ambang) — di situ pemilik
   sudah menyatakan harapannya sendiri, jadi meminta beli sebanyak ambang bukan mengarang.
+- **Ganti cabang di tengah opname menyimpan ke cabang yang salah** (terbukti 2026-08-04,
+  belum diperbaiki). Owner berhak atas semua outletnya dan lembar opname punya dropdown
+  outlet, tapi `Opname::updated()` hanya mereset nomor halaman — `$fisik` dibiarkan utuh.
+  Karena kuncinya `product_id` dan produknya ada di kedua cabang, angka yang dihitung di
+  Cabang A ditemukan cocok di Cabang B lalu disimpan ke situ. Reproduksi: Beras A=100,
+  B=20; ketik 50 di A, ganti ke B, Simpan ⇒ **B jadi 50** (mutasi +30 di cabang salah),
+  A tidak tersentuh, tanpa peringatan apa pun. Terjangkau dalam pemakaian biasa: hitung
+  sebagian di gudang A, tersela, buka dropdown untuk melihat B, tekan Simpan.
+  Arahnya BUKAN sekadar "bersihkan saat ganti outlet" — itu menghapus hasil menghitung
+  120 barang tanpa bertanya. Lembar sebaiknya MENGUNCI outlet begitu angka pertama
+  diketik, supaya simpan selalu masuk ke outlet tempat angkanya dihitung, bukan ke outlet
+  yang sedang dipilih — pengaman di lapisan yang tidak bisa dilewati payload Livewire.
 - Yang QA jujur belum buktikan di lembar opname, jangan dianggap aman maupun cacat: angka
   fisik notasi ilmiah (`1e10`), dan `alasan`/`catatan` dikirim sebagai array lewat payload
   Livewire mentah.
