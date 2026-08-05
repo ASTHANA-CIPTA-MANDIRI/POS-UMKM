@@ -115,11 +115,13 @@
          `sticky top-4 mb-2`, jadi tanpa ini sisa jaraknya hanya ±8px — kartu pertama
          halaman terlihat MENEMPEL ke kartu judul, sementara jarak antar-bagian di bawahnya
          16/20px. Nilainya bukan angka baru, hanya melengkapi irama yang sudah ada. --}}
-    {{-- DUA kolom sejak ponsel, alasan yang sama dengan kartu "Harus belanja": empat
-         kartu yang menumpuk satu per baris menghabiskan hampir satu layar penuh di HP,
-         sehingga isi layar yang sebenarnya — daftar barangnya — baru mulai jauh di bawah
-         lipatan. --}}
-    <div class="mt-2 mb-4 grid grid-cols-2 gap-3 sm:mt-3 sm:mb-5 xl:grid-cols-[1.35fr_repeat(3,minmax(0,1fr))]">
+    {{-- Dua kolom baru dari ≥sm, TIDAK di 390px — dan ini pernah saya salah sekali.
+         Dijadikan dua kolom di ponsel, tiap kartu hanya dapat ±150px dan isinya terpotong
+         jadi "Nilai per…" / "Rp 1.…". Angka uang yang terpotong lebih buruk daripada tidak
+         ditampilkan sama sekali: pembacanya menduga digit yang hilang, dan dugaan itu dipakai
+         untuk memutuskan belanja. Kartu "Harus belanja" boleh dua-dua karena isinya nama
+         barang pendek, bukan nominal. --}}
+    <div class="mt-2 mb-4 grid gap-3 sm:mt-3 sm:mb-5 sm:grid-cols-2 xl:grid-cols-[1.35fr_repeat(3,minmax(0,1fr))]">
         <div class="kartu flex min-h-[5.625rem] items-center gap-4 pr-5 pl-[1.125rem]">
             <span class="lencana-ikon bg-cream-deep text-terracotta">
                 <svg viewBox="0 0 24 24" class="size-6" fill="none" aria-hidden="true">
@@ -212,7 +214,6 @@
     </div>
 
     <x-kartu-alat
-        :aksi-penuh="true"
         judul="Stok per outlet"
         jumlah="{{ $daftar->total() }}"
         keterangan="Selalu satu outlet — angka gabungan cabang tidak bisa dibelanjakan."
@@ -220,18 +221,32 @@
         <x-slot:aksi>
             {{-- Tautan, bukan tombol wire:click: opname adalah halaman tersendiri, dan
                  tautan bisa dibuka di tab lain saat lembar hitungnya dipegang orang kedua. --}}
-            {{-- Tindakan utama layar ini, dan di ponsel ia dibuat selebar kartu dengan tinggi
-                 48px: itu tombol yang paling sering ditekan dari layar ini, dan sebagai kotak
-                 kecil menempel di kanan judul ia terbaca setara dengan tautan biasa. --}}
+            {{-- Seukuran isinya dan SEJAJAR dengan judul seksinya sejak ponsel, bukan tombol
+                 selebar kartu yang turun ke bawah judulnya (permintaan pemilik proyek; bentuk
+                 selebar kartu adalah permintaan sebelumnya yang digantikan).
+
+                 Tingginya 44px — batas bawah target sentuh, bukan angka yang dipilih supaya
+                 muat. Ukurannya persis sama dengan "Daftar stok" di layar hitung stok, jadi
+                 pasangan pergi-pulang antara dua layar ini terbaca sebagai satu pasangan.
+                 Yang membedakan tindakan utama dari tautan biasa di sini warnanya
+                 (tombol-utama terisi penuh), bukan lebarnya. --}}
             <a href="{{ route('owner.stok.opname', $outletDipakai !== null ? ['outlet' => $outletDipakai] : []) }}"
                wire:navigate
-               class="tombol-utama h-12 w-full px-5 text-[0.9375rem]">
+               class="tombol-utama h-11 w-auto shrink-0 px-4 text-[0.875rem]">
                 <span class="tombol-ikon">
                     <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                         <path d="M6 4h8v12H6V4Zm2.5 3.5h3M8.5 10h3M8.5 12.5h1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
                     </svg>
                 </span>
-                Hitung stok sekarang
+                {{-- Dua bentuk teks: tombolnya duduk SEJAJAR dengan judul seksinya, jadi
+                     lebarnya langsung memakan lebar judul. Terukur di 390px: dengan
+                     "Hitung stok sekarang" (211px) sisanya cuma 91px, sehingga "Stok per
+                     outlet" pecah dua baris dan lencana jumlahnya turun ke baris ketiga.
+                     Bentuk pendek dipakai di bawah 640px saja; maknanya tidak berubah —
+                     "sekarang" hanya penegas, dan yang menjelaskan waktunya sudah ada di
+                     kalimat di bawah judulnya. --}}
+                <span class="sm:hidden">Hitung stok</span>
+                <span class="hidden sm:inline">Hitung stok sekarang</span>
             </a>
         </x-slot:aksi>
 
@@ -285,21 +300,35 @@
 
                 {{-- Ringkasan dipasang PADA saringannya, bukan sebagai deretan kartu angka
                      terpisah: angka yang tidak bisa diklik hanya memberi tahu ada masalah
-                     tanpa membawa siapa pun ke barangnya. Barisnya digulir mendatar di
-                     ponsel alih-alih melebarkan halaman. --}}
-                <div class="-m-px max-w-full overflow-x-auto p-px lg:col-span-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {{-- Di layar lebar deretnya MENGISI lebar penuh (setiap pil `flex-1`);
-                         menggerombol di kiri, ia menyisakan bidang kosong selebar sepertiga
-                         kartu di kanannya. Di ponsel tetap `w-fit` supaya bisa digulir
-                         mendatar di dalam wadah ini — bukan melebarkan halaman. --}}
-                    {{-- min-w-full, bukan w-fit: deretnya mengisi lebar penuh di SEMUA ukuran, dan
-                         tetap bisa digulir mendatar kalau pilnya tidak muat. Dengan `w-fit`
-                         ia menggerombol di kiri dan menyisakan bidang kosong di kanannya —
-                         paling terasa di tablet, tempat lebarnya cukup tapi tidak dipakai.
-                         Pilnya TIDAK dipaksa `flex-1` di ponsel: tujuh pil dibagi 390px
-                         menyisakan ±50px masing-masing, dan angka di sebelah namanya —
-                         justru isi utamanya — akan hilang. --}}
-                    <div class="inline-flex min-w-full items-center gap-1 rounded-xl bg-white p-1 ring-1 ring-line lg:flex lg:w-full">
+                     tanpa membawa siapa pun ke barangnya. --}}
+                {{-- col-span-2 di ponsel. Tanpa itu deret pil ini menempati SATU kolom dari
+                     petak dua kolom — terukur 153px dari 318px lebar kartu — sehingga enam
+                     dari tujuh pilnya berada di luar layar dan hanya bisa ditemukan dengan
+                     menggulir ke samping di dalam kotak selebar ibu jari. --}}
+                <div class="col-span-2 -m-px min-w-0 overflow-x-auto p-px lg:col-span-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {{-- MEMBUNGKUS ke baris berikutnya di ponsel, bukan digulir mendatar.
+                         Pil yang harus digulir untuk ditemukan sama saja dengan pil yang tidak
+                         ada, dan dua yang paling perlu ditemukan — "Belum dihitung" dan "Perlu
+                         dihitung ulang" — justru yang paling ujung. Ketujuhnya TIDAK dipaksa
+                         sebaris dengan `flex-1` di 390px: masing-masing cuma kebagian ±50px
+                         dan angka di sebelah namanya, yang justru isi utamanya, akan hilang.
+
+                         `grow` membuat pil di setiap baris melar mengisi sisa lebarnya, jadi
+                         deretnya rata kanan-kiri alih-alih menggantung setengah baris. Di ≥lg
+                         tetap seperti semula: satu baris, setiap pil `flex-1`.
+
+                         Melarnya DIBATASI 20rem, dan barisnya ditengahkan. Di 768px baris
+                         kedua kadang hanya berisi satu pil; tanpa batas itu ia melar jadi
+                         664px — dan begitu pil itu yang sedang aktif, ia berubah menjadi
+                         batang terracotta selebar kartu yang terbaca sebagai tombol, bukan
+                         sebagai satu pilihan di antara tujuh. Batasnya sengaja lebih lebar
+                         daripada pil terpanjang (168px), jadi tidak pernah ada teks yang
+                         terpotong karenanya.
+
+                         overflow-x-auto disisakan sebagai jaring pengaman — kalau satu pil
+                         sendirian lebih lebar daripada kartunya (angka lima digit), yang
+                         menggulir kotak ini, bukan halamannya. --}}
+                    <div class="flex min-w-full flex-wrap items-center justify-center gap-1 rounded-xl bg-white p-1 ring-1 ring-line lg:flex-nowrap">
                         {{-- 'Semua' memakai $ringkasan['semua'] — jumlah baris yang SEBENARNYA,
                              bukan penjumlahan chip di sebelahnya. Bentuk lama menjumlah empat
                              status manual, jadi status kelima membuatnya kurang secara diam-diam:
@@ -319,7 +348,7 @@
                             <button type="button" wire:click="$set('status', '{{ $nilai }}')"
                                     aria-pressed="{{ $status === $nilai ? 'true' : 'false' }}"
                                     @class([
-                                        'flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[0.8125rem] whitespace-nowrap transition lg:flex-1',
+                                        'flex h-9 max-w-80 shrink-0 grow cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 text-[0.8125rem] whitespace-nowrap transition lg:max-w-none lg:flex-1',
                                         'bg-terracotta font-semibold text-white' => $status === $nilai,
                                         'font-medium text-umber hover:bg-cream hover:text-ink' => $status !== $nilai,
                                     ])>
@@ -368,9 +397,12 @@
             //
             // Di layar lebar barisnya dipilih supaya tidak ada kartu yatim: 3 kolom kalau
             // jumlahnya habis dibagi 3, kalau tidak 2 kolom.
+            // Di ≥lg barisnya dipilih supaya tidak ada kartu yatim: 3 kolom kalau jumlahnya
+            // habis dibagi 3, kalau tidak 2 kolom. Di bawah lg tidak dipakai — di situ
+            // kartunya digeser mendatar, bukan dipetak.
             $kolomBelanja = match (true) {
-                $muat % 3 === 0 => 'grid-cols-2 lg:grid-cols-3',
-                default => 'grid-cols-2',
+                $muat % 3 === 0 => 'lg:grid-cols-3',
+                default => 'lg:grid-cols-2',
             };
         @endphp
 
@@ -389,11 +421,29 @@
                 </p>
             </div>
 
-            <div class="grid gap-3 px-5 py-4 sm:px-6 {{ $kolomBelanja }}">
+            {{-- Di bawah lg: satu jalur yang DIGESER mendatar, bukan petak yang memanjang
+                 ke bawah. Empat kartu bertumpuk membuat blok ini setinggi satu layar penuh,
+                 dan pemilik harus menggulir jauh hanya untuk sampai ke daftar barangnya.
+
+                 Kartu dibuat 78% lebar wadahnya, dan angka itu disengaja: kartu berikutnya
+                 IKUT TERLIHAT sepotong di tepi kanan. Tanpa potongan itu tidak ada yang
+                 memberi tahu bahwa jalurnya bisa digeser, dan jalur yang tidak diketahui bisa
+                 digeser sama saja dengan kartu-kartu berikutnya tidak ada.
+
+                 `snap` supaya berhentinya pas di kartu, bukan menggantung setengah. Batang
+                 gulirnya disembunyikan mengikuti pola deret pil di atas — potongan kartunya
+                 sudah menjadi penandanya.
+
+                 Di ≥lg kembali jadi petak: layarnya cukup lebar untuk menampilkan semuanya
+                 sekaligus, dan menggeser di tetikus lebih repot daripada melihat. --}}
+            <div class="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 py-4 sm:px-6 lg:grid lg:snap-none lg:overflow-visible {{ $kolomBelanja }} [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 @foreach ($tampil as $b)
                     @php [$judulTindakan, $ketTindakan] = $tindakan($b); @endphp
 
-                    <div class="flex min-w-0 flex-col gap-2 rounded-xl border border-line p-3.5">
+                    {{-- 78% + shrink-0: kartu berikutnya menyembul di tepi kanan, itulah yang
+                         memberi tahu jalurnya bisa digeser. Di ≥lg lebarnya dilepas kembali ke
+                         petak. --}}
+                    <div class="flex w-[78%] shrink-0 snap-start flex-col gap-2 rounded-xl border border-line p-3.5 lg:w-auto lg:shrink lg:snap-align-none">
                         <div class="flex min-w-0 items-start justify-between gap-2">
                             <p class="min-w-0 flex-1 text-[0.9375rem] font-bold text-ink">{{ $b['nama'] }}</p>
                             <x-lencana :warna="$warnaStatus($b['status'])" :denyut="$b['status'] !== 'belum_dihitung'" class="shrink-0">

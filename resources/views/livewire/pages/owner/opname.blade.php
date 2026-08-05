@@ -74,11 +74,10 @@
         keterangan="Isi jumlah yang benar-benar ada di rak. Kolom kosong berarti belum dihitung, bukan nol · desimal pakai titik (1.5)."
     >
         <x-slot:aksi>
-            {{-- Selebar kartu di ponsel, 48px: ini satu-satunya jalan keluar dari lembar
-                 hitung, dan sebagai kotak kecil di pojok kanan judul ia hampir tidak
-                 terlihat di layar 390px. Tetap bergaris rambut, bukan isian penuh — tombol
-                 utama layar ini adalah SIMPAN di bar bawah, dan dua tombol berwarna penuh di
-                 satu layar membuat keduanya berhenti berarti. --}}
+            {{-- Seukuran isinya dan sejajar dengan judul seksinya sejak ponsel, tinggi 44px
+                 (batas bawah target sentuh). Tetap bergaris rambut, bukan isian penuh —
+                 tombol utama layar ini adalah SIMPAN di bar bawah, dan dua tombol berwarna
+                 penuh di satu layar membuat keduanya berhenti berarti. --}}
             <a href="{{ route('owner.stok', $outletDipakai !== null ? ['outlet' => $outletDipakai] : []) }}"
                wire:navigate
                class="tombol-kedua h-11 w-auto shrink-0 px-4 text-[0.875rem]">
