@@ -41,8 +41,13 @@
      * kalimat di atasnya. Di ponsel keduanya dibuat berlabel dan berbagi lebar penuh:
      * sasaran sentuhnya besar, maksudnya terbaca tanpa menebak arti panah, dan barisnya
      * penuh. Di ≥sm kembali jadi kotak ikon karena di sana ada tombol angka di antaranya.
+     *
+     * `max-sm:flex` WAJIB dan bukan sekadar penegas: $petak memakai `grid place-items-center`,
+     * dan dua anak di dalam grid tanpa kolom eksplisit tersusun KE BAWAH — ikon di atas
+     * labelnya, bukan di sampingnya. Hanya kelihatan setelah tombolnya berlabel; selama
+     * isinya cuma ikon, grid dan flex tampak sama.
      */
-    $petakArah = $petak.' max-sm:h-11 max-sm:w-full max-sm:gap-2';
+    $petakArah = $petak.' max-sm:flex max-sm:w-full max-sm:items-center max-sm:justify-center max-sm:gap-2 max-sm:h-11';
     $bisa = 'cursor-pointer border border-line bg-white text-ink hover:border-terracotta hover:text-terracotta';
     $mati = 'cursor-default border border-line-soft bg-cream text-umber-soft/70';
 @endphp
