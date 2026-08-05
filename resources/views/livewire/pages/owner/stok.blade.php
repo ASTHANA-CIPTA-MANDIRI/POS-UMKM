@@ -148,10 +148,20 @@
                      yang membandingkannya dengan uang belanjanya menyimpulkan pencatatannya
                      kacau — padahal yang kurang hanya harga belinya. --}}
                 <p class="mt-0.5 line-clamp-2 text-[0.6875rem] leading-snug {{ $nilaiPersediaan['tanpa_harga'] > 0 ? 'text-jingga-tua' : 'text-umber-soft' }}">
+                    {{-- Kalimatnya menjelaskan angka yang MELOMPAT sesudah belanja: harga beli
+                         TERAKHIR yang menang (lihat CatatPembelianAction), jadi satu nota baru
+                         menilai ulang seluruh stok lama barang itu. Tanpa keterangan ini,
+                         lompatannya terbaca sebagai aplikasi yang salah hitung.
+
+                         Ia menempati baris yang SAMA dengan keterangan lama ("jumlah sistem ×
+                         harga beli") dan tetap `line-clamp-2`, jadi tinggi keempat kartu
+                         ringkasan tidak berubah (terukur 90px). Kalau barang tanpa harga beli
+                         ada, peringatan itu yang menang — ia mengubah keputusan, kalimat ini
+                         hanya menjelaskan. --}}
                     @if ($nilaiPersediaan['tanpa_harga'] > 0)
                         {{ $nilaiPersediaan['tanpa_harga'] }} barang belum ada harga belinya
                     @else
-                        jumlah sistem × harga beli
+                        Dihitung dengan harga beli terakhir.
                     @endif
                 </p>
             </div>

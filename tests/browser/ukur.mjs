@@ -123,12 +123,34 @@ for (const g of gagalMuat) {
     console.log(`${awalan}: ${g.jenis} ${g.sebab} — ${g.url}`);
 }
 
+/*
+ * Lebar yang DIMINTA harus sama dengan lebar yang benar-benar terukur.
+ *
+ * Kalau ada lebih dari satu Chrome/tab yang mendengarkan porta debug, `/json/list`
+ * bisa mengembalikan target yang berbeda dari yang dipakai pengukuran sebelumnya —
+ * dan hasilnya angka yang bergeser: permintaan 390px melaporkan lebar=1280, 768
+ * melaporkan 390, dan seterusnya. Semuanya tampak BERSIH karena asetnya memang
+ * termuat, jadi penjaga "GAGAL MUAT" tidak menangkapnya sama sekali.
+ *
+ * Ini sudah benar-benar terjadi. Pemeriksaan satu baris di bawah membuatnya mustahil
+ * lolos lagi.
+ */
+const lebarNyata = (await kirim('Runtime.evaluate', {
+    expression: 'window.innerWidth', returnByValue: true,
+})).result?.result?.value;
+
+if (Number(lebarNyata) !== Number(lebar)) {
+    console.log(`TIDAK SAH: diminta ${lebar}px, yang terukur ${lebarNyata}px — kemungkinan `
+        + 'ada lebih dari satu Chrome/tab di porta 9333. Matikan semuanya, nyalakan SATU, ulangi.');
+    process.exitCode = 2;
+}
+
 if (ukur) {
     const balasan = await kirim('Runtime.evaluate', { expression: ukur, returnByValue: true, awaitPromise: true });
 
     const nilai = balasan.result?.result?.value;
     // Tandanya di DEPAN baris, bukan di belakang: baris hasil sering dipotong `head`.
-    const tanda = fatal.length > 0 ? 'TIDAK SAH — ' : '';
+    const tanda = (fatal.length > 0 || Number(lebarNyata) !== Number(lebar)) ? 'TIDAK SAH — ' : '';
     console.log(tanda + `${lebar}px | ` + (typeof nilai === 'string' ? nilai : JSON.stringify(balasan.result).slice(0, 700)));
 }
 

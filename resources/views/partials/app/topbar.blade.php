@@ -11,6 +11,19 @@
     'admin.dasbor' => ['Platform', 'Dasbor'],
     'owner.dasbor' => ['Kelola', 'Dasbor'],
     'owner.produk' => ['Katalog & stok', 'Produk'],
+    /*
+     * Rute yang belum terpeta jatuh ke cadangan "nama rute sesudah titik terakhir", dan
+     * untuk dua rute berikut cadangan itu SALAH secara berbahaya:
+     * `owner.stok.opname` jatuh ke "Opname" — kata akuntansi yang justru dilarang tampil
+     * oleh bagian "Bahasa layar" di CLAUDE.md, sementara seluruh isi layarnya sudah
+     * memakai "hitung stok"; dan `owner.pembelian.baru` jatuh ke "Baru", yang tidak
+     * berarti apa pun di HP tempat judul itu satu-satunya penunjuk halaman.
+     * Judulnya sengaja pendek: judul 1,5rem ber-truncate di 390px.
+     */
+    'owner.stok.opname' => ['Katalog & stok', 'Hitung stok'],
+    'owner.stok' => ['Katalog & stok', 'Stok'],
+    'owner.pembelian.baru' => ['Katalog & stok', 'Catat nota'],
+    'owner.pembelian' => ['Katalog & stok', 'Nota belanja'],
     'owner.laporan' => ['Kelola', 'Laporan'],
     'owner.langganan' => ['Kelola', 'Langganan'],
     ];

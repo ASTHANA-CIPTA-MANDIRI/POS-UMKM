@@ -89,6 +89,15 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
   terbuka kosong dan terbaca sebagai "tidak ada data". `->links()` selalu dirender;
   `limit(n)` tanpa penunjuk halaman adalah pemotongan diam-diam.
 
+### Uji mutasi pada berkas Blade: WAJIB `view:clear` sesudah memulihkan
+
+Blade dikompilasi dan hasilnya di-cache. Kalau kamu merusak sebuah `.blade.php` untuk uji
+mutasi lalu memulihkannya, **cache masih memegang versi yang dirusak** — dan uji berikutnya
+memakai versi itu. Akibatnya bisa dua arah: uji yang seharusnya hijau tampak merah, atau
+sebaliknya. Sudah terjadi: satu uji penjaga tampak merah padahal berkasnya sudah benar.
+
+Urutannya: rusak → uji → pulihkan → **`php artisan view:clear`** → uji lagi.
+
 ## PATOKAN RESPONSIF — tiru layar Stok & hitung stok
 
 Kedua layar itu sudah melewati belasan putaran koreksi pemilik proyek dan diukur di

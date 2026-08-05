@@ -99,4 +99,42 @@ class SidebarAktifTest extends TestCase
                 "tepat satu menu harus aktif di {$rute}");
         }
     }
+
+    /* ── Judul halaman di navbar ─────────────────────────────────────────── */
+
+    /**
+     * Judul navbar tidak boleh membocorkan kata akuntansi yang dilarang tampil.
+     *
+     * Cacat nyata yang ditemukan agen frontend: rute `owner.stok.opname` belum terpeta di
+     * `topbar.blade.php`, jadi judulnya jatuh ke cadangan "nama rute sesudah titik terakhir"
+     * dan tercetak **"Opname"** — kata yang seluruh isi layarnya sudah dihindari
+     * (CLAUDE.md, bagian "Bahasa layar"). Cadangan itu berguna supaya halaman baru tidak
+     * tampil tanpa judul, tapi ia mengambil nama TEKNIS rutenya, dan nama rute tidak wajib
+     * memakai bahasa pengguna.
+     *
+     * Diuji atas HTML terender, bukan atas isi $peta: yang salah bukan petanya, melainkan
+     * apa yang sampai ke layar.
+     */
+    public function test_judul_navbar_tidak_memakai_kata_akuntansi(): void
+    {
+        foreach ([
+            'owner.stok.opname' => 'Hitung stok',
+            'owner.pembelian' => 'Nota belanja',
+            'owner.pembelian.baru' => 'Catat nota',
+        ] as $rute => $judulSeharusnya) {
+            if (! Route::has($rute)) {
+                continue;
+            }
+
+            $html = $this->bukaSebagaiOwner($rute);
+
+            $this->assertStringContainsString($judulSeharusnya, $html,
+                "judul halaman {$rute} harus '{$judulSeharusnya}'");
+
+            foreach (['Opname', 'Purchase', 'Supplier', 'Draft'] as $terlarang) {
+                $this->assertStringNotContainsString($terlarang, $html,
+                    "kata '{$terlarang}' tidak boleh tampil di {$rute} — lihat CLAUDE.md, Bahasa layar");
+            }
+        }
+    }
 }

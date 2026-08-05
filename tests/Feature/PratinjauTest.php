@@ -4,11 +4,16 @@ namespace Tests\Feature;
 
 use App\Actions\Kas\BukaSesiKasAction;
 use App\Actions\Kas\KoreksiModalAwalAction;
+use App\Actions\Kasir\SusunSisaStokAction;
+use App\Actions\Purchase\BatalkanPembelianAction;
+use App\Actions\Purchase\CatatPembelianAction;
 use App\Actions\Stock\AdjustStockAction;
 use App\Enums\AlasanOpname;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Livewire\Pages\Owner\Opname;
+use App\Livewire\Pages\Owner\Pembelian;
+use App\Livewire\Pages\Owner\PembelianBaru;
 use App\Livewire\Pages\Owner\Produk;
 use App\Livewire\Pages\Owner\Stok;
 use App\Models\CashSession;
@@ -67,6 +72,8 @@ class PratinjauTest extends TestCase
             mkdir($tujuan, 0755, true);
         }
 
+        $kasirWarteg = null;
+
         foreach (['warteg' => 'open_bill', 'depot' => 'pesan_antar'] as $nama => $mode) {
             // Outlet dibaca tanpa global scope: permintaan sebelumnya sudah menetapkan
             // TenantContext ke tenant lain, sehingga outlet tenant berikutnya
@@ -95,7 +102,13 @@ class PratinjauTest extends TestCase
             $html = $this->ambil('kasir.transaksi', $kasir);
 
             file_put_contents("{$tujuan}/kasir-{$nama}.html", $html);
+
+            if ($nama === 'warteg') {
+                $kasirWarteg = $kasir;
+            }
         }
+
+        $this->tangkapSisaStok($kasirWarteg, $tujuan);
 
         /*
          * Beranda kasir (riwayat + ringkasan), dua rentang.
@@ -164,6 +177,147 @@ class PratinjauTest extends TestCase
         }
 
         $this->assertFileExists("{$tujuan}/kasir-warteg.html");
+    }
+
+    /**
+     * Layar kasir DENGAN lencana sisa stok — ketiga keadaannya sekaligus.
+     *
+     * KENAPA butuh perlakuan khusus: lencananya digambar Alpine dari kabar yang ditarik
+     * lewat fetch ke /kasir/sisa-stok, sedangkan tangkapan ini HTML statis yang dibuka
+     * peramban tanpa sesi. Fetch-nya karena itu selalu gagal (dialihkan ke halaman masuk),
+     * dan tangkapan apa adanya cuma membuktikan satu hal: petak tanpa lencana tetap rapi.
+     * Itu keadaan yang sudah terpotret di kasir-warteg.html.
+     *
+     * Jalan yang dipakai: kabarnya DITANAM di localStorage lewat satu skrip kecil di
+     * kepala halaman, lalu jalur pemulihan yang sungguhan (pulihkanSisaStok) yang
+     * mengangkatnya saat Alpine init. Dipilih daripada menambah 'bekalAwal' berisi kabar
+     * awal karena:
+     *   - tidak satu baris pun kode produksi berubah demi sebuah tangkapan layar, dan
+     *   - jalur inilah yang benar-benar dipakai puluhan kali sehari di warung (tiap muat
+     *     ulang halaman), jadi yang terpotret adalah kode yang memang berjalan.
+     * Menaruhnya di bekalAwal justru akan melawan keputusan arsitekturnya: sisa stok
+     * SENGAJA lepas dari katalog karena umurnya beda (lihat SisaStokController).
+     *
+     * Isi kabarnya bukan karangan: peta yang ditanam adalah keluaran SusunSisaStokAction
+     * yang sebenarnya atas data yang dibengkokkan di bawah — kalau bentuk muatannya
+     * berubah, tangkapan ini ikut berubah alih-alih diam-diam ketinggalan.
+     */
+    private function tangkapSisaStok(?User $kasir, string $tujuan): void
+    {
+        $this->assertNotNull($kasir, 'Kasir warteg tidak ditemukan untuk tangkapan sisa stok.');
+
+        $outletId = $kasir->outlet_id;
+
+        // Konteks diarahkan dulu: produk contoh di bawah dibuat lewat model biasa, dan
+        // BelongsToTenant mengambil tenant_id dari konteks. Tanpa ini ia lahir di tenant
+        // permintaan sebelumnya (depot) dan tidak akan pernah muncul di katalog warteg.
+        app(TenantContext::class)->setTenant($kasir->tenant_id)->setOutlet($outletId);
+
+        $bahan = RawMaterial::withoutGlobalScopes()
+            ->where('tenant_id', $kasir->tenant_id)
+            ->get()
+            ->keyBy('nama');
+
+        $produk = Product::withoutGlobalScopes()
+            ->where('tenant_id', $kasir->tenant_id)
+            ->get()
+            ->keyBy('nama_produk');
+
+        $stok = fn (string $kolom, string $id): ?Stock => Stock::withoutGlobalScopes()
+            ->where('outlet_id', $outletId)
+            ->where($kolom, $id)
+            ->first();
+
+        // 1. HABIS lewat bahan baku: ayam habis ⇒ menu "Ayam Goreng" berlencana Habis.
+        //    Justru jalur ini yang paling mudah salah — stok produk jadinya tidak pernah
+        //    bergerak, jadi kalau yang dibaca produk, menunya tidak akan pernah berlencana.
+        $stok('raw_material_id', $bahan['Ayam Potong']->getKey())
+            ?->forceFill(['jumlah_saat_ini' => 0, 'stok_minimum' => 2])->save();
+
+        // 2. MENIPIS lewat bahan: gula tinggal sedikit ⇒ "Es Teh Manis" berlencana Menipis.
+        $stok('raw_material_id', $bahan['Gula Pasir']->getKey())
+            ?->forceFill(['jumlah_saat_ini' => 3, 'stok_minimum' => 8])->save();
+
+        // 3. HABIS pada barang dagang biasa (bukan resep): Kerupuk. Dua jalur berbeda
+        //    menuju lencana yang sama harus terlihat sama di layar.
+        $stok('product_id', $produk['Kerupuk']->getKey())
+            ?->forceFill(['jumlah_saat_ini' => 0, 'stok_minimum' => 5])->save();
+
+        // 4. BELUM PERNAH DIHITUNG: baris telur dihapus ⇒ "Telur Dadar" TANPA lencana.
+        //    Ini keadaan ketiga yang wajib hadir dalam satu bidikan: kalau suatu saat
+        //    belum-dihitung ikut dikabarkan habis, tangkapan ini yang memperlihatkannya.
+        $stok('raw_material_id', $bahan['Telur Ayam']->getKey())?->delete();
+
+        /*
+         * 5. Kasus tersempit yang bisa terjadi: harga TUJUH DIGIT bersama lencana
+         *    "Menipis" di petak dua kolom pada layar 390px. Warteg memang menjual paket
+         *    katering seharga jutaan, dan justru petak inilah yang menentukan apakah
+         *    harganya masih terbaca utuh — angka uang tidak boleh terpotong atau pecah
+         *    dua baris (PATOKAN RESPONSIF, kartu ringkasan).
+         */
+        $katering = Product::create([
+            'kategori_id' => $produk['Kerupuk']->kategori_id,
+            'nama_produk' => 'Paket Katering 50 Kotak',
+            'sku' => 'BJM-KTR',
+            'harga_default' => 1250000,
+            'harga_beli' => 900000,
+            'satuan' => Satuan::Dus,
+        ]);
+
+        Stock::create([
+            'outlet_id' => $outletId,
+            'product_id' => $katering->getKey(),
+            'jumlah_saat_ini' => 2,
+            'stok_minimum' => 5,
+        ]);
+
+        $sisa = app(SusunSisaStokAction::class)->execute($outletId);
+
+        // Tangkapan yang cuma memuat satu keadaan tidak membuktikan kerapian keadaan
+        // lainnya, dan itu tidak terlihat dari PNG-nya kalau tidak diperiksa di sini.
+        $this->assertContains('habis', $sisa, 'Tidak ada barang berlencana Habis di tangkapan.');
+        $this->assertContains('menipis', $sisa, 'Tidak ada barang berlencana Menipis di tangkapan.');
+        $this->assertArrayNotHasKey(
+            $produk['Nasi Putih']->getKey(),
+            $sisa,
+            'Tidak ada barang TANPA lencana di tangkapan.',
+        );
+
+        file_put_contents(
+            "{$tujuan}/kasir-sisa-stok.html",
+            $this->suntikKabarStok($this->ambil('kasir.transaksi', $kasir), $sisa),
+        );
+    }
+
+    /**
+     * Menanam kabar sisa stok ke localStorage halaman tangkapan.
+     *
+     * Skrip biasa (bukan module) di dalam <head> berjalan saat halaman diurai, yaitu
+     * sebelum bundel Alpine/Livewire yang ditangguhkan — jadi kabarnya sudah ada ketika
+     * init memanggil pulihkanSisaStok().
+     *
+     * 'sampai' dihitung di peramban, bukan di PHP: tangkapan yang dibuat kemarin lalu
+     * diukur hari ini akan berisi batas umur yang sudah lewat, dan lencananya hilang
+     * lagi — kegagalan yang menyamar sebagai "sudah rapi".
+     *
+     * Kuncinya DIHAPUS lagi begitu Alpine selesai init. localStorage dibagi seluruh
+     * tangkapan (semuanya disajikan dari origin yang sama), jadi tanpa ini kasir-warteg
+     * yang diukur sesudahnya ikut berlencana — tangkapan yang seharusnya membuktikan
+     * keadaan TANPA lencana berubah diam-diam.
+     */
+    private function suntikKabarStok(string $halaman, array $sisa): string
+    {
+        $skrip = '<script>(function(){'
+            .'localStorage.setItem("nampan.sisa", JSON.stringify({'
+            .'sisa:'.json_encode($sisa).','
+            .'sampai:Date.now()+30*60*1000,'
+            .'jam:'.json_encode(now()->format('H.i'))
+            .'}));'
+            .'document.addEventListener("alpine:initialized",function(){'
+            .'localStorage.removeItem("nampan.sisa");},{once:true});'
+            .'})();</script>';
+
+        return str_replace('</head>', $skrip.'</head>', $halaman);
     }
 
     public function test_menangkap_dasbor_dan_halaman_masuk(): void
@@ -402,6 +556,156 @@ class PratinjauTest extends TestCase
         );
 
         $this->assertFileExists("{$tujuan}/owner-stok.html");
+    }
+
+    /**
+     * Layar nota belanja: daftar + formulir.
+     *
+     * Datanya dibengkokkan lebih dulu dengan alasan yang sama seperti stok: seeder demo
+     * hanya meninggalkan SATU nota, dan daftar berisi satu baris tidak membuktikan apa pun
+     * — tidak ada navigasi halaman, tidak ada nota dibatalkan, dan kolom "Beli dari" hanya
+     * pernah berisi satu nama pendek.
+     */
+    public function test_menangkap_pembelian(): void
+    {
+        if (env('PRATINJAU') !== '1') {
+            $this->markTestSkipped('Jalankan dengan PRATINJAU=1 untuk menangkap HTML.');
+        }
+
+        $this->seed(PlanSeeder::class);
+        // Warteg, bukan kelontong: ia punya DUA outlet, dan blok peringatan "nota ini
+        // diketik untuk cabang lain" hanya bisa muncul kalau ada cabang kedua.
+        $this->seed(WartegSeeder::class);
+
+        $tujuan = base_path('storage/pratinjau');
+
+        if (! is_dir($tujuan)) {
+            mkdir($tujuan, 0755, true);
+        }
+
+        $owner = User::withoutGlobalScopes()->where('role', 'owner')->firstOrFail();
+
+        $outlet = Outlet::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->orderBy('outlet_name')
+            ->firstOrFail();
+
+        $outletLain = Outlet::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->whereKeyNot($outlet->getKey())
+            ->orderBy('outlet_name')
+            ->firstOrFail();
+
+        $kunci = $this->siapkanPembelianPratinjau($owner, $outlet, $outletLain);
+
+        file_put_contents("{$tujuan}/owner-pembelian.html", $this->ambil('owner.pembelian', $owner));
+        file_put_contents("{$tujuan}/owner-pembelian-baru.html", $this->ambil('owner.pembelian.baru', $owner));
+
+        /*
+         * Panel rincian hanya ada di DOM sesudah sebuah nota dibuka — dan justru di situlah
+         * tabel isi nota, ringkasan uangnya, dan tombol batalkan berada.
+         */
+        $fragmenRincian = Livewire::actingAs($owner)->test(Pembelian::class)
+            ->call('bukaRincian', $kunci['nota'])
+            ->html();
+
+        file_put_contents(
+            "{$tujuan}/owner-pembelian-rincian.html",
+            $this->suntik($this->ambil('owner.pembelian', $owner), $fragmenRincian),
+        );
+
+        /*
+         * Formulir dalam keadaan yang paling padat: baris terisi (bar uang berisi nominal
+         * sungguhan), ringkasan galat karena harga belum diisi, DAN blok pergantian cabang
+         * yang ditolak. Ketiganya blok berteks panjang, dan ketiganya paling mungkin
+         * melebarkan halaman di 390px — keadaan yang tidak pernah terukur kalau yang
+         * dipotret cuma formulir kosong.
+         */
+        $fragmenForm = Livewire::actingAs($owner)->test(PembelianBaru::class)
+            ->set('beliDari', 'CV Sumber Pangan')
+            ->set('jumlah.'.$kunci['beras'], '25')
+            ->set('harga.'.$kunci['beras'], '13000')
+            ->set('jumlah.'.$kunci['gula'], '4')
+            ->set('ongkosKirim', '25000')
+            ->call('simpan')
+            ->set('outletId', $outletLain->getKey())
+            ->html();
+
+        file_put_contents(
+            "{$tujuan}/owner-pembelian-baru-terisi.html",
+            $this->suntik($this->ambil('owner.pembelian.baru', $owner), $fragmenForm),
+        );
+
+        $this->assertFileExists("{$tujuan}/owner-pembelian.html");
+    }
+
+    /**
+     * Nota belanja contoh: cukup banyak untuk berhalaman, dan setiap keadaan yang harus
+     * dibedakan di layar benar-benar ada.
+     *
+     * @return array<string, string>
+     */
+    private function siapkanPembelianPratinjau(User $owner, Outlet $outlet, Outlet $outletLain): array
+    {
+        $bahan = RawMaterial::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->get()
+            ->keyBy('nama');
+
+        $produk = Product::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->get()
+            ->keyBy('nama_produk');
+
+        // Satu barang diberi konversi satuan supaya baris "1 dus = 24 pcs" ikut terpotret:
+        // itu keterangan yang menjelaskan kenapa angka yang diketik (2) berbeda dari angka
+        // yang bertambah di kartu stok (48).
+        $produk['Air Mineral 600ml']->forceFill([
+            'satuan' => Satuan::Dus,
+            'satuan_dasar' => Satuan::Pcs,
+            'isi_per_satuan' => 24,
+        ])->save();
+
+        $catat = app(CatatPembelianAction::class);
+
+        $pemasok = ['CV Sumber Pangan', 'Pasar Kranggan', 'Grosir Bu Yanti', 'Toko Berkah Jaya'];
+        $notaPertama = null;
+
+        // 11 nota: dengan 10 baris per halaman, navigasi halamannya benar-benar muncul.
+        for ($i = 0; $i < 11; $i++) {
+            $nota = $catat->execute(
+                $i % 3 === 2 ? $outletLain : $outlet,
+                $owner,
+                [
+                    // Satu nota sengaja tanpa nama toko: belanja di pasar tidak selalu punya
+                    // nama, dan kolomnya harus berbunyi "—", bukan kosong.
+                    'beli_dari' => $i === 4 ? null : $pemasok[$i % count($pemasok)],
+                    'tanggal' => now()->subDays($i)->toDateString(),
+                    'diskon' => $i % 4 === 1 ? 5000 : 0,
+                    'ongkos_kirim' => $i % 2 === 0 ? 25000 : 0,
+                    'catatan' => $i === 0 ? 'Diantar sore, ongkir dibayar tunai.' : null,
+                    'baris' => [
+                        ['raw_material_id' => $bahan['Beras']->getKey(), 'qty_beli' => 25, 'harga_satuan' => 13000],
+                        ['raw_material_id' => $bahan['Ayam Potong']->getKey(), 'qty_beli' => 10, 'harga_satuan' => 38000],
+                        ['product_id' => $produk['Air Mineral 600ml']->getKey(), 'qty_beli' => 2, 'harga_satuan' => 58000],
+                    ],
+                ],
+            );
+
+            $notaPertama ??= $nota;
+
+            // Satu nota dibatalkan: stoknya kembali, notanya TETAP ada di daftar, dan
+            // lencananya harus terbaca berbeda dari nota yang barangnya sudah datang.
+            if ($i === 3) {
+                app(BatalkanPembelianAction::class)->execute($nota, $owner);
+            }
+        }
+
+        return [
+            'nota' => $notaPertama->getKey(),
+            'beras' => $bahan['Beras']->getKey(),
+            'gula' => $bahan['Gula Pasir']->getKey(),
+        ];
     }
 
     /**

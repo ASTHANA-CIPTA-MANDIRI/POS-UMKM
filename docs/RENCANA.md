@@ -43,10 +43,10 @@ tidak sesuai** — sekarang masih perkiraan.
 - [x] Baris `stocks` kembar: unique index dijamin + balapan tidak menggagalkan penjualan | 2026-08-05 | data | 2j
 - [x] Sisa stok di layar kasir: lencana keadaan + umur kabar 30 menit | 2026-08-05 | kasir | 4j
 - [x] Pembelian sisi data: nota, batal, harga beli, kunci outlet | 2026-08-05 | owner | 5j
+- [x] Pembelian: tampilan daftar + formulir + rincian nota | 2026-08-05 | owner | 3j
 
 ## Wajib sebelum deploy
 
-- [~] Pembelian: tampilan kedua layarnya (sisi data selesai) | 2026-08-05 | owner | 3j
 - [ ] Kasbon: daftar piutang + pelunasan tercatat | | owner | 6j
 - [ ] Pelanggan: daftar + formulir | | owner | 4j
 - [ ] Impor produk dari Excel/CSV | | owner | 5j
@@ -55,6 +55,7 @@ tidak sesuai** — sekarang masih perkiraan.
 - [ ] Bill terbuka (layar owner) | | owner | 4j
 - [ ] Tutup kasir (layar owner) | | owner | 4j
 - [ ] Service worker: layar kasir tetap terbuka saat dimuat ulang tanpa jaringan | | kasir | 5j
+- [ ] Kontras lencana merah: 21 pemakaian masih 4,15:1 (butuh 4,5:1) | | owner | 1j
 - [ ] Audit kerapian seluruh layar (7 angka nol di 390/768/1280) | | owner | 4j
 - [ ] Infra rilis: domain, HTTPS, queue worker, cron, cadangan basis data | | infra | 6j
 
@@ -136,6 +137,22 @@ menunggu jawaban.
   WAJIB memuat satu kalimat "Dihitung dengan harga beli terakhir" di bawah nilai persediaan —
   angka yang melompat tanpa kalimat itu terbaca sebagai aplikasi yang salah hitung.
   Tanpa alur draf: disimpan berarti barang sudah datang.
+- **Kontras lencana merah belum selesai — 21 pemakaian masih gagal.** Token
+  `--color-merah-tua` (#9b1c1c, 7,14:1) sudah ada dan sudah dipakai lencana kasir, tapi
+  `text-merah-deep` di atas `bg-merah/…` masih 4,15:1 di 21 tempat. Perbaikan terbesar per
+  baris kode: satu baris di `resources/views/components/lencana.blade.php:15`
+  (`'merah' => 'bg-merah/10 text-merah-deep'`) menyelesaikan mayoritasnya sekaligus; sisanya
+  kelas inline di `owner/stok.blade.php:433`, `owner/produk.blade.php:764`,
+  `kasir/beranda.blade.php:361`. Yang di atas latar PUTIH sudah lolos dan tidak perlu diubah.
+  Tiga teks galat di atas tint jingga/terracotta (4,35–4,46:1) polanya BERBEDA — bukan
+  sekadar ganti token, perlu keputusan desain sendiri.
+- **Catatan alat ukur (dua jebakan yang sudah ditutup, jangan diulang).** (1) Lebih dari satu
+  Chrome di porta 9333 membuat lebar yang dilaporkan bergeser satu langkah — minta 390 dapat
+  1280 — dan SEMUANYA tampak BERSIH karena asetnya termuat. `ukur.mjs` sekarang menolak kalau
+  lebar diminta ≠ lebar terukur. (2) `ukur-pratinjau.sh` dulu memakai satu nama folder tetap
+  dengan `trap EXIT` yang menghapusnya, jadi proses yang selesai lebih dulu menghapus folder
+  milik yang masih berjalan; foldernya sekarang berakhiran PID. Urutan wajib: `npm run build`
+  DULU, baru `PRATINJAU=1 … PratinjauTest` — build mengubah hash aset.
 - Yang QA jujur belum buktikan di lembar opname, jangan dianggap aman maupun cacat: angka
   fisik notasi ilmiah (`1e10`), dan `alasan`/`catatan` dikirim sebagai array lewat payload
   Livewire mentah.

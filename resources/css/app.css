@@ -87,6 +87,21 @@
     --color-jingga-tua: #855000;
     --color-merah: #ea4848;
     --color-merah-deep: #e31a1a;
+    /*
+     * Varian gelap khusus TEKS, padanan --color-jingga-tua. Palet ini tidak punya
+     * merah gelap: #ea4848 dan #e31a1a keduanya masih terang, jadi di atas latar
+     * merah muda merah-deep GAGAL WCAG AA.
+     *
+     * Diukur di peramban pada lencana "Habis" layar kasir, latar efektif bg-merah/10
+     * di atas kartu putih = rgb(253,238,238) (dibaca dari piksel tangkapan, bukan
+     * dihitung): merah-deep 4,15:1 (gagal) -> merah-tua 7,14:1 (lolos). Jarak
+     * gelapnya sepadan dengan jingga -> jingga-tua, dan masih terbaca merah,
+     * bukan cokelat.
+     *
+     * Pakai untuk tulisan di atas bg-merah/…; merah-deep tetap benar untuk tulisan
+     * di atas putih, di sana ia sudah lolos.
+     */
+    --color-merah-tua: #9b1c1c;
 
     /* ── Alias semantik yang dipakai seluruh view ───────────────────────── */
     --color-cream: #f4f7fe;

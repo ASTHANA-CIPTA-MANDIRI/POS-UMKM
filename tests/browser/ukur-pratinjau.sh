@@ -30,9 +30,17 @@ PORTA="${PORTA:-8000}"
 AKAR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$AKAR"
 
-# Disajikan dari public/ supaya origin-nya sama dengan aset. Nama foldernya khusus dan
-# dibersihkan di akhir; JANGAN pernah menyentuh storage/app/public/produk.
-SAJI="public/pratinjau"
+# Disajikan dari public/ supaya origin-nya sama dengan aset.
+#
+# Foldernya diberi akhiran PID, dan itu bukan kerapian: bentuk lama memakai satu nama
+# tetap "public/pratinjau" dengan `trap ... EXIT` yang menghapusnya. Kalau dua proses
+# mengukur bersamaan — mudah terjadi saat beberapa agen bekerja di repo yang sama —
+# yang selesai lebih dulu MENGHAPUS folder milik yang masih berjalan, dan pengukuran
+# yang sedang jalan mendadak mendapat 404. Hasilnya bukan galat yang jelas, melainkan
+# angka yang salah. Sudah benar-benar terjadi.
+#
+# JANGAN pernah menyentuh storage/app/public/produk.
+SAJI="public/pratinjau-$$"
 bersihkan() { rm -rf "$SAJI"; }
 trap bersihkan EXIT
 
@@ -58,7 +66,7 @@ for nama in "${BERKAS[@]}"; do
         set -- $pasangan
         lebar="$1"; tinggi="$2"
         keluaran=$(node tests/browser/ukur.mjs \
-            "http://localhost:${PORTA}/pratinjau/${nama}.html" \
+            "http://localhost:${PORTA}/$(basename "$SAJI")/${nama}.html" \
             "$lebar" "/tmp/ukur-${nama}-${lebar}.png" \
             tests/browser/periksa-rapi.js "$tinggi" 2>&1) || GAGAL=1
         printf '%-24s %-5s %s\n' "$nama" "$lebar" "$(echo "$keluaran" | grep -E 'px \|' | head -1)"

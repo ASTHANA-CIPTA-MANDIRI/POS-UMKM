@@ -200,8 +200,19 @@
                     disentuh saat membuka meja dan saat menutupnya — bukan sepanjang
                     transaksi — jadi ia tidak layak menempati ruang tetap.
                 --}}
-                <div class="flex items-center gap-2 px-4 pb-3">
-                    <div x-show="modeTersedia.length > 1" x-cloak class="flex flex-1 gap-2 overflow-x-auto">
+                <div class="flex flex-wrap items-center gap-2 px-4 pb-3">
+                    {{--
+                        Pil mode MEMBUNGKUS, tidak digulir mendatar.
+
+                        Sebelumnya baris ini `overflow-x-auto`: di 390px dengan tiga mode
+                        (depot: titip/antar + bayar langsung + bill) pil kedua terpotong
+                        di tengah kata — terbaca "Bayar langsu" — dan kotaknya menyusup ke
+                        bawah tombol bill di sebelahnya (terukur tumpangTindih=1 pada
+                        tangkapan kasir-depot @390). Mode adalah pilihan yang menentukan
+                        ke mana transaksi tercatat; pilihan yang harus dicari dengan
+                        menggeser sama saja tidak ada (PATOKAN RESPONSIF — pil saringan).
+                    --}}
+                    <div x-show="modeTersedia.length > 1" x-cloak class="flex min-w-0 flex-1 flex-wrap gap-2">
                     <template x-for="m in modeTersedia" :key="m">
                         <button type="button" @click="gantiMode(m)"
                                 :aria-pressed="mode === m"
@@ -459,7 +470,12 @@
                                     --}}
                                     <template x-if="statusStok(p.id)">
                                         <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap"
-                                              :class="statusStok(p.id) === 'habis' ? 'bg-merah/10 text-merah-deep' : 'bg-jingga/15 text-jingga-tua'"
+                                              {{-- text-merah-tua, BUKAN merah-deep: di atas bg-merah/10
+                                                   merah-deep terukur 4,15:1 — gagal AA. merah-tua
+                                                   7,14:1. Polanya sama dengan jingga → jingga-tua
+                                                   di sebelahnya (6,14:1), jadi kedua lencana ini
+                                                   memakai aturan yang sama. --}}
+                                              :class="statusStok(p.id) === 'habis' ? 'bg-merah/10 text-merah-tua' : 'bg-jingga/15 text-jingga-tua'"
                                               :title="keteranganStok(p.id)"
                                               :aria-label="keteranganStok(p.id)">
                                             {{-- Titik di depan teks: statusnya terbaca tanpa

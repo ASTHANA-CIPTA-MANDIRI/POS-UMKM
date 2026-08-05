@@ -403,6 +403,27 @@ class PembelianBaru extends Component
             $atribut['harga.'.$kunci] = 'harga beli';
         }
 
+        /*
+         * Pesan bawaan Laravel BERBAHASA INGGRIS di repo ini (APP_LOCALE=en, dan tidak ada
+         * lang/id), jadi tanpa blok ini kotak harga yang lupa diisi berbunyi
+         * "The harga beli field is required." — terpotret begitu di tangkapan pratinjau.
+         * Setengah Inggris setengah Indonesia di layar pemilik warung bukan cuma jelek: ia
+         * membuat kalimatnya berhenti bisa dibaca sama sekali.
+         *
+         * Aturannya TIDAK diubah — hanya teks yang dilihat orang. `:Attribute` memakai nama
+         * dari $atribut ("harga beli", "jumlah beli"), yang sudah berbahasa Indonesia.
+         */
+        $pesan = [
+            'required' => ':Attribute wajib diisi.',
+            'numeric' => ':Attribute harus berupa angka.',
+            'gt' => ':Attribute harus lebih dari :value.',
+            'min' => ':Attribute tidak boleh kurang dari :min.',
+            'max.numeric' => ':Attribute kelewat besar — periksa lagi angkanya.',
+            'max.string' => ':Attribute paling panjang :max huruf.',
+            'date' => ':Attribute harus berupa tanggal yang benar.',
+            'string' => ':Attribute harus berupa teks.',
+        ];
+
         $validator = Validator::make(
             [
                 'jumlah' => $this->jumlah,
@@ -414,7 +435,7 @@ class PembelianBaru extends Component
                 'catatan' => $this->catatan,
             ],
             $aturan,
-            [],
+            $pesan,
             $atribut,
         );
 
@@ -624,6 +645,13 @@ class PembelianBaru extends Component
             'ringkasan' => $this->ringkasan($semua),
             'jumlahTerisi' => $this->jumlahTerisi(),
             'saranPemasok' => $this->saranPemasok(),
+            // Nama barang per kunci untuk ringkasan galat. Diambil dari $semua (SELURUH
+            // lembar), bukan dari halaman yang sedang tampak: validasi berjalan atas semua
+            // baris terisi, jadi baris yang menahan simpan bisa berada di halaman lain —
+            // dan pesan "jumlah beli harus lebih dari nol" tanpa nama barang tidak bisa
+            // ditindaklanjuti tanpa menyisir halaman satu per satu. Tidak ada kueri baru:
+            // koleksinya sudah dimuat untuk ringkasan uang di atas.
+            'namaPerKunci' => $semua->pluck('nama', 'kunci')->all(),
             'outletTersedia' => auth()->user()->scopedOutletId() === null ? $this->outletTersedia() : [],
             'outletDipakai' => $this->outletTerpakai(),
             // null berarti tidak ada permintaan pindah yang tertahan ATAU id-nya bukan

@@ -206,6 +206,41 @@ class Pembelian extends Component
             ->all();
     }
 
+    /**
+     * Angka kepala layar: uang yang keluar bulan ini dan berapa nota yang menghasilkannya.
+     *
+     * SENGAJA tidak mengikuti saringan pencarian maupun status — kalimat di kartunya
+     * berbunyi "bulan ini", dan angka yang diam-diam berubah saat kata pencarian diketik
+     * tidak lagi menjawab pertanyaan itu. Yang tetap diikuti hanya outlet: belanja cabang
+     * lain tidak pernah dibayar dari laci cabang ini.
+     *
+     * Nota yang dibatalkan TIDAK ikut dijumlahkan ke uangnya — uangnya kembali, stoknya
+     * dikembalikan — tapi tetap dihitung di kartunya sendiri supaya pembatalan yang sering
+     * terjadi terlihat, bukan hilang tanpa jejak.
+     *
+     * `addMonthNoOverflow()`, bukan endOfMonth/subMonths mentah: batas atas dibuat
+     * eksklusif supaya nota tertanggal hari terakhir bulan tetap ikut terhitung.
+     *
+     * @return array{belanja: float, nota: int, dibatalkan: int}
+     */
+    private function ringkasanBulanIni(): array
+    {
+        $awal = now()->startOfMonth();
+        $akhir = $awal->copy()->addMonthNoOverflow();
+        $outletId = $this->outletTerpakai();
+
+        $dasar = fn () => PurchaseOrder::query()
+            ->when($outletId !== null, fn ($q) => $q->where('outlet_id', $outletId))
+            ->where('tanggal', '>=', $awal->toDateString())
+            ->where('tanggal', '<', $akhir->toDateString());
+
+        return [
+            'belanja' => (float) $dasar()->whereNot('status', DocumentStatus::Dibatalkan->value)->sum('total'),
+            'nota' => (int) $dasar()->whereNot('status', DocumentStatus::Dibatalkan->value)->count(),
+            'dibatalkan' => (int) $dasar()->where('status', DocumentStatus::Dibatalkan->value)->count(),
+        ];
+    }
+
     public function render()
     {
         $daftar = $this->kueri()->paginate(config('nampan.per_halaman'), ['*'], self::NAMA_HALAMAN);
@@ -216,6 +251,7 @@ class Pembelian extends Component
                 ? null
                 : $daftar->firstWhere('id', $this->rincianId) ?? PurchaseOrder::query()->find($this->rincianId),
             'barisRincian' => $this->barisRincian(),
+            'ringkasan' => $this->ringkasanBulanIni(),
             'outletTersedia' => auth()->user()->scopedOutletId() === null ? $this->outletTersedia() : [],
             'outletDipakai' => $this->outletTerpakai(),
         ]);
