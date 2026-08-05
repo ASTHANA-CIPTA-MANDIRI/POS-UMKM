@@ -127,7 +127,7 @@
          terpotong jadi "Nilai per…" / "Rp 1.…"; angka uang yang terpotong lebih buruk
          daripada tidak ditampilkan, karena pembacanya menduga digit yang hilang. --}}
     <div class="mt-2 mb-4 grid grid-cols-2 gap-3 sm:mt-3 sm:mb-5 xl:grid-cols-[1.35fr_repeat(3,minmax(0,1fr))]">
-        <div class="kartu flex min-h-[5.625rem] flex-col justify-center gap-2 px-4 sm:flex-row sm:items-center sm:gap-4 sm:pr-5 sm:pl-[1.125rem]">
+        <div class="kartu flex min-h-[5.625rem] flex-col justify-center gap-2 px-4 sm:flex-row sm:items-center sm:justify-start sm:gap-4 sm:pr-5 sm:pl-[1.125rem]">
             <span class="lencana-ikon bg-cream-deep text-terracotta">
                 <svg viewBox="0 0 24 24" class="size-6" fill="none" aria-hidden="true">
                     <path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5v-9Zm0 0 8 3.5m0 0 8-3.5M12 11v9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
@@ -195,7 +195,7 @@
             <button type="button" wire:click="$set('status', '{{ $kartuAngka['nilai'] }}')"
                     aria-pressed="{{ $status === $kartuAngka['nilai'] ? 'true' : 'false' }}"
                     @class([
-                        'kartu flex min-h-[5.625rem] cursor-pointer flex-col justify-center gap-2 px-4 text-left transition sm:flex-row sm:items-center sm:gap-4 sm:pr-5 sm:pl-[1.125rem]',
+                        'kartu flex min-h-[5.625rem] cursor-pointer flex-col justify-center gap-2 px-4 text-left transition sm:flex-row sm:items-center sm:justify-start sm:gap-4 sm:pr-5 sm:pl-[1.125rem]',
                         'ring-2 ring-terracotta' => $status === $kartuAngka['nilai'],
                         'hover:shadow-md' => $status !== $kartuAngka['nilai'],
                     ])>
