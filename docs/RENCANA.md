@@ -40,10 +40,10 @@ tidak sesuai** — sekarang masih perkiraan.
 - [x] Stok & opname: konversi satuan, ambang minimum, hitung fisik, status "belum dihitung" | 2026-08-04 | owner | 12j
 - [x] Pagination 10 baris seluruh aplikasi termasuk riwayat kartu stok | 2026-08-04 | infra | 2j
 - [x] Opname terkunci ke cabang tempat angkanya dihitung + jejak audit jujur | 2026-08-04 | owner | 3j
+- [x] Baris `stocks` kembar: unique index dijamin + balapan tidak menggagalkan penjualan | 2026-08-05 | data | 2j
 
 ## Wajib sebelum deploy
 
-- [ ] Baris `stocks` kembar: `SiapkanBarisStokAction` tidak atomik | | data | 2j
 - [ ] Sisa stok tampil di layar kasir (lencana di petak produk) | | kasir | 4j
 - [ ] Pembelian: stok masuk, supplier, harga beli | | owner | 8j
 - [ ] Kasbon: daftar piutang + pelunasan tercatat | | owner | 6j
@@ -89,13 +89,17 @@ menunggu jawaban.
   meninjau dan meminta perubahan.
 - Zona waktu aplikasi sudah Asia/Jakarta. Data lama yang ditulis saat masih UTC terbaca
   bergeser +7 jam; data demo cukup disemai ulang.
-- **Baris `stocks` bisa kembar** (temuan analis, belum diperbaiki, sudah masuk daftar
-  wajib): `SiapkanBarisStokAction` memakai `first()` lalu `create`, bukan operasi atomik.
-  Dua perangkat kasir yang menjual barang yang sama saat barangnya belum punya baris stok
-  bisa membuat dua baris sekaligus, dan `LEFT JOIN` di layar stok akan menampilkannya
-  **kembar**. Obatnya unique index `(outlet_id, product_id)` dan
-  `(outlet_id, raw_material_id)` — bukan sekadar mengubah ke `firstOrCreate`, karena
-  balapannya ada di tingkat basis data.
+- **Baris `stocks` kembar — selesai 2026-08-05, dengan satu koreksi atas temuan aslinya.**
+  Kedua unique index yang disebut analis (`(outlet_id, product_id)` dan
+  `(outlet_id, raw_material_id)`) TERNYATA SUDAH ADA sejak `create_stocks_table`;
+  pemeriksaan skema membuktikannya. Artinya baris kembar sebenarnya tidak bisa lahir —
+  yang benar-benar terjadi di jalur balapan justru lebih buruk dan tidak terpikirkan
+  sebelumnya: `SiapkanBarisStokAction` melempar pelanggaran unique, dan karena aksi itu
+  dipanggil dari jalur penjualan, PENJUALANNYA yang gagal (melanggar aturan 5). Sekarang
+  pelanggarannya ditangani — baris pemenang dipungut, penjualan tetap tercatat. Kedua index
+  dikunci uji skema supaya tidak bisa hilang diam-diam, dan ada migrasi penjamin yang
+  menggabungkan baris kembar (menjumlahkan saldo, memindahkan mutasi sebelum menghapus)
+  untuk basis data lama yang index-nya pernah hilang.
 - **Status stok "belum dihitung" dipisahkan dari "habis"** (diputuskan 2026-08-04). Barang
   yang belum pernah punya baris `stocks` tidak lagi dicap merah "Habis" dan tidak lagi
   masuk blok "Harus belanja" — angkanya belum ada, jadi jumlah belanjanya tidak bisa
