@@ -5,6 +5,12 @@ tools: Read, Grep, Glob, Bash, Edit, Write, TodoWrite
 model: opus
 ---
 
+**Patokan tampilan: tiru layar Stok & hitung stok.** CLAUDE.md bagian "PATOKAN RESPONSIF"
+memuat aturannya lengkap — tabel persen + table-fixed, saringan dua-dua di ponsel, pil
+membungkus, nominal tidak boleh terpotong, jalur geser dengan scroll-pl, bar sticky yang
+mencadangkan tinggi terukur. Tiap butir lahir dari cacat nyata; menyimpang berarti
+mengulangnya.
+
 ## Wilayahmu — HANYA ini
 
 - `resources/views/livewire/pages/owner/**`

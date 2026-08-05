@@ -89,6 +89,71 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
   terbuka kosong dan terbaca sebagai "tidak ada data". `->links()` selalu dirender;
   `limit(n)` tanpa penunjuk halaman adalah pemotongan diam-diam.
 
+## PATOKAN RESPONSIF — tiru layar Stok & hitung stok
+
+Kedua layar itu sudah melewati belasan putaran koreksi pemilik proyek dan diukur di
+390/768/1280. **Layar baru menyalin polanya, bukan mengarang sendiri.** Tiap butir di bawah
+lahir dari cacat nyata, jadi menyimpang darinya berarti mengulang cacat yang sama.
+
+### Tabel
+- Lebar kolom **persen + `table-fixed`**, jumlahnya 100%. Kolom tanpa lebar akan menyerap
+  SELURUH sisa lebar panel, dan lubangnya cuma berpindah tempat — sudah terjadi dua kali.
+- Judul kolom rata **tengah**, isinya juga (keputusan pemilik proyek, ditandai di kode).
+- Keterangan panjang jangan berkolom sendiri di ujung; jadikan baris kedua di kolom yang
+  menjelaskannya.
+- `<lg` pakai kartu, `≥lg` pakai tabel. Tabel yang dipaksa ke ponsel menuntut gulir mendatar.
+
+### Kepala seksi (`x-kartu-alat`)
+- Tombol aksi **sejajar judul**, seukuran isinya. `aksiPenuh` hanya untuk tindakan utama.
+- Teks tombol panjang: sediakan bentuk pendek `sm:hidden` / `hidden sm:inline`. Ukur —
+  tombol 211px di kartu 318px membuat judulnya pecah tiga baris.
+
+### Saringan
+- Pencarian `col-span-2` (lebar penuh), dropdown berbagi baris **dua-dua** di ponsel.
+- Jangan paksa 3–4 kontrol sebaris di 390px: masing-masing tinggal 90–120px dan nama cabang
+  tidak terbaca. Dropdown yang menentukan ke mana data TERSIMPAN dibuat lebar penuh.
+
+### Pil saringan / tab
+- Wadah `col-span-2` + `flex-wrap`, mengisi lebar penuh, membungkus ke baris berikutnya.
+  Jangan digulir mendatar: pil yang harus dicari dengan menggeser sama saja tidak ada.
+- Jangan `flex-1` di ponsel — tujuh pil dibagi 390px menyisakan ±50px dan ANGKA di sebelah
+  namanya hilang, padahal itu isi utamanya.
+- Angka pada pil aktif wajib kontras ≥4,5:1. `opacity-70` putih di atas terracotta hilang.
+
+### Kartu ringkasan (angka)
+- Dua-dua di ponsel HANYA kalau isinya muat. **Angka uang tidak boleh terpotong maupun pecah
+  dua baris** — pembacanya menduga digit yang hilang dan memakainya untuk memutuskan belanja.
+- Kalau tidak muat: perkecil ikon (36px) dan angkanya (0,9375rem) di `<sm`, JANGAN memotong.
+- Ikon selalu **sebaris** dengan teks, tidak ditumpuk di atasnya.
+
+### Kartu tindakan berderet (mis. "Harus belanja")
+- `<lg`: satu jalur **geser mendatar**, kartu `w-[78%] shrink-0 snap-start` supaya kartu
+  berikutnya menyembul — tanpa potongan itu tak ada yang tahu jalurnya bisa digeser.
+- `scroll-pl-*` WAJIB menyertai `px-*`. Tanpa itu snap mengabaikan padding dan jalurnya
+  menggeser sendiri saat dimuat (terukur `scrollLeft=20`), kartu pertama menempel tepi.
+
+### Bar sticky
+- Cadangkan padding bawah **≥ tinggi bar terukur**, di tiap breakpoint. Mengubah isi bar
+  mengubah tingginya — ukur ulang, jangan pakai angka lama.
+- Rata tengah hanya di ponsel; `≥sm` kembali kiri-kanan.
+
+### Tombol
+- `.tombol-utama` / `.tombol-kedua` / `.tombol-ikon` di `app.css`. Jangan bikin gaya baru.
+- Tombol berlabel + ikon harus `flex`, BUKAN `grid` — dua anak dalam grid tanpa kolom
+  tersusun ke bawah. Tidak terlihat selama isinya cuma ikon.
+- Satu tindakan utama per layar. Dua tombol berwarna penuh membuat keduanya berhenti berarti.
+
+### Keadaan kosong & halaman
+- `<x-kosong>` (punya slot `aksi` dan pilihan `ikon`).
+- `->links()` selalu dirender; jumlah baris dari `config('nampan.per_halaman')`.
+  Daftar di dalam panel pakai `pageName` sendiri dan reset ke halaman 1 saat panel dibuka.
+
+### Membuktikan
+`tests/browser/ukur-pratinjau.sh` — tujuh angka 0 di 390/768/1280, tanpa baris `TIDAK SAH`.
+**Angka nol tidak cukup**: buka PNG-nya dan LIHAT. Keluhan "kurang rapi"/"banyak yang kosong"
+tidak tersentuh ketujuh angka itu. Untuk teks terpotong pakai probe
+`scrollWidth > clientWidth` dengan `overflow !== 'visible'` — mata melewatkannya.
+
 ## Bahasa layar: pakai kata orang warung, bukan kata akuntansi
 
 Pemilik proyek meminta ini tegas untuk layar Stok & hitung stok, dan berlaku untuk layar

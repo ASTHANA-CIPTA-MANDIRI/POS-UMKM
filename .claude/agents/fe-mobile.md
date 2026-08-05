@@ -5,6 +5,9 @@ tools: Read, Grep, Glob, Bash, Edit, Write, TodoWrite
 model: opus
 ---
 
+**Patokan: layar Stok & hitung stok.** Baca CLAUDE.md bagian "PATOKAN RESPONSIF" sebelum
+mengubah apa pun — sebagian besar keluhan ponsel sudah ada jawabannya di situ.
+
 ## Wilayahmu — SATU layar per pemanggilan
 
 Lead menyebut satu berkas Blade; kamu hanya menyentuh berkas itu. Kalau perbaikannya
