@@ -444,9 +444,15 @@
                  gulirnya disembunyikan mengikuti pola deret pil di atas — potongan kartunya
                  sudah menjadi penandanya.
 
+                 `scroll-pl-5` WAJIB menyertai `px-5`, dan ini bukan hiasan: tanpa itu
+                 scroll-snap menempelkan tepi kartu pertama ke tepi wadah dan MENGABAIKAN
+                 padding kirinya, jadi saat halaman dimuat jalurnya menggeser sendiri
+                 sebanyak paddingnya (terukur scrollLeft=20) dan kartu pertama duduk menempel
+                 di tepi kartu — tidak sejajar dengan judul panel di atasnya.
+
                  Di ≥lg kembali jadi petak: layarnya cukup lebar untuk menampilkan semuanya
                  sekaligus, dan menggeser di tetikus lebih repot daripada melihat. --}}
-            <div class="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 py-4 sm:px-6 lg:grid lg:snap-none lg:overflow-visible {{ $kolomBelanja }} [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div class="flex snap-x snap-mandatory scroll-pl-5 gap-3 overflow-x-auto px-5 py-4 sm:scroll-pl-6 sm:px-6 lg:grid lg:snap-none lg:overflow-visible {{ $kolomBelanja }} [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 @foreach ($tampil as $b)
                     @php [$judulTindakan, $ketTindakan] = $tindakan($b); @endphp
 
