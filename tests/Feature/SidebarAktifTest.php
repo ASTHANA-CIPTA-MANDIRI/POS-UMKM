@@ -79,7 +79,18 @@ class SidebarAktifTest extends TestCase
      */
     public function test_hanya_satu_menu_aktif_di_setiap_halaman(): void
     {
-        foreach (['owner.dasbor', 'owner.produk', 'owner.stok', 'owner.stok.opname'] as $rute) {
+        foreach ([
+            'owner.dasbor',
+            'owner.produk',
+            'owner.stok',
+            'owner.stok.opname',
+            // Pembelian punya DUA rute (daftar + nota baru) justru supaya pola `.*` di
+            // sidebar menyalakan induknya saat notanya sedang diketik. Kalau nama rute
+            // formulirnya suatu hari diubah jadi berdiri sendiri, layar itu akan mematikan
+            // seluruh menu dan penggunanya kehilangan petunjuk sedang berada di mana.
+            'owner.pembelian',
+            'owner.pembelian.baru',
+        ] as $rute) {
             if (! Route::has($rute)) {
                 continue;
             }

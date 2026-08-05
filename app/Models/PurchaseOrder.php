@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'outlet_id', 'supplier_id', 'nomor_po', 'tanggal', 'total',
+    'diskon', 'ongkos_kirim',
     'status', 'catatan', 'dibuat_oleh', 'diterima_pada',
 ])]
 class PurchaseOrder extends Model
@@ -23,6 +24,8 @@ class PurchaseOrder extends Model
     /** Disamakan dengan default di migrasi. */
     protected $attributes = [
         'total' => 0,
+        'diskon' => 0,
+        'ongkos_kirim' => 0,
         'status' => 'draft',
     ];
 
@@ -31,6 +34,8 @@ class PurchaseOrder extends Model
         return [
             'tanggal' => 'date',
             'total' => 'decimal:2',
+            'diskon' => 'decimal:2',
+            'ongkos_kirim' => 'decimal:2',
             'status' => DocumentStatus::class,
             'diterima_pada' => 'datetime',
         ];

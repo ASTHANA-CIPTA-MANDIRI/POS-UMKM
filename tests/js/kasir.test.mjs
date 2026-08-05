@@ -22,6 +22,7 @@ function pasang(konfigurasi = {}) {
         deviceId: 'device-1',
         sesiId: 'sesi-1',
         urlKatalog: '/kasir/katalog',
+        urlSisaStok: '/kasir/sisa-stok',
         urlSinkron: '/sinkronisasi/transaksi',
         bekalAwal: {
             produk: [
@@ -1256,5 +1257,196 @@ describe('struk', () => {
         assert.equal(k.strukTerakhir.kembalian, 15000);
         assert.equal(k.strukTerakhir.items[0].nama_produk, 'Nasi Putih');
         assert.match(k.strukTerakhir.nomor, /^TRX-/);
+    });
+});
+
+/**
+ * Lencana sisa stok di petak produk.
+ *
+ * Seluruh blok ini menguji satu sikap: lencana ini MEMBERI TAHU, bukan menghalangi,
+ * dan lebih baik diam daripada mengarang. Angka stok di layar kasir selalu tertinggal
+ * dari kenyataan — kasir lain di perangkat lain menjual barang yang sama — jadi yang
+ * dijaga di sini adalah apa yang terjadi ketika kabarnya TIDAK ada, sudah lewat, atau
+ * gagal diambil.
+ */
+describe('sisa stok', () => {
+    /** Menjalankan fn dengan jawaban server palsu, lalu mengembalikan fetch aslinya. */
+    async function denganJawaban(data, fn) {
+        const asli = global.fetch;
+
+        global.fetch = async () => ({ ok: true, status: 200, json: async () => data });
+
+        try {
+            await fn();
+        } finally {
+            global.fetch = asli;
+        }
+    }
+
+    it('tidak memberi lencana apa pun sebelum ada kabar dari server', () => {
+        const k = pasang();
+
+        // Petak tampil apa adanya — seperti sebelum fitur ini ada. Bukan "0", bukan
+        // "Habis": tidak tahu tidak boleh terbaca sebagai pernyataan.
+        assert.equal(k.statusStok('p1'), null);
+        assert.equal(k.labelStok('p1'), '');
+    });
+
+    it('memberi lencana hanya pada produk yang dikabarkan server', async () => {
+        const k = pasang();
+
+        await denganJawaban(
+            { sisa: { p1: 'habis', p3: 'menipis' }, kedaluwarsa_menit: 30, jam: '10.15' },
+            () => k.muatSisaStok(),
+        );
+
+        assert.equal(k.statusStok('p1'), 'habis');
+        assert.equal(k.labelStok('p1'), 'Habis');
+        assert.equal(k.statusStok('p3'), 'menipis');
+        assert.equal(k.labelStok('p3'), 'Menipis');
+
+        // p2 tidak ada di kabar: aman, atau belum pernah dihitung. Dua-duanya berakhir
+        // sama di layar, dan itu memang jawaban yang benar untuk dua-duanya.
+        assert.equal(k.statusStok('p2'), null);
+    });
+
+    /**
+     * Kabar baru MENGGANTI kabar lama, bukan menggabungkannya.
+     *
+     * Server hanya mengirim barang yang perlu dikabarkan, jadi barang yang kirimannya
+     * sudah datang tidak muncul lagi di jawaban berikutnya. Kalau petanya digabung,
+     * lencana "Habis" menempel selamanya pada barang yang raknya sudah penuh — dan
+     * kasir menolak menjual barang yang ada.
+     */
+    it('mengganti kabar lama, tidak menggabungkannya', async () => {
+        const k = pasang();
+
+        await denganJawaban({ sisa: { p1: 'habis' }, kedaluwarsa_menit: 30, jam: '10.15' },
+            () => k.muatSisaStok());
+        await denganJawaban({ sisa: { p2: 'menipis' }, kedaluwarsa_menit: 30, jam: '11.00' },
+            () => k.muatSisaStok());
+
+        assert.equal(k.statusStok('p1'), null);
+        assert.equal(k.statusStok('p2'), 'menipis');
+    });
+
+    /**
+     * Kabar punya umur, dan sesudahnya lencananya HILANG.
+     *
+     * Perangkat yang offline sejak pagi akan terus memegang kabar jam tujuh. Lencana
+     * "Habis" berumur enam jam membuat kasir menolak menjual barang yang kirimannya
+     * datang jam sepuluh — kerugian yang sama dengan masalah yang mau diselesaikan,
+     * hanya terbalik arahnya.
+     */
+    it('melepas lencana ketika kabarnya sudah kedaluwarsa', async () => {
+        const k = pasang();
+
+        await denganJawaban({ sisa: { p1: 'habis' }, kedaluwarsa_menit: 30, jam: '07.00' },
+            () => k.muatSisaStok());
+
+        assert.equal(k.statusStok('p1'), 'habis');
+
+        k.sisaStokSampai = Date.now() - 1;
+
+        assert.equal(k.statusStok('p1'), null);
+        assert.equal(k.labelStok('p1'), '');
+    });
+
+    it('memakai lagi kabar tersimpan yang belum kedaluwarsa saat halaman dimuat ulang', async () => {
+        const k = pasang();
+
+        await denganJawaban({ sisa: { p1: 'habis' }, kedaluwarsa_menit: 30, jam: '10.15' },
+            () => k.muatSisaStok());
+
+        // Halaman dimuat ulang: di warung, tombol kembali tertekan puluhan kali sehari.
+        // Tanpa pemulihan ini seluruh lencana hilang sampai permintaan berikutnya terjawab.
+        const lagi = pasang();
+
+        assert.equal(lagi.statusStok('p1'), 'habis');
+    });
+
+    /**
+     * Kegagalan menarik kabar TIDAK menyentuh apa pun (aturan 3 CLAUDE.md).
+     *
+     * Tidak ada pesan galat, tidak ada katalog yang hilang, tidak ada penjualan yang
+     * tertahan. Yang terjadi cuma satu: petaknya tampil apa adanya.
+     */
+    it('tidak merusak apa pun ketika kabarnya gagal diambil', async () => {
+        const k = pasang();
+        const asli = global.fetch;
+
+        global.fetch = async () => { throw new Error('jaringan mati'); };
+
+        try {
+            await k.muatSisaStok();
+        } finally {
+            global.fetch = asli;
+        }
+
+        assert.equal(k.statusStok('p1'), null);
+        assert.equal(k.katalog.length, 3);
+
+        // Tidak ada pemberitahuan: kabar yang tidak bisa ditindaklanjuti hanya melatih
+        // kasir mengabaikan pemberitahuan, dan yang PERLU dibaca di layar ini soal uang.
+        assert.equal(k.pesan, null);
+
+        k.tambah(k.katalog[0]);
+        assert.equal(k.keranjang.length, 1);
+    });
+
+    /**
+     * PENJAGA TERPENTING: lencana "Habis" tidak menghalangi penjualan.
+     *
+     * Aturan 5 CLAUDE.md — stok boleh minus, penjualan jangan pernah diblokir. Barang
+     * yang tercatat habis sering masih ada di rak (kiriman yang belum dicatat, opname
+     * yang belum dilakukan), dan penjualan yang ditolak karena angka di layar adalah
+     * uang yang tidak masuk. Kalau lencana ini bisa menahan tombol Bayar, ia lebih
+     * merugikan daripada tidak ada sama sekali.
+     */
+    it('tetap bisa menjual barang yang dikabarkan habis', async () => {
+        const k = pasang();
+
+        await denganJawaban({ sisa: { p1: 'habis' }, kedaluwarsa_menit: 30, jam: '10.15' },
+            () => k.muatSisaStok());
+
+        assert.equal(k.statusStok('p1'), 'habis');
+
+        k.tambah(k.katalog[0]);
+        k.pembayaran[0].jumlah = 5000;
+        k.pembayaran[0].diterima = 5000;
+
+        assert.equal(k.bisaBayar, true);
+
+        await k.bayar();
+
+        assert.equal(permintaan.length, 1);
+        assert.equal(permintaan[0].body.transactions[0].items[0].product_id, 'p1');
+    });
+
+    /**
+     * Keterangan lencana menyebut JAM-nya.
+     *
+     * "Habis" saja terbaca sebagai kepastian; "menurut catatan pukul 10.15" mengundang
+     * kasir memeriksa rak. Angka di layar ini tidak boleh berlagak mutakhir.
+     */
+    it('menyebut jam catatan dan menegaskan penjualan tetap bisa dilanjutkan', async () => {
+        const k = pasang();
+
+        await denganJawaban({ sisa: { p1: 'habis' }, kedaluwarsa_menit: 30, jam: '10.15' },
+            () => k.muatSisaStok());
+
+        const keterangan = k.keteranganStok('p1');
+
+        assert.match(keterangan, /10\.15/);
+        assert.match(keterangan, /tetap bisa dilanjutkan/);
+        assert.equal(k.keteranganStok('p2'), '');
+    });
+
+    it('mengabaikan kabar tanpa batas umur, bukan menganggapnya berlaku selamanya', async () => {
+        const k = pasang();
+
+        await denganJawaban({ sisa: { p1: 'habis' } }, () => k.muatSisaStok());
+
+        assert.equal(k.statusStok('p1'), null);
     });
 });

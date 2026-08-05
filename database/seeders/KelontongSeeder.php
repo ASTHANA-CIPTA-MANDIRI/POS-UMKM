@@ -2,16 +2,14 @@
 
 namespace Database\Seeders;
 
-use App\Actions\Stock\AdjustStockAction;
+use App\Actions\Purchase\CatatPembelianAction;
 use App\Enums\BusinessType;
 use App\Enums\DeviceOwnership;
 use App\Enums\DeviceType;
-use App\Enums\DocumentStatus;
 use App\Enums\InvoiceStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\Satuan;
 use App\Enums\StockModel;
-use App\Enums\StockMovementType;
 use App\Enums\TenantStatus;
 use App\Enums\TransactionMode;
 use App\Enums\UserRole;
@@ -22,8 +20,6 @@ use App\Models\Invoice;
 use App\Models\Outlet;
 use App\Models\Plan;
 use App\Models\Product;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
 use App\Models\Stock;
 use App\Models\Subscription;
 use App\Models\Supplier;
@@ -44,7 +40,7 @@ class KelontongSeeder extends Seeder
     public function __construct(
         private TenantContext $context,
         private DemoTransactionBuilder $builder,
-        private AdjustStockAction $adjustStock,
+        private CatatPembelianAction $catatPembelian,
     ) {}
 
     public function run(): void
@@ -237,66 +233,55 @@ class KelontongSeeder extends Seeder
         }
     }
 
-    /** @param array<string, Product> $produk */
+    /**
+     * Dua nota belanja, keduanya lewat CatatPembelianAction — jalur yang sama persis
+     * dengan layar Pembelian.
+     *
+     * Dulu urutannya (PO → item → mutasi masuk → total) ditulis tangan di sini. Itu jalur
+     * kedua untuk hal yang sama, dan jalur kedua cepat atau lambat menghasilkan angka yang
+     * berbeda dari jalur yang dipakai pengguna.
+     *
+     * Dulu juga ada satu PO berstatus draft "untuk menguji tampilan status". Statusnya
+     * dibuang: alur draf tidak ada di layar mana pun, jadi nota itu memamerkan keadaan yang
+     * tidak punya satu pun tombol yang bisa mengeluarkannya — dan data demo yang
+     * memperlihatkan jalan buntu mengajari pemakainya mencari tombol yang tidak ada.
+     * Gantinya nota KEDUA yang diterima, sekaligus contoh diskon & ongkos kirim.
+     *
+     * @param  array<string, Product>  $produk
+     */
     private function pembelian(Outlet $outlet, array $produk, User $owner): void
     {
-        $supplier = Supplier::create([
+        // Dibuat lebih dulu supaya pemasok langganan punya nomor telepon & alamat; aksi
+        // pembelian hanya menyimpan namanya (medan "Beli dari" memang cuma nama), dan ia
+        // akan memungut baris ini karena namanya sama.
+        Supplier::create([
             'nama' => 'Grosir Amanah',
             'no_hp' => '081500099887',
             'alamat' => 'Pasar Beringharjo, Yogyakarta',
         ]);
 
-        $tanggal = now()->subDays(4);
-
-        $po = PurchaseOrder::create([
-            'outlet_id' => $outlet->getKey(),
-            'supplier_id' => $supplier->getKey(),
-            'nomor_po' => 'PO-'.$tanggal->format('Ymd').'-001',
-            'tanggal' => $tanggal->toDateString(),
-            'status' => DocumentStatus::Diterima,
-            'dibuat_oleh' => $owner->getKey(),
-            'diterima_pada' => $tanggal->copy()->addHours(5),
+        $this->catatPembelian->execute($outlet, $owner, [
+            'beli_dari' => 'Grosir Amanah',
+            'tanggal' => now()->subDays(4)->toDateString(),
+            'baris' => [
+                ['product_id' => $produk['indomie']->getKey(), 'qty_beli' => 80, 'harga_satuan' => 2900],
+                ['product_id' => $produk['minyak']->getKey(), 'qty_beli' => 24, 'harga_satuan' => 17000],
+            ],
         ]);
 
-        $total = 0;
-
-        foreach ([['indomie', 80, 2900], ['minyak', 24, 17000]] as [$kunci, $qty, $harga]) {
-            $subtotal = $qty * $harga;
-            $total += $subtotal;
-
-            PurchaseOrderItem::create([
-                'purchase_order_id' => $po->getKey(),
-                'product_id' => $produk[$kunci]->getKey(),
-                'qty' => $qty,
-                'qty_diterima' => $qty,
-                'harga_satuan' => $harga,
-                'subtotal' => $subtotal,
-            ]);
-
-            $stock = Stock::where('outlet_id', $outlet->getKey())
-                ->where('product_id', $produk[$kunci]->getKey())
-                ->firstOrFail();
-
-            $this->adjustStock->execute(
-                $stock,
-                StockMovementType::Masuk,
-                $qty,
-                $po,
-                $owner->getKey(),
-                'Penerimaan '.$po->nomor_po,
-            );
-        }
-
-        $po->update(['total' => $total]);
-
-        // Satu PO masih draft, belum menyentuh stok — untuk menguji tampilan status.
-        PurchaseOrder::create([
-            'outlet_id' => $outlet->getKey(),
-            'supplier_id' => $supplier->getKey(),
-            'nomor_po' => 'PO-'.now()->format('Ymd').'-002',
+        // Nota kedua: pemasok yang BELUM ada di daftar — barisnya lahir dari teks yang
+        // diketik, persis seperti di layar. Barangnya sengaja yang stoknya sudah aman,
+        // supaya contoh "stok menipis" (gula) tetap ada untuk menguji peringatannya.
+        $this->catatPembelian->execute($outlet, $owner, [
+            'beli_dari' => 'Toko Berkah Jaya',
             'tanggal' => now()->toDateString(),
-            'status' => DocumentStatus::Draft,
-            'dibuat_oleh' => $owner->getKey(),
+            'diskon' => 5000,
+            'ongkos_kirim' => 20000,
+            'catatan' => 'Diantar sore, ongkir dibayar tunai.',
+            'baris' => [
+                ['product_id' => $produk['kopi']->getKey(), 'qty_beli' => 100, 'harga_satuan' => 1500],
+                ['product_id' => $produk['kerupuk']->getKey(), 'qty_beli' => 24, 'harga_satuan' => 4500],
+            ],
         ]);
     }
 

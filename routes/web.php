@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\KeluarController;
 use App\Http\Controllers\Kasir\KatalogController;
+use App\Http\Controllers\Kasir\SisaStokController;
 use App\Http\Controllers\OfflineSyncController;
 use App\Livewire\Pages\Admin\Dasbor as DasborAdmin;
 use App\Livewire\Pages\Auth\Masuk;
@@ -12,6 +13,8 @@ use App\Livewire\Pages\Owner\Dasbor as DasborOwner;
 use App\Livewire\Pages\Owner\Langganan;
 use App\Livewire\Pages\Owner\Laporan as LaporanOwner;
 use App\Livewire\Pages\Owner\Opname as OpnameOwner;
+use App\Livewire\Pages\Owner\Pembelian as PembelianOwner;
+use App\Livewire\Pages\Owner\PembelianBaru as PembelianBaruOwner;
 use App\Livewire\Pages\Owner\Produk as ProdukOwner;
 use App\Livewire\Pages\Owner\Stok as StokOwner;
 use Illuminate\Support\Facades\Route;
@@ -81,6 +84,18 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
             Route::get('/stok', StokOwner::class)->name('stok');
             Route::get('/stok/opname', OpnameOwner::class)->name('stok.opname');
 
+            /*
+             * Pembelian ikut grup yang sama, dan alasannya sama dengan stok: mencatat
+             * barang masuk berarti mengubah angka stok tanpa ada barang yang dihitung.
+             * Kasir yang bisa mencatat pembelian bisa menutup selisih laci dengan "barang
+             * datang" yang tidak pernah datang.
+             *
+             * Dua nama rute (`pembelian` dan `pembelian.baru`) supaya penanda menu samping
+             * — `routeIs($rute, $rute.'.*')` — tetap menyala saat notanya sedang diketik.
+             */
+            Route::get('/pembelian', PembelianOwner::class)->name('pembelian');
+            Route::get('/pembelian/baru', PembelianBaruOwner::class)->name('pembelian.baru');
+
             Route::get('/laporan', LaporanOwner::class)->name('laporan');
         });
     });
@@ -100,6 +115,19 @@ Route::middleware(['auth', 'peran:kasir,dapur', 'tenant-aktif'])
         // Katalog dilayani sebagai JSON supaya klien kasir bisa menyimpannya di
         // perangkat dan menyegarkannya tanpa memuat ulang halaman.
         Route::get('/katalog', KatalogController::class)->name('katalog');
+
+        /*
+         * Sisa stok TERPISAH dari katalog, dan bukan karena kerapian.
+         *
+         * Katalog dimuat sekali lalu dipakai berjam-jam; penyegarannya sengaja manual
+         * supaya harga tidak berganti diam-diam di tengah transaksi. Sisa stok berubah
+         * tiap satu transaksi — termasuk transaksi kasir lain — jadi ia perlu jalur
+         * yang boleh sering ditarik tanpa ikut menyeret harga, gambar, dan barcode.
+         *
+         * Kegagalan endpoint ini TIDAK berakibat apa pun di layar kasir: tanpa jawaban,
+         * petak produk tampil apa adanya dan penjualan berjalan seperti biasa.
+         */
+        Route::get('/sisa-stok', SisaStokController::class)->name('sisa-stok');
     });
 
 /*

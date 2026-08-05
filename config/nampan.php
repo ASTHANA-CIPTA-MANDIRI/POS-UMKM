@@ -21,4 +21,28 @@ return [
 
     'per_halaman' => (int) env('NAMPAN_PER_HALAMAN', 10),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Umur kabar sisa stok di layar kasir (menit)
+    |--------------------------------------------------------------------------
+    |
+    | Lencana "Habis"/"Menipis" di petak produk kasir berasal dari catatan server,
+    | dan catatan itu SELALU tertinggal: kasir lain di perangkat lain menjual barang
+    | yang sama, dan perangkat ini bisa saja sedang offline. Karena itu kabarnya
+    | punya umur. Lewat batas ini lencananya hilang dan petak kembali tampil apa
+    | adanya — seperti sebelum fitur ini ada.
+    |
+    | Kenapa hilang, bukan dibiarkan: lencana "Habis" berumur enam jam membuat kasir
+    | MENOLAK menjual barang yang kirimannya sudah datang — kerugian yang sama
+    | dengan masalah yang mau diselesaikan, hanya terbalik arahnya. Tidak tahu lebih
+    | jujur daripada tahu yang sudah kedaluwarsa.
+    |
+    | Tiga puluh menit: cukup panjang supaya lencana tidak berkedip-kedip di warung
+    | bersinyal putus-putus, cukup pendek supaya kabar yang salah tidak bertahan
+    | melewati satu kiriman barang.
+    |
+    */
+
+    'sisa_stok_kedaluwarsa_menit' => (int) env('NAMPAN_SISA_STOK_MENIT', 30),
+
 ];

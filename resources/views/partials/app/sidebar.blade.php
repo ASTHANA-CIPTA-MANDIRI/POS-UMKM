@@ -51,7 +51,7 @@
                 ['Produk', 'owner.produk', 'kotak'],
                 ['Bahan baku & resep', null, 'daun'],
                 ['Stok & hitung stok', 'owner.stok', 'lapis'],
-                ['Pembelian', null, 'truk'],
+                ['Pembelian', 'owner.pembelian', 'truk'],
             ],
             'Pelanggan' => [
                 ['Pelanggan', null, 'orang'],

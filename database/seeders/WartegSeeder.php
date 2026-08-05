@@ -2,17 +2,15 @@
 
 namespace Database\Seeders;
 
-use App\Actions\Stock\AdjustStockAction;
+use App\Actions\Purchase\CatatPembelianAction;
 use App\Enums\BillStatus;
 use App\Enums\BusinessType;
 use App\Enums\DeviceOwnership;
 use App\Enums\DeviceType;
-use App\Enums\DocumentStatus;
 use App\Enums\InvoiceStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\Satuan;
 use App\Enums\StockModel;
-use App\Enums\StockMovementType;
 use App\Enums\TenantStatus;
 use App\Enums\TransactionMode;
 use App\Enums\UserRole;
@@ -26,8 +24,6 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
 use App\Models\RawMaterial;
 use App\Models\RecipeItem;
 use App\Models\Stock;
@@ -51,7 +47,7 @@ class WartegSeeder extends Seeder
     public function __construct(
         private TenantContext $context,
         private DemoTransactionBuilder $builder,
-        private AdjustStockAction $adjustStock,
+        private CatatPembelianAction $catatPembelian,
     ) {}
 
     public function run(): void
@@ -405,64 +401,36 @@ class WartegSeeder extends Seeder
         }
     }
 
-    /** @param  array<string, RawMaterial>  $bahan */
+    /**
+     * Nota belanja bahan baku, lewat CatatPembelianAction — jalur yang sama persis dengan
+     * layar Pembelian.
+     *
+     * Dulu urutannya (PO → item → mutasi masuk → total) ditulis tangan di sini. Dua salinan
+     * untuk satu alur berarti cepat atau lambat data demo dan data sungguhan bercerita
+     * berbeda tentang hal yang sama.
+     *
+     * @param  array<string, RawMaterial>  $bahan
+     */
     private function pembelian(Outlet $outlet, array $bahan, User $owner): void
     {
-        $supplier = Supplier::create([
+        // Dibuat lebih dulu supaya pemasoknya punya nomor telepon & alamat; aksi pembelian
+        // hanya menyimpan namanya, dan ia akan memungut baris ini karena namanya sama.
+        Supplier::create([
             'nama' => 'CV Sumber Pangan',
             'no_hp' => '081200011122',
             'alamat' => 'Pasar Kranggan, Yogyakarta',
         ]);
 
-        $tanggal = now()->subDays(6);
-
-        $po = PurchaseOrder::create([
-            'outlet_id' => $outlet->getKey(),
-            'supplier_id' => $supplier->getKey(),
-            'nomor_po' => 'PO-'.$tanggal->format('Ymd').'-001',
-            'tanggal' => $tanggal->toDateString(),
-            'status' => DocumentStatus::Diterima,
-            'dibuat_oleh' => $owner->getKey(),
-            'diterima_pada' => $tanggal->copy()->addHours(3),
+        $this->catatPembelian->execute($outlet, $owner, [
+            'beli_dari' => 'CV Sumber Pangan',
+            'tanggal' => now()->subDays(6)->toDateString(),
+            'ongkos_kirim' => 25000,
+            'baris' => [
+                ['raw_material_id' => $bahan['beras']->getKey(), 'qty_beli' => 25, 'harga_satuan' => 13000],
+                ['raw_material_id' => $bahan['ayam']->getKey(), 'qty_beli' => 10, 'harga_satuan' => 38000],
+                ['raw_material_id' => $bahan['minyak']->getKey(), 'qty_beli' => 12, 'harga_satuan' => 18000],
+            ],
         ]);
-
-        $pesanan = [
-            ['beras', 25, 13000],
-            ['ayam', 10, 38000],
-            ['minyak', 12, 18000],
-        ];
-
-        $total = 0;
-
-        foreach ($pesanan as [$kunci, $qty, $harga]) {
-            $subtotal = $qty * $harga;
-            $total += $subtotal;
-
-            PurchaseOrderItem::create([
-                'purchase_order_id' => $po->getKey(),
-                'raw_material_id' => $bahan[$kunci]->getKey(),
-                'qty' => $qty,
-                'qty_diterima' => $qty,
-                'harga_satuan' => $harga,
-                'subtotal' => $subtotal,
-            ]);
-
-            // PO yang sudah diterima menaikkan stok, dengan jejak di kartu stok.
-            $stock = Stock::where('outlet_id', $outlet->getKey())
-                ->where('raw_material_id', $bahan[$kunci]->getKey())
-                ->firstOrFail();
-
-            $this->adjustStock->execute(
-                $stock,
-                StockMovementType::Masuk,
-                $qty,
-                $po,
-                $owner->getKey(),
-                'Penerimaan '.$po->nomor_po,
-            );
-        }
-
-        $po->update(['total' => $total]);
     }
 
     /** @return array<string, Customer> */

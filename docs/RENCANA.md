@@ -41,11 +41,12 @@ tidak sesuai** — sekarang masih perkiraan.
 - [x] Pagination 10 baris seluruh aplikasi termasuk riwayat kartu stok | 2026-08-04 | infra | 2j
 - [x] Opname terkunci ke cabang tempat angkanya dihitung + jejak audit jujur | 2026-08-04 | owner | 3j
 - [x] Baris `stocks` kembar: unique index dijamin + balapan tidak menggagalkan penjualan | 2026-08-05 | data | 2j
+- [x] Sisa stok di layar kasir: lencana keadaan + umur kabar 30 menit | 2026-08-05 | kasir | 4j
+- [x] Pembelian sisi data: nota, batal, harga beli, kunci outlet | 2026-08-05 | owner | 5j
 
 ## Wajib sebelum deploy
 
-- [ ] Sisa stok tampil di layar kasir (lencana di petak produk) | | kasir | 4j
-- [ ] Pembelian: stok masuk, supplier, harga beli | | owner | 8j
+- [~] Pembelian: tampilan kedua layarnya (sisi data selesai) | 2026-08-05 | owner | 3j
 - [ ] Kasbon: daftar piutang + pelunasan tercatat | | owner | 6j
 - [ ] Pelanggan: daftar + formulir | | owner | 4j
 - [ ] Impor produk dari Excel/CSV | | owner | 5j
@@ -119,6 +120,22 @@ menunggu jawaban.
   kebocoran antar-tab (dua tab, dua cabang, owner yang sama), dan perilaku `wire:key` di
   peramban hidup — yang terbukti baru bahwa kuncinya berubah per outlet plus alasan
   morph-nya; sisanya butuh sesi login dan klik nyata.
+- **Sisa stok di layar kasir menampilkan KEADAAN, bukan angka** (diputuskan 2026-08-05).
+  "Sisa 2" yang salah membuat kasir menjanjikan angka yang tidak ada; "Menipis" tetap benar
+  walau sudah lewat sepuluh transaksi. Kabarnya punya UMUR 30 menit
+  (`NAMPAN_SISA_STOK_MENIT`) lalu lencananya hilang — tanpa itu, lencana "Habis" berusia
+  enam jam membuat kasir menolak menjual barang yang kirimannya baru datang, yaitu kerugian
+  yang sama persis hanya terbalik arahnya. Menu warteg mengambil keadaan BAHAN BAKUNYA
+  (bahan terparah menentukan); bahan yang belum pernah dihitung DIABAIKAN, bukan dianggap
+  habis. **Belum diukur kerapiannya** — pratinjau memotret layar kasir sebagai HTML statis
+  sementara lencananya bergantung fetch hidup, jadi tangkapannya selalu tanpa lencana.
+- **Pembelian: harga TERAKHIR menang, bukan rata-rata bergerak** (diputuskan 2026-08-05).
+  Rata-rata butuh saldo sebagai pembagi, sedangkan saldo boleh minus dan boleh belum ada —
+  rata-rata atas saldo −3 menghasilkan harga negatif tanpa satu pun galat. Akibat yang harus
+  ditangani FE: seluruh stok lama ikut dinilai ulang dengan harga terbaru, jadi layar Stok
+  WAJIB memuat satu kalimat "Dihitung dengan harga beli terakhir" di bawah nilai persediaan —
+  angka yang melompat tanpa kalimat itu terbaca sebagai aplikasi yang salah hitung.
+  Tanpa alur draf: disimpan berarti barang sudah datang.
 - Yang QA jujur belum buktikan di lembar opname, jangan dianggap aman maupun cacat: angka
   fisik notasi ilmiah (`1e10`), dan `alasan`/`catatan` dikirim sebagai array lewat payload
   Livewire mentah.

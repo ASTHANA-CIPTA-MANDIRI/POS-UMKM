@@ -27,7 +27,17 @@ const KUNCI_ANTREAN = 'nampan.antrean';
 const KUNCI_BEKAL = 'nampan.bekal';
 const KUNCI_BILL = 'nampan.bill';
 const KUNCI_KERANJANG = 'nampan.keranjang';
+const KUNCI_SISA = 'nampan.sisa';
 const KUNCI_SUARA = 'nampan.suara';
+
+/**
+ * Jeda mencoba lagi menarik sisa stok setelah gagal (jaringan mati, server sibuk).
+ *
+ * Ini jeda PERCOBAAN ULANG, bukan salinan kebijakan umur kabar — batas umurnya
+ * ditentukan server (config nampan.sisa_stok_kedaluwarsa_menit) dan ikut di setiap
+ * jawaban, jadi tidak ada angka kebijakan yang diketik dua kali.
+ */
+const JEDA_COBA_SISA = 60_000;
 
 /**
  * Tiga keadaan suara, bukan dua.
@@ -84,12 +94,27 @@ export function pasangKasir() {
             deviceId: konfigurasi.deviceId,
             sesiId: konfigurasi.sesiId,
             urlKatalog: konfigurasi.urlKatalog,
+            urlSisaStok: konfigurasi.urlSisaStok,
             urlSinkron: konfigurasi.urlSinkron,
             bekalAwal: konfigurasi.bekalAwal ?? {},
 
             katalog: [],
             pelanggan: [],
             modeTersedia: ['langsung'],
+
+            /*
+             * Kabar sisa stok: { product_id: 'habis' | 'menipis' }.
+             *
+             * HANYA berisi barang yang perlu dikabarkan — barang aman dan barang yang
+             * belum pernah dihitung sengaja tidak dikirim server. Jadi peta kosong
+             * berarti "tidak ada lencana", bukan "semua habis", dan itulah yang membuat
+             * kegagalan jaringan aman dengan sendirinya.
+             */
+            sisaStok: {},
+            /** Kapan kabar ini berhenti dipercaya (epoch ms). 0 = belum ada kabar. */
+            sisaStokSampai: 0,
+            /** Jam menurut server saat kabar diambil, untuk keterangan di lencana. */
+            jamStok: null,
 
             mode: 'langsung',
             billAktif: null,
@@ -186,6 +211,19 @@ export function pasangKasir() {
                 this.mode = this.modeTersedia[0] ?? 'langsung';
                 this.resetPembayaran();
 
+                /*
+                 * Kabar sisa stok dari sesi sebelumnya dipakai lagi — kalau belum
+                 * kedaluwarsa. Tanpa ini, memuat ulang halaman (atau kembali dari
+                 * beranda, yang di warung terjadi puluhan kali sehari) membuat seluruh
+                 * lencana hilang sampai permintaan berikutnya terjawab.
+                 *
+                 * Penarikannya lepas dari alur transaksi: tidak di-await, tidak ada
+                 * yang menunggunya, dan kegagalannya tidak dikabarkan ke kasir. Layar
+                 * ini wajib jalan tanpa jaringan (aturan 3 CLAUDE.md).
+                 */
+                this.pulihkanSisaStok();
+                this.muatSisaStok();
+
                 window.addEventListener('online', () => {
                     this.online = true;
                     this.kirimAntrean();
@@ -240,10 +278,150 @@ export function pasangKasir() {
                     const data = await respons.json();
                     this.terapkanBekal(data);
                     tulisJson(KUNCI_BEKAL, data);
+
+                    // Sisa stok ikut ditarik: kasir yang menekan Segarkan sedang bertanya
+                    // "apa keadaan sekarang", dan menu baru yang muncul tanpa kabar stok
+                    // menjawab setengahnya saja.
+                    this.muatSisaStok();
+
                     this.beriPesan('Data disegarkan.', 'sukses');
                 } catch {
                     this.beriPesan('Gagal menyegarkan.', 'galat');
                 }
+            },
+
+            /* ── Sisa stok di petak produk ─────────────────────────────────── */
+
+            /**
+             * Menarik kabar sisa stok. SENGAJA tidak mengabarkan kegagalan.
+             *
+             * Fungsi ini tidak pernah dipanggil dari jalur penjualan dan tidak pernah
+             * ditunggu. Kalau gagal, yang terjadi cuma satu: lencananya tidak berubah,
+             * lalu kedaluwarsa dengan sendirinya dan petak kembali tampil apa adanya.
+             * Kasir tidak diberi toast untuk ini — pemberitahuan yang tidak bisa
+             * ditindaklanjuti hanya melatih orang mengabaikan pemberitahuan, dan
+             * pemberitahuan yang PERLU dibaca di layar ini adalah soal uang.
+             */
+            async muatSisaStok() {
+                if (! this.urlSisaStok) {
+                    return;
+                }
+
+                if (! this.online) {
+                    this.jadwalkanSisaStok(JEDA_COBA_SISA);
+
+                    return;
+                }
+
+                try {
+                    const respons = await fetch(this.urlSisaStok, { headers: { Accept: 'application/json' } });
+
+                    if (! respons.ok) {
+                        this.jadwalkanSisaStok(JEDA_COBA_SISA);
+
+                        return;
+                    }
+
+                    const data = await respons.json();
+                    const menit = Number(data.kedaluwarsa_menit) || 0;
+
+                    if (menit <= 0) {
+                        this.jadwalkanSisaStok(JEDA_COBA_SISA);
+
+                        return;
+                    }
+
+                    /*
+                     * Peta DIGANTI seluruhnya, tidak digabung dengan yang lama.
+                     *
+                     * Server hanya mengirim barang yang perlu dikabarkan, jadi barang
+                     * yang stoknya sudah terisi lagi tidak muncul di jawaban baru —
+                     * menggabungkan berarti lencana "Habis" menempel selamanya pada
+                     * barang yang kirimannya sudah datang.
+                     */
+                    this.sisaStok = data.sisa ?? {};
+                    this.sisaStokSampai = Date.now() + menit * 60_000;
+                    this.jamStok = data.jam ?? null;
+
+                    tulisJson(KUNCI_SISA, {
+                        sisa: this.sisaStok,
+                        sampai: this.sisaStokSampai,
+                        jam: this.jamStok,
+                    });
+
+                    // Ditarik lagi di separuh umurnya, supaya kabarnya tidak pernah
+                    // sempat kedaluwarsa selama perangkat masih online.
+                    this.jadwalkanSisaStok((menit * 60_000) / 2);
+                } catch {
+                    this.jadwalkanSisaStok(JEDA_COBA_SISA);
+                }
+            },
+
+            /** Kabar dari sesi sebelumnya, dipakai lagi hanya kalau belum kedaluwarsa. */
+            pulihkanSisaStok() {
+                const tersimpan = bacaJson(KUNCI_SISA, null);
+
+                if (! tersimpan || Number(tersimpan.sampai || 0) <= Date.now()) {
+                    return;
+                }
+
+                this.sisaStok = tersimpan.sisa ?? {};
+                this.sisaStokSampai = Number(tersimpan.sampai);
+                this.jamStok = tersimpan.jam ?? null;
+            },
+
+            jadwalkanSisaStok(jeda) {
+                if (typeof window.setTimeout !== 'function') {
+                    return;
+                }
+
+                window.clearTimeout(this._timerStok);
+                this._timerStok = window.setTimeout(() => this.muatSisaStok(), jeda);
+            },
+
+            /**
+             * Keadaan stok satu produk: 'habis', 'menipis', atau null (tanpa lencana).
+             *
+             * null di tiga keadaan yang berbeda, dan ketiganya memang berakhir sama:
+             * barang aman, barang yang belum pernah dihitung, dan kabar yang sudah
+             * kedaluwarsa. Menampilkan "0" atau "Habis" untuk salah satunya berarti
+             * mengarang — dan karangan di layar kasir dibayar dengan penjualan yang
+             * ditolak padahal barangnya ada di rak.
+             */
+            statusStok(produkId) {
+                if (this.sisaStokSampai <= Date.now()) {
+                    return null;
+                }
+
+                return this.sisaStok[produkId] ?? null;
+            },
+
+            labelStok(produkId) {
+                return { habis: 'Habis', menipis: 'Menipis' }[this.statusStok(produkId)] ?? '';
+            },
+
+            /**
+             * Keterangan lengkap lencana, dipakai sebagai judul & label aksesibilitas.
+             *
+             * Menyebut JAM-nya dengan sengaja: angka stok di layar kasir selalu
+             * tertinggal dari kenyataan (kasir lain, perangkat lain), jadi lencananya
+             * tidak boleh berlagak mutakhir. "Menurut catatan pukul 10.15" mengundang
+             * kasir memeriksa rak; "Habis" saja terbaca sebagai kepastian.
+             */
+            keteranganStok(produkId) {
+                const status = this.statusStok(produkId);
+
+                if (! status) {
+                    return '';
+                }
+
+                const kalimat = status === 'habis'
+                    ? 'Menurut catatan, barang ini sudah habis'
+                    : 'Menurut catatan, barang ini tinggal sedikit';
+
+                const jam = this.jamStok ? ' (pukul ' + this.jamStok + ')' : '';
+
+                return kalimat + jam + '. Cek rak dulu — penjualan tetap bisa dilanjutkan.';
             },
 
             get kategori() {
@@ -1282,6 +1460,14 @@ export function pasangKasir() {
                     } else {
                         this.beriPesan('Tersimpan.', 'sukses');
                     }
+
+                    /*
+                     * Penjualan yang barusan terkirim SUDAH mengubah stok di server —
+                     * termasuk antrean offline yang menumpuk sejak pagi. Ini saat paling
+                     * murah untuk memperbarui kabarnya: kasir baru saja menutup satu
+                     * transaksi, jadi tidak ada yang sedang menunggu layar.
+                     */
+                    this.muatSisaStok();
                 } catch {
                     this.online = navigator.onLine;
                     this.beriPesan('Belum terkirim. ' + this.antrean.length + ' menunggu.', 'offline');

@@ -91,6 +91,7 @@
                 deviceId: @js($deviceId),
                 sesiId: @js($sesi->getKey()),
                 urlKatalog: @js(route('kasir.katalog')),
+                urlSisaStok: @js(route('kasir.sisa-stok')),
                 urlSinkron: @js(route('sinkronisasi.transaksi')),
                 bekalAwal: @js($bekalAwal),
             })"
@@ -426,7 +427,49 @@
                                 </span>
 
                                 <span class="line-clamp-2 text-sm font-semibold leading-snug text-ink" x-text="p.nama"></span>
-                                <span class="tabular mt-2 text-sm font-bold text-terracotta" x-text="'Rp ' + rupiah(p.harga)"></span>
+
+                                {{--
+                                    Harga dan lencana stok SEBARIS, bukan lencana yang
+                                    ditumpangkan di atas gambar. Lencana melayang menutupi
+                                    foto produk — satu-satunya penanda yang dipakai kasir
+                                    untuk mengenali barang tanpa membaca — dan tumpukan
+                                    seperti itu juga yang terhitung sebagai "tumpangTindih"
+                                    saat kerapian diukur.
+
+                                    flex-wrap: harga jutaan + "Menipis" tidak muat sebaris
+                                    di petak selebar 180px (dua kolom di layar 390px), dan
+                                    yang boleh turun baris adalah lencananya, bukan harganya.
+                                --}}
+                                <span class="mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                                    <span class="tabular text-sm font-bold text-terracotta" x-text="'Rp ' + rupiah(p.harga)"></span>
+
+                                    {{--
+                                        Lencana ini MEMBERI TAHU, tidak menghalangi: petaknya
+                                        tetap bisa ditekan dan barangnya tetap bisa dijual
+                                        (aturan 5 CLAUDE.md — stok boleh minus, penjualan
+                                        jangan pernah diblokir). Kasir yang melihat "Habis"
+                                        lalu menemukan barangnya di rak tetap menjualnya;
+                                        selisihnya diselesaikan lewat hitung stok.
+
+                                        x-if, BUKAN x-show: produk tanpa kabar stok — barang
+                                        aman, barang yang belum pernah dihitung, dan seluruh
+                                        petak saat kabarnya kedaluwarsa atau gagal diambil —
+                                        tidak menyisakan elemen apa pun, jadi petaknya tampil
+                                        persis seperti sebelum fitur ini ada.
+                                    --}}
+                                    <template x-if="statusStok(p.id)">
+                                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap"
+                                              :class="statusStok(p.id) === 'habis' ? 'bg-merah/10 text-merah-deep' : 'bg-jingga/15 text-jingga-tua'"
+                                              :title="keteranganStok(p.id)"
+                                              :aria-label="keteranganStok(p.id)">
+                                            {{-- Titik di depan teks: statusnya terbaca tanpa
+                                                 bergantung warna saja — pola yang sama dengan
+                                                 x-lencana di layar owner. --}}
+                                            <span class="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true"></span>
+                                            <span x-text="labelStok(p.id)"></span>
+                                        </span>
+                                    </template>
+                                </span>
                             </button>
                         </template>
                     </div>
