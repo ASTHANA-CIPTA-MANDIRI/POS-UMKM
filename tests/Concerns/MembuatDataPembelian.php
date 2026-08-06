@@ -70,6 +70,21 @@ trait MembuatDataPembelian
         return app(CatatPembelianAction::class)->execute($outlet, $oleh, $muatan);
     }
 
+    /**
+     * Nota yang barangnya BELUM DATANG — stok tidak boleh bergerak sama sekali.
+     *
+     * Muatan tanpa kunci `sudah_datang` berarti "sudah datang" (bawaannya), jadi keadaan ini
+     * harus dinyatakan eksplisit. Disediakan di trait supaya seluruh berkas uji pembelian
+     * memakai satu jalur yang sama; nota belum-datang yang disusun tangan per berkas cepat
+     * atau lambat salah satunya lupa dan hijau karena alasan yang salah.
+     *
+     * @param  array<string, mixed>  $muatan
+     */
+    protected function catatNotaBelumDatang(Outlet $outlet, User $oleh, array $muatan): PurchaseOrder
+    {
+        return $this->catatNota($outlet, $oleh, array_merge($muatan, ['sudah_datang' => false]));
+    }
+
     /** Saldo stok satu barang di satu outlet; null kalau barisnya belum pernah ada. */
     protected function saldo(Outlet $outlet, Product|RawMaterial $barang): ?float
     {

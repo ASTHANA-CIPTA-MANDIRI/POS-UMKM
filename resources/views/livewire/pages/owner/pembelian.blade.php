@@ -478,10 +478,28 @@
                     {{-- Bergaris rambut, BUKAN isian penuh. Sepuluh kartu nota berarti sepuluh
                          batang berwarna penuh berjajar ke bawah, dan begitu semuanya berwarna
                          tidak ada lagi yang menonjol — termasuk satu-satunya tindakan utama
-                         layar ini, "Catat nota belanja" di kepala halaman. --}}
+                         layar ini, "Catat nota belanja" di kepala halaman.
+
+                         `.tombol-kedua` + `.tombol-ikon`, bentuk yang sama dengan tombol
+                         pembuka rincian di tabel ≥lg: satu layar tidak boleh punya dua bentuk
+                         untuk tindakan yang sama. aria-label MENYEBUT nomor notanya — teksnya
+                         berbunyi "Lihat isi nota" sepuluh kali, dan pembaca layar yang
+                         mendengar kalimat identik sepuluh kali tidak tahu ia sedang di nota
+                         yang mana. --}}
                     <div class="mt-3 flex">
                         <button type="button" wire:click="bukaRincian('{{ $nota->getKey() }}')"
-                                class="h-11 w-full cursor-pointer rounded-xl border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                                class="tombol-kedua h-11 w-full cursor-pointer px-3 text-[0.8125rem]">
+                            <span class="tombol-ikon">
+                                @if ($rincianId === $nota->getKey())
+                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                        <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                                    </svg>
+                                @else
+                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                        <path d="M4 5.5h9M4 10h12M4 14.5h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                                    </svg>
+                                @endif
+                            </span>
                             {{ $rincianId === $nota->getKey() ? 'Tutup rincian' : 'Lihat isi nota' }}
                         </button>
                     </div>
@@ -504,10 +522,17 @@
                              gulir mendatar (kartunya overflow-hidden), jadi ia hanya terlihat
                              di potretnya. Jumlah barisnya sekarang menempel di bawah total —
                              tempatnya memang di situ: ia menjelaskan uang yang di atasnya. --}}
-                        <th class="w-[22%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Nota</th>
-                        <th class="w-[22%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Beli dari</th>
-                        <th class="w-[18%] px-3 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Outlet</th>
-                        <th class="w-[16%] px-3 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Total belanja</th>
+                        {{-- Nota 1% lebih lebar dan selnya berpadding tipis (px-2, bukan px-5):
+                             nomor notanya sekarang berdiri di dalam tombol berikon, dan tombol
+                             itu butuh ±180px. Yang ditambah bukan hanya persennya — 24px
+                             padding sel yang dibebaskan lebih besar daripada 1% lebar tabel.
+                             Sisa 1% diambil dari Outlet dan diberikan ke Total belanja, karena
+                             nominal yang pecah dua baris adalah cacat yang sudah diatur
+                             tersendiri di CLAUDE.md. --}}
+                        <th class="w-[23%] px-3 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Nota</th>
+                        <th class="w-[21%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Beli dari</th>
+                        <th class="w-[17%] px-3 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Outlet</th>
+                        <th class="w-[17%] px-3 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Total belanja</th>
                         <th class="w-[22%] px-3 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
                     </tr>
                 </thead>
@@ -518,16 +543,48 @@
                                 'bg-cream/60' => $rincianId === $nota->getKey(),
                             ])
                             wire:key="baris-nota-{{ $nota->getKey() }}">
-                            <td class="px-5 py-3.5">
+                            <td class="px-3 py-3.5">
                                 {{-- Seluruh identitas nota jadi satu tombol: itu satu-satunya
                                      tindakan baris ini, dan tombol ikon kecil di ujung kanan
-                                     membuat orang harus membidik sesudah membaca kiri. --}}
+                                     membuat orang harus membidik sesudah membaca kiri.
+
+                                     Dan tombolnya BERBENTUK tombol — `.tombol-kedua` bergaris
+                                     rambut + `.tombol-ikon`, bentuk yang sama dengan kartu di
+                                     <lg. Bentuk lama hanya teks berwarna terracotta: satu-satunya
+                                     petunjuk bahwa ia bisa ditekan adalah warnanya, dan pemilik
+                                     proyek bertanya persis itu ("bagaimana saya tahu
+                                     PB-20260801-002 bisa diklik kalau tidak ada ikonnya?").
+                                     Penandanya tidak boleh menunggu hover: layar ini dipakai di
+                                     tablet dan HP, dan di sana hover TIDAK ADA — cacat yang sama
+                                     sudah pernah terjadi pada tombol hapus yang kelabu sampai
+                                     disorot. Tingginya min 44px, jadi sasaran sentuhnya sah juga
+                                     di tablet lanskap yang memakai tata letak tabel ini.
+
+                                     Selebar selnya (`w-full` + `justify-between`), bukan
+                                     seukuran isinya: tanggalnya panjangnya berbeda-beda
+                                     ("6 Agt 2026" vs "31 Jul 2026"), jadi tombol yang menyusut
+                                     ke isinya membuat ikonnya berpindah tempat sampai 7px dari
+                                     baris ke baris (terukur) — dan kolom yang tepinya bergerigi
+                                     membuat mata mencari ikonnya lagi setiap turun satu baris.
+                                     Nomor notanya rata kiri di posisi yang sama tiap baris. --}}
                                 <button type="button" wire:click="bukaRincian('{{ $nota->getKey() }}')"
-                                        class="mx-auto block max-w-full cursor-pointer text-center"
-                                        aria-label="{{ $rincianId === $nota->getKey() ? 'Tutup rincian nota '.$nota->nomor_po : 'Lihat isi nota '.$nota->nomor_po }}">
-                                    <span class="tabular block truncate text-[0.875rem] font-semibold text-terracotta">{{ $nota->nomor_po }}</span>
-                                    <span class="tabular block text-[0.75rem] text-umber-soft">
-                                        {{ $nota->tanggal?->locale('id')->translatedFormat('j M Y') ?? '—' }}
+                                        class="tombol-kedua min-h-11 w-full cursor-pointer justify-between py-1.5 pr-1.5 pl-2.5 text-left"
+                                    <span class="min-w-0">
+                                        <span class="tabular block truncate text-[0.875rem] font-bold text-terracotta">{{ $nota->nomor_po }}</span>
+                                        <span class="tabular block truncate text-[0.75rem] font-normal text-umber-soft">
+                                            {{ $nota->tanggal?->locale('id')->translatedFormat('j M Y') ?? '—' }}
+                                        </span>
+                                    </span>
+                                    <span class="tombol-ikon">
+                                        @if ($rincianId === $nota->getKey())
+                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                                            </svg>
+                                        @else
+                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                <path d="M4 5.5h9M4 10h12M4 14.5h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                                            </svg>
+                                        @endif
                                     </span>
                                 </button>
                             </td>

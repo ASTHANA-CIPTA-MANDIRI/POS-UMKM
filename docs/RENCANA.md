@@ -44,6 +44,7 @@ tidak sesuai** — sekarang masih perkiraan.
 - [x] Sisa stok di layar kasir: lencana keadaan + umur kabar 30 menit | 2026-08-05 | kasir | 4j
 - [x] Pembelian sisi data: nota, batal, harga beli, kunci outlet | 2026-08-05 | owner | 5j
 - [x] Pembelian: tampilan daftar + formulir + rincian nota | 2026-08-05 | owner | 3j
+- [x] Pembelian sisi data: keadaan "barang belum datang", stok masuk saat ditandai datang | 2026-08-06 | data | 4j
 
 ## Wajib sebelum deploy
 
@@ -136,7 +137,30 @@ menunggu jawaban.
   ditangani FE: seluruh stok lama ikut dinilai ulang dengan harga terbaru, jadi layar Stok
   WAJIB memuat satu kalimat "Dihitung dengan harga beli terakhir" di bawah nilai persediaan —
   angka yang melompat tanpa kalimat itu terbaca sebagai aplikasi yang salah hitung.
-  Tanpa alur draf: disimpan berarti barang sudah datang.
+- **Pembelian: keadaan "barang belum datang" — sisi data selesai 2026-08-06.** Ini MENGGANTI
+  kalimat "tanpa alur draf: disimpan berarti barang sudah datang" di catatan sebelumnya.
+  Cacat yang diperbaiki: menyimpan nota langsung menambah stok, jadi belanja yang barangnya
+  datang tujuh hari kemudian membuat saldo mengaku ada barang yang belum tiba di rak — dan
+  layar kasir mengabari "Aman" untuk rak yang kosong, lalu kasir menjanjikannya ke pembeli.
+  Sekarang stok HANYA bergerak lewat `TerimaPembelianAction` (aksi terpisah, bukan cabang
+  `if`), dan harga beli master juga baru diperbarui di situ — memperbaruinya saat simpan
+  berarti menilai ulang barang yang sudah di rak dengan harga barang yang belum dibeli.
+  Bawaan formulir tetap "barangnya sudah saya terima", jadi belanja warung biasa tidak
+  berubah perilakunya. Yang SENGAJA tidak dibangun, dan jangan pernah dibangun: apa pun yang
+  menahan penjualan (aturan 5) — kasir cuma tidak dikabari, tidak dihalangi. Terima SEBAGIAN
+  juga tidak dibangun; `qty_diterima` selalu penuh dan selisihnya lewat Hitung stok, kalimatnya
+  disediakan sebagai `TerimaPembelianAction::CATATAN_TERIMA_SEBAGIAN`. Status `Draft` tetap
+  TIDAK PERNAH ditulis aplikasi walaupun ia default kolomnya — itulah yang menjadikannya
+  penanda anomali, dan ada uji yang menjaganya. Dua cacat lain ikut ditutup: membatalkan nota
+  belum-datang tidak lagi menulis ulang harga beli master, dan pesan pembatalannya tidak lagi
+  mengaku "stok dikembalikan" untuk barang yang belum pernah masuk.
+- **Sisa sisi tampilan untuk "belum datang"** (FE, belum dikerjakan saat catatan ini ditulis):
+  pilihan dua-cabang di formulir nota (`sudahDatang`, bawaan true, TANPA bintang wajib karena
+  validatornya bukan required), tombol + blok konfirmasi "Tandai datang" yang memanggil
+  `tandaiDatang($id)` dan memuat `$catatanTerimaSebagian`, pil saringan `status=belum`, dan
+  kartu ringkasan "Menunggu datang" (`$ringkasan['menunggu']` → nilai, nota, umur_hari, tertua).
+  Kartu "Belanja bulan ini" sekarang hanya nota yang sudah datang, jadi keterangan kecilnya
+  perlu menyebutkannya — bukan lagi cuma "tanpa nota yang dibatalkan".
 - **Kontras lencana merah belum selesai — 21 pemakaian masih gagal.** Token
   `--color-merah-tua` (#9b1c1c, 7,14:1) sudah ada dan sudah dipakai lencana kasir, tapi
   `text-merah-deep` di atas `bg-merah/…` masih 4,15:1 di 21 tempat. Perbaikan terbesar per

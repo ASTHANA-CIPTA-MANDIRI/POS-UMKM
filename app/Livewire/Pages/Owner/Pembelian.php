@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages\Owner;
 
 use App\Actions\Purchase\BatalkanPembelianAction;
+use App\Actions\Purchase\TerimaPembelianAction;
 use App\Enums\DocumentStatus;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;
@@ -11,6 +12,7 @@ use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -20,13 +22,20 @@ use Livewire\WithPagination;
 /**
  * Daftar nota belanja (pembelian) — riwayat barang masuk beserta uang yang keluar.
  *
- * Yang TIDAK ada di sini, dan sengaja: alur draf. Nota disimpan berarti barangnya sudah
- * datang, jadi status yang mungkin hanya dua — Diterima dan Dibatalkan. Nota lama dari
- * data demo yang berstatus lain tetap tampil apa adanya; menyembunyikannya berarti
- * menghilangkan mutasi stok yang sudah terjadi dari layar yang seharusnya menjelaskannya.
+ * TIGA keadaan nota, dan hanya tiga: "barang sudah datang" (Diterima), "belum datang"
+ * (Dikirim), "dibatalkan". `Draft` TIDAK PERNAH ditulis aplikasi ini walaupun ia default
+ * kolomnya di migrasi — nota berstatus draft berarti ada baris yang lahir tanpa lewat
+ * CatatPembelianAction, dan itu anomali yang harus terlihat, bukan keadaan sah yang
+ * diam-diam ikut dihitung. Nota lama berstatus tak dikenal tetap tampil apa adanya;
+ * menyembunyikannya berarti menghilangkan mutasi stok yang sudah terjadi dari layar yang
+ * seharusnya menjelaskannya.
  *
  * Nota yang dibatalkan TIDAK hilang dari daftar. Kalau ia hilang, kartu stok memuat mutasi
  * masuk dan keluar yang menunjuk dokumen yang tidak bisa dibuka siapa pun.
+ *
+ * Yang TIDAK dibangun di sini dan harus tetap begitu: apa pun yang MENAHAN penjualan.
+ * Nota belum datang cuma berarti angkanya belum masuk saldo — kasir tidak pernah dikabari
+ * barangnya tersedia, tapi ia juga tidak pernah dihalangi menjualnya (aturan 5 CLAUDE.md).
  */
 #[Layout('layouts.aplikasi')]
 class Pembelian extends Component
@@ -51,7 +60,12 @@ class Pembelian extends Component
     #[Url(as: 'cari')]
     public string $cari = '';
 
-    /** semua|diterima|dibatalkan */
+    /**
+     * semua|diterima|belum|dibatalkan
+     *
+     * 'belum' = nota yang barangnya belum datang (DocumentStatus::Dikirim). Nilainya kata
+     * warung, bukan nama status: yang membaca URL ini adalah pemiliknya, bukan gudang.
+     */
     #[Url(as: 'status')]
     public string $status = 'semua';
 
@@ -143,6 +157,51 @@ class Pembelian extends Component
             ->paginate(config('nampan.per_halaman'), ['*'], self::HALAMAN_RINCIAN);
     }
 
+    /* ── Barang datang ───────────────────────────────────────────────────── */
+
+    /**
+     * Menandai nota "barangnya sudah datang": stok masuk, harga beli master diperbarui.
+     *
+     * Gerbangnya kueri() yang sama dengan batalkan() — tersaring tenant DAN outlet — jadi
+     * nota cabang lain maupun merchant lain terbaca sebagai "tidak ada". Outlet tempat
+     * barangnya masuk TIDAK diambil dari sini sama sekali: TerimaPembelianAction membacanya
+     * dari notanya (`$po->outlet_id`), dan aksinya bahkan tidak punya parameter outlet.
+     *
+     * Aksinya idempoten, jadi tombol yang tertekan dua kali tidak menambah stok dua kali.
+     */
+    public function tandaiDatang(string $id): void
+    {
+        $nota = $this->kueri()->whereKey($id)->first();
+
+        if ($nota === null) {
+            $this->toast('Nota belanja tidak ditemukan.', 'peringatan');
+
+            return;
+        }
+
+        if ($nota->status === DocumentStatus::Dibatalkan) {
+            // Dinyatakan sendiri, bukan dibiarkan jatuh ke pesan idempotensi di bawah:
+            // "sudah ditandai datang" untuk nota yang DIBATALKAN adalah keterangan yang
+            // salah, dan pemiliknya lalu mencari barangnya di catatan stok.
+            $this->toast('Nota '.$nota->nomor_po.' sudah dibatalkan, jadi barangnya tidak bisa ditandai datang.', 'peringatan');
+
+            return;
+        }
+
+        $terjadi = app(TerimaPembelianAction::class)->execute($nota, auth()->user());
+
+        $this->toast(
+            $terjadi
+                ? 'Nota '.$nota->nomor_po.' ditandai datang. Stok sudah bertambah.'
+                : 'Nota '.$nota->nomor_po.' memang sudah ditandai datang sebelumnya; stok tidak disentuh lagi.',
+            $terjadi ? 'sukses' : 'info',
+        );
+
+        // Panel rincian yang sedang terbuka ikut memperlihatkan lencana barunya tanpa
+        // pemiliknya harus menutup lalu membukanya lagi.
+        $this->resetPage(self::HALAMAN_RINCIAN);
+    }
+
     /* ── Pembatalan ──────────────────────────────────────────────────────── */
 
     /**
@@ -151,6 +210,12 @@ class Pembelian extends Component
      * Aksinya idempoten, jadi tombol yang tertekan dua kali tidak mengurangi stok dua
      * kali. Pesannya dibedakan supaya pemilik tahu mana yang benar-benar baru terjadi —
      * "sudah dibatalkan sebelumnya" adalah keterangan, bukan kegagalan.
+     *
+     * Pesan "stok dikembalikan" HANYA untuk nota yang barangnya memang pernah masuk. Ini
+     * cacat nyata yang sudah pernah ada di sini: nota yang barangnya belum datang tidak
+     * pernah menambah stok, jadi mengaku mengembalikannya membuat pemilik mencari 24 pcs
+     * yang tidak pernah ada di catatannya — dan pesan yang salah satu kali membuat seluruh
+     * pesan berikutnya berhenti dipercaya.
      */
     public function batalkan(string $id): void
     {
@@ -164,12 +229,18 @@ class Pembelian extends Component
             return;
         }
 
+        // Dibaca SEBELUM aksinya jalan: sesudah itu statusnya sudah Dibatalkan dan
+        // pertanyaan "apakah barangnya pernah masuk" tidak bisa dijawab lagi.
+        $pernahMasuk = $nota->status->movesStock();
+
         $terjadi = app(BatalkanPembelianAction::class)->execute($nota, auth()->user());
 
         $this->toast(
-            $terjadi
-                ? 'Nota '.$nota->nomor_po.' dibatalkan. Stok dikembalikan seperti sebelum nota ini dicatat.'
-                : 'Nota '.$nota->nomor_po.' memang sudah dibatalkan sebelumnya; stok tidak disentuh lagi.',
+            match (true) {
+                $terjadi && $pernahMasuk => 'Nota '.$nota->nomor_po.' dibatalkan. Stok dikembalikan seperti sebelum nota ini dicatat.',
+                $terjadi => 'Nota '.$nota->nomor_po.' dibatalkan. Barangnya belum datang, jadi tidak ada stok yang berubah.',
+                default => 'Nota '.$nota->nomor_po.' memang sudah dibatalkan sebelumnya; stok tidak disentuh lagi.',
+            },
             $terjadi ? 'sukses' : 'info',
         );
     }
@@ -187,6 +258,7 @@ class Pembelian extends Component
             ->withCount('items')
             ->when($outletId !== null, fn ($q) => $q->where('outlet_id', $outletId))
             ->when($this->status === 'diterima', fn ($q) => $q->where('status', DocumentStatus::Diterima->value))
+            ->when($this->status === 'belum', fn ($q) => $q->where('status', DocumentStatus::Dikirim->value))
             ->when($this->status === 'dibatalkan', fn ($q) => $q->where('status', DocumentStatus::Dibatalkan->value))
             ->when($cari !== '', fn ($q) => $q->where(function ($w) use ($cari) {
                 $w->where('nomor_po', 'like', '%'.$cari.'%')
@@ -214,14 +286,22 @@ class Pembelian extends Component
      * tidak lagi menjawab pertanyaan itu. Yang tetap diikuti hanya outlet: belanja cabang
      * lain tidak pernah dibayar dari laci cabang ini.
      *
-     * Nota yang dibatalkan TIDAK ikut dijumlahkan ke uangnya — uangnya kembali, stoknya
-     * dikembalikan — tapi tetap dihitung di kartunya sendiri supaya pembatalan yang sering
-     * terjadi terlihat, bukan hilang tanpa jejak.
+     * "Belanja bulan ini" HANYA menghitung nota yang barangnya SUDAH DATANG. Uang untuk
+     * barang yang belum ada tidak boleh berbaur dengan uang yang sudah jadi barang: yang
+     * pertama masih bisa hangus atau berubah jumlahnya, yang kedua sudah ada di rak. Satu
+     * angka yang mencampur keduanya tidak bisa dipakai untuk memutuskan apa pun — dan
+     * pemilik yang melihatnya melompat naik pada hari ia mencatat pesanan akan menyimpulkan
+     * uangnya sudah keluar. Nota yang dibatalkan juga tidak ikut, dengan alasan yang sama.
+     *
+     * "Menunggu datang" TIDAK dibatasi bulan ini, dan itu disengaja: nota yang barangnya
+     * belum sampai sejak bulan lalu justru yang paling perlu ditanyakan ke grosirnya. Karena
+     * itu umur nota TERTUA ikut dikirim — "menunggu 19 hari" adalah pertanyaan, sedangkan
+     * "3 nota menunggu" cuma angka.
      *
      * `addMonthNoOverflow()`, bukan endOfMonth/subMonths mentah: batas atas dibuat
      * eksklusif supaya nota tertanggal hari terakhir bulan tetap ikut terhitung.
      *
-     * @return array{belanja: float, nota: int, dibatalkan: int}
+     * @return array{belanja: float, nota: int, dibatalkan: int, menunggu: array{nilai: float, nota: int, tertua: ?Carbon, umur_hari: ?int}}
      */
     private function ringkasanBulanIni(): array
     {
@@ -235,9 +315,37 @@ class Pembelian extends Component
             ->where('tanggal', '<', $akhir->toDateString());
 
         return [
-            'belanja' => (float) $dasar()->whereNot('status', DocumentStatus::Dibatalkan->value)->sum('total'),
-            'nota' => (int) $dasar()->whereNot('status', DocumentStatus::Dibatalkan->value)->count(),
+            'belanja' => (float) $dasar()->where('status', DocumentStatus::Diterima->value)->sum('total'),
+            'nota' => (int) $dasar()->where('status', DocumentStatus::Diterima->value)->count(),
             'dibatalkan' => (int) $dasar()->where('status', DocumentStatus::Dibatalkan->value)->count(),
+            'menunggu' => $this->ringkasanMenungguDatang($outletId),
+        ];
+    }
+
+    /**
+     * Nota yang barangnya belum datang: nilainya, jumlahnya, dan umur yang tertua.
+     *
+     * Umur dihitung dari `tanggal` nota (tanggal belanjanya), bukan dari `created_at`:
+     * pemilik boleh mencatat nota kemarin hari ini, dan yang ia tunggu adalah barang yang
+     * dipesan pada tanggal notanya. `startOfDay()` di kedua sisi supaya "hari ini" selalu
+     * 0 hari dan tidak pernah terbaca 1 hari hanya karena jamnya sudah lewat tengah hari.
+     *
+     * @return array{nilai: float, nota: int, tertua: ?Carbon, umur_hari: ?int}
+     */
+    private function ringkasanMenungguDatang(?string $outletId): array
+    {
+        $dasar = fn () => PurchaseOrder::query()
+            ->when($outletId !== null, fn ($q) => $q->where('outlet_id', $outletId))
+            ->where('status', DocumentStatus::Dikirim->value);
+
+        $tertua = $dasar()->min('tanggal');
+        $tertua = $tertua === null ? null : Carbon::parse($tertua)->startOfDay();
+
+        return [
+            'nilai' => (float) $dasar()->sum('total'),
+            'nota' => (int) $dasar()->count(),
+            'tertua' => $tertua,
+            'umur_hari' => $tertua === null ? null : (int) $tertua->diffInDays(now()->startOfDay()),
         ];
     }
 
@@ -254,6 +362,10 @@ class Pembelian extends Component
             'ringkasan' => $this->ringkasanBulanIni(),
             'outletTersedia' => auth()->user()->scopedOutletId() === null ? $this->outletTersedia() : [],
             'outletDipakai' => $this->outletTerpakai(),
+            // WAJIB terpasang di blok konfirmasi "tandai datang". Terima sebagian tidak
+            // dibangun (qty_diterima selalu penuh), jadi tanpa kalimat ini pemilik yang
+            // menerima 8 dari 10 mengarang jalannya sendiri.
+            'catatanTerimaSebagian' => TerimaPembelianAction::CATATAN_TERIMA_SEBAGIAN,
         ]);
     }
 }

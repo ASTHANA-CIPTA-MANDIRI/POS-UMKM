@@ -23,6 +23,12 @@ use Illuminate\Support\Facades\DB;
  * angkanya sempat naik lalu turun. Yang dibatalkan tetap terbaca di daftar, berlencana
  * "Dibatalkan".
  *
+ * Nota yang barangnya BELUM DATANG juga boleh dibatalkan, dan di situ tidak ada satu pun
+ * angka yang berubah: tidak ada stok yang dikembalikan (tidak pernah masuk) dan tidak ada
+ * harga beli yang dipulihkan (tidak pernah menimpa). Pemanggilnya WAJIB membedakan pesannya
+ * — lihat Pembelian::batalkan(); mengaku "stok dikembalikan" untuk nota seperti ini membuat
+ * pemilik mencari 24 pcs yang tidak pernah ada di catatannya.
+ *
  * IDEMPOTEN, dan ini bukan kerapian: tombol yang ditekan dua kali (jaringan lambat, jari
  * yang tidak yakin) akan mengurangi stok DUA KALI, dan angka yang dihasilkan tidak
  * melanggar aturan apa pun — stok memang boleh minus di POS ini, jadi tidak ada galat,
@@ -59,17 +65,28 @@ class BatalkanPembelianAction
                 return false;
             }
 
-            // Stok hanya dikembalikan kalau notanya memang pernah menggerakkannya. Nota
-            // yang belum diterima (data lama berstatus draft) tidak punya mutasi masuk,
-            // jadi mengeluarkan barangnya akan mengarang pengurangan yang tidak berpasangan.
+            /*
+             * Stok DAN harga beli sama-sama hanya disentuh kalau notanya memang pernah
+             * menggerakkannya.
+             *
+             * Stoknya: nota yang belum datang tidak punya mutasi masuk, jadi mengeluarkan
+             * barangnya akan mengarang pengurangan yang tidak berpasangan.
+             *
+             * Harganya: ini CACAT NYATA yang pernah ada di sini — pulihkanHargaBeli()
+             * dipanggil tanpa penjagaan ini, sehingga membatalkan nota yang barangnya BELUM
+             * DATANG menulis ulang `harga_beli` master ke harga nota sebelumnya. Nota itu
+             * belum pernah mengubah harga apa pun, jadi "memulihkan" darinya bukan
+             * memulihkan: ia MENGUBAH nilai persediaan seluruh saldo yang ada di rak, tanpa
+             * satu barang pun bergerak dan tanpa satu pun galat. Jangan "merapikan"
+             * penjagaan ini.
+             */
             $pernahMasuk = $terkunci->status->movesStock();
 
-            foreach ($terkunci->items as $item) {
-                if ($pernahMasuk) {
+            if ($pernahMasuk) {
+                foreach ($terkunci->items as $item) {
                     $this->kembalikanStok($terkunci, $item, $oleh);
+                    $this->pulihkanHargaBeli($terkunci, $item);
                 }
-
-                $this->pulihkanHargaBeli($terkunci, $item);
             }
 
             $terkunci->status = DocumentStatus::Dibatalkan;

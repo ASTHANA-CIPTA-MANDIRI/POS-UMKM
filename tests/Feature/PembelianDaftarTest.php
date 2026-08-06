@@ -167,6 +167,99 @@ class PembelianDaftarTest extends TestCase
         $this->assertSame(1, Supplier::query()->count());
     }
 
+    /* ── Nota yang barangnya belum datang ────────────────────────────────── */
+
+    /**
+     * Saringan "Belum datang" — pertanyaan yang dibawa pemilik: apa yang masih saya tunggu.
+     *
+     * Tanpa saringan ini, nota menggantung tenggelam di antara nota biasa yang jumlahnya jauh
+     * lebih banyak, dan barang yang tidak pernah datang tidak pernah ditanyakan ke grosirnya.
+     */
+    public function test_saringan_belum_datang_hanya_menampilkan_nota_yang_belum_datang(): void
+    {
+        $kopi = $this->buatProduk('Kopi Sachet');
+
+        $sudah = $this->catatNota($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 5, 1500)]]);
+        $belum = $this->catatNotaBelumDatang($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 5, 1500)]]);
+
+        $komponen = Livewire::actingAs($this->owner)->test(Pembelian::class);
+
+        $idDi = fn ($daftar) => collect($daftar->items())->pluck('id')->all();
+
+        $this->assertCount(2, $idDi($komponen->viewData('daftar')), 'keduanya tetap terbaca di "semua"');
+
+        $komponen->set('status', 'belum');
+        $this->assertSame([$belum->getKey()], $idDi($komponen->viewData('daftar')));
+
+        $komponen->set('status', 'diterima');
+        $this->assertSame([$sudah->getKey()], $idDi($komponen->viewData('daftar')));
+    }
+
+    /**
+     * "Belanja bulan ini" HANYA menghitung nota yang barangnya sudah datang.
+     *
+     * Uang untuk barang yang belum ada tidak boleh berbaur dengan uang yang sudah jadi barang:
+     * yang pertama masih bisa hangus atau berubah jumlahnya, yang kedua sudah ada di rak. Satu
+     * angka yang mencampur keduanya tidak bisa dipakai memutuskan apa pun — dan pemilik yang
+     * melihatnya melompat pada hari ia mencatat PESANAN menyimpulkan uangnya sudah keluar.
+     */
+    public function test_kartu_belanja_bulan_ini_tidak_memuat_nota_yang_belum_datang(): void
+    {
+        $kopi = $this->buatProduk('Kopi Sachet');
+
+        $this->catatNota($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 100, 1500)]]);
+        $this->catatNotaBelumDatang($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 200, 1500)]]);
+
+        $ringkasan = Livewire::actingAs($this->owner)->test(Pembelian::class)->viewData('ringkasan');
+
+        $this->assertEqualsWithDelta(150000.0, $ringkasan['belanja'], 0.01,
+            'hanya 150.000 yang sudah jadi barang; 300.000 lainnya masih di grosir');
+        $this->assertSame(1, $ringkasan['nota'], 'jumlah notanya menghitung himpunan yang sama dengan uangnya');
+
+        $this->assertEqualsWithDelta(300000.0, $ringkasan['menunggu']['nilai'], 0.01,
+            'uang yang ditunggu tetap terbaca — di kartunya sendiri, bukan bercampur');
+        $this->assertSame(1, $ringkasan['menunggu']['nota']);
+    }
+
+    /**
+     * Kartu "Menunggu datang" menyebut UMUR nota tertua, dan tidak dibatasi bulan ini.
+     *
+     * Nota yang barangnya belum sampai sejak bulan lalu justru yang paling perlu ditanyakan ke
+     * grosirnya, jadi membatasi kartu ini ke bulan berjalan akan menyembunyikan tepat kasus
+     * yang paling merugikan. Dan "menunggu 19 hari" adalah pertanyaan, sedangkan "3 nota
+     * menunggu" cuma angka.
+     */
+    public function test_kartu_menunggu_datang_menyebut_umur_nota_tertua(): void
+    {
+        $kopi = $this->buatProduk('Kopi Sachet');
+
+        // 19 hari lalu — sengaja bisa jatuh di bulan sebelumnya tergantung tanggal hari ini.
+        $tertua = now()->subDays(19)->startOfDay();
+
+        $this->catatNotaBelumDatang($this->outlet, $this->owner, [
+            'tanggal' => $tertua->toDateString(),
+            'baris' => [$this->baris($kopi, 10, 1500)],
+        ]);
+
+        $this->catatNotaBelumDatang($this->outlet, $this->owner, [
+            'tanggal' => now()->subDays(2)->toDateString(),
+            'baris' => [$this->baris($kopi, 10, 1500)],
+        ]);
+
+        $menunggu = Livewire::actingAs($this->owner)->test(Pembelian::class)->viewData('ringkasan')['menunggu'];
+
+        $this->assertSame(2, $menunggu['nota']);
+        $this->assertSame(19, $menunggu['umur_hari'], 'umurnya dari nota TERTUA, bukan dari yang terbaru');
+        $this->assertSame($tertua->toDateString(), $menunggu['tertua']->toDateString());
+
+        // Nota yang sudah ditandai datang keluar dari kartu ini seluruhnya.
+        $this->catatNota($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 10, 1500)]]);
+
+        $lagi = Livewire::actingAs($this->owner)->test(Pembelian::class)->viewData('ringkasan')['menunggu'];
+
+        $this->assertSame(2, $lagi['nota']);
+    }
+
     /** "Beli dari" boleh dikosongkan: belanja di pasar tidak selalu punya nama toko. */
     public function test_beli_dari_boleh_dikosongkan(): void
     {

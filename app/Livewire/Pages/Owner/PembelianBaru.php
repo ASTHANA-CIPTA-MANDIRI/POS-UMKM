@@ -89,6 +89,25 @@ class PembelianBaru extends Component
     public string $catatan = '';
 
     /**
+     * "Barangnya sudah saya terima" (true, BAWAAN) / "Barangnya belum datang" (false).
+     *
+     * Bawaannya true, dan itu keputusan yang menentukan: belanja warung yang biasa dicatat
+     * SESUDAH barangnya diturunkan dari motor. Bawaan sebaliknya akan mengubah setiap nota
+     * biasa menjadi nota menggantung yang stoknya tidak pernah masuk, dan pemiliknya baru
+     * menyadarinya saat layar kasir mengabari "Habis" untuk rak yang penuh.
+     *
+     * Sebaliknya, keadaan yang jarang tapi nyata — barang dipesan hari ini, datang tujuh
+     * hari kemudian — dulu tidak punya wujud sama sekali: notanya langsung menambah stok,
+     * jadi selama seminggu saldo mengaku ada barang yang belum tiba di rak dan kasir
+     * dikabari "Aman" untuk barang yang raknya kosong.
+     *
+     * TIDAK berbintang wajib: radio yang punya bawaan tidak pernah bisa kosong, jadi
+     * validatornya bukan `required` (lihat CLAUDE.md — bintang hanya untuk yang benar-benar
+     * required).
+     */
+    public bool $sudahDatang = true;
+
+    /**
      * Outlet tempat nota ini DIKETIK — bukan outlet yang sedang dipilih di dropdown.
      *
      * #[Locked] karena ia penentu tujuan penyimpanan: kalau klien bisa mengubahnya,
@@ -338,6 +357,9 @@ class PembelianBaru extends Component
             'diskon' => $this->diskon,
             'ongkos_kirim' => $this->ongkosKirim,
             'catatan' => $this->catatan,
+            // Penentu apakah stok ikut bertambah sekarang. Aksinya yang memutuskan, bukan
+            // layar ini: satu-satunya jalur stok dari pembelian ada di TerimaPembelianAction.
+            'sudah_datang' => $this->sudahDatang,
             'baris' => $terisi->map(fn (mixed $nilai, string $kunci) => [
                 'product_id' => $semua[$kunci]['product_id'],
                 'raw_material_id' => $semua[$kunci]['raw_material_id'],
@@ -352,6 +374,12 @@ class PembelianBaru extends Component
             $muatan,
         );
 
+        // Diingat sebelum isiannya dikembalikan ke bawaan, karena pesan di bawah bergantung
+        // padanya — dan pesan yang mengaku "stok sudah bertambah" untuk nota yang barangnya
+        // belum datang adalah kebohongan yang membuat seluruh pesan berikutnya tidak
+        // dipercaya lagi.
+        $sudahDatang = $this->sudahDatang;
+
         // Dikosongkan supaya tekanan tombol kedua tidak mencatat nota kembar, dan supaya
         // nota berikutnya (belanja di dua grosir dalam satu hari itu biasa) mulai bersih.
         $this->jumlah = [];
@@ -361,10 +389,18 @@ class PembelianBaru extends Component
         $this->catatan = '';
         $this->outletTerkunci = null;
         $this->outletDiminta = null;
+        // Dikembalikan ke bawaan: nota berikutnya biasanya belanja biasa yang barangnya
+        // sudah dibawa pulang, dan pilihan yang MENEMPEL dari nota sebelumnya membuat
+        // belanja hari itu diam-diam tidak masuk stok.
+        $this->sudahDatang = true;
         $this->resetValidation();
         $this->resetPage();
 
-        $this->toast('Nota '.$nota->nomor_po.' tersimpan. Stok sudah bertambah.');
+        $this->toast(
+            $sudahDatang
+                ? 'Nota '.$nota->nomor_po.' tersimpan. Stok sudah bertambah.'
+                : 'Nota '.$nota->nomor_po.' tersimpan sebagai belum datang. Stok belum bertambah — tandai datang begitu barangnya sampai.',
+        );
     }
 
     /**
@@ -381,6 +417,10 @@ class PembelianBaru extends Component
             'tanggal' => ['required', 'date'],
             'beliDari' => ['nullable', 'string', 'max:255'],
             'catatan' => ['nullable', 'string', 'max:1000'],
+            // BUKAN 'required': pilihannya punya bawaan, jadi ia tidak pernah bisa kosong —
+            // dan medan yang berbintang wajib padahal tidak pernah bisa kosong membuat
+            // bintangnya berhenti dipercaya di seluruh formulir (CLAUDE.md).
+            'sudahDatang' => ['boolean'],
         ];
 
         $atribut = [
@@ -389,6 +429,7 @@ class PembelianBaru extends Component
             'tanggal' => 'tanggal nota',
             'beliDari' => 'beli dari',
             'catatan' => 'catatan',
+            'sudahDatang' => 'keterangan barang sudah datang',
         ];
 
         foreach ($terisi->keys() as $kunci) {
@@ -433,6 +474,7 @@ class PembelianBaru extends Component
                 'tanggal' => $this->tanggal,
                 'beliDari' => $this->beliDari,
                 'catatan' => $this->catatan,
+                'sudahDatang' => $this->sudahDatang,
             ],
             $aturan,
             $pesan,

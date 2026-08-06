@@ -209,6 +209,107 @@ class PembelianBatalTest extends TestCase
             'nota yang dibatalkan tetap muncul di daftar');
     }
 
+    /* ── Nota yang barangnya BELUM DATANG ────────────────────────────────── */
+
+    /**
+     * Membatalkan nota belum-datang tidak boleh mengurangi stok.
+     *
+     * Notanya belum pernah menambah stok, jadi mengeluarkan barangnya berarti mengarang
+     * pengurangan yang tidak berpasangan dengan apa pun — dan pengurangan itu terbaca SAH di
+     * riwayat barang, lengkap dengan keterangan "Pembatalan nota …". Sebulan kemudian tidak
+     * ada yang bisa menjawab kenapa saldonya turun 24.
+     */
+    public function test_membatalkan_nota_belum_datang_tidak_mengurangi_stok(): void
+    {
+        $susu = $this->buatProduk('Susu Kotak', [
+            'satuan' => Satuan::Dus,
+            'satuan_dasar' => Satuan::Pcs,
+            'isi_per_satuan' => 12,
+        ]);
+
+        $this->buatStok($this->outlet, $susu, 5);
+
+        $nota = $this->catatNotaBelumDatang($this->outlet, $this->owner, [
+            'baris' => [$this->baris($susu, 2, 58000)],
+        ]);
+
+        $this->assertTrue(app(BatalkanPembelianAction::class)->execute($nota, $this->owner));
+
+        $this->assertEqualsWithDelta(5.0, $this->saldo($this->outlet, $susu), 0.001,
+            'saldo tidak boleh turun ke −19: 24 pcs itu tidak pernah masuk');
+        $this->assertSame(0, StockMovement::query()->count(),
+            'tidak ada mutasi masuk, jadi tidak boleh ada mutasi keluar');
+        $this->assertSame(DocumentStatus::Dibatalkan, $nota->fresh()->status);
+    }
+
+    /**
+     * CACAT NYATA yang dijaga di sini: `pulihkanHargaBeli()` dipanggil tanpa penjagaan
+     * `$pernahMasuk`.
+     *
+     * Nota yang barangnya belum datang belum pernah menimpa harga beli apa pun, jadi
+     * "memulihkan" darinya bukan memulihkan — ia MENGUBAH `harga_beli` master ke harga nota
+     * sebelumnya, dan seluruh saldo yang ada di rak ikut dinilai ulang. Tidak ada satu barang
+     * pun yang bergerak, tidak ada satu galat pun, hanya nilai persediaan yang melompat di
+     * layar yang paling dipercaya pemiliknya.
+     *
+     * Jangan "merapikan" penjagaannya ke dalam pulihkanHargaBeli() sebagai baris tunggal:
+     * pemanggilan bersyarat itulah yang diuji di sini.
+     */
+    public function test_membatalkan_nota_belum_datang_tidak_mengubah_harga_beli_master(): void
+    {
+        $kopi = $this->buatProduk('Kopi Sachet', ['harga_beli' => 1500]);
+
+        // Nota lama yang barangnya SUDAH datang: harga master jadi 1.600.
+        $this->catatNota($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 10, 1600)]]);
+
+        // Lalu pemilik menaikkan harga belinya sendiri — mis. dari nota kertas grosir.
+        $kopi->harga_beli = 1900;
+        $kopi->save();
+
+        // Nota baru yang barangnya BELUM datang: harganya belum berlaku sama sekali.
+        $belum = $this->catatNotaBelumDatang($this->outlet, $this->owner, [
+            'baris' => [$this->baris($kopi, 10, 2500)],
+        ]);
+
+        $this->assertEqualsWithDelta(1900.0, (float) $kopi->fresh()->harga_beli, 0.01,
+            'prasyarat: nota belum-datang memang tidak menyentuh harga master');
+
+        app(BatalkanPembelianAction::class)->execute($belum, $this->owner);
+
+        $this->assertEqualsWithDelta(1900.0, (float) $kopi->fresh()->harga_beli, 0.01,
+            'harga master TIDAK boleh dikembalikan ke 1.600: nota yang dibatalkan itu belum pernah mengubahnya');
+    }
+
+    /**
+     * Pesannya harus jujur — ini juga cacat nyata.
+     *
+     * "Stok dikembalikan seperti sebelum nota ini dicatat" untuk nota yang barangnya belum
+     * pernah datang membuat pemilik mencari 24 pcs yang tidak pernah ada di catatannya. Dan
+     * pesan yang salah satu kali membuat seluruh pesan berikutnya berhenti dipercaya, termasuk
+     * yang benar.
+     */
+    public function test_pesan_pembatalan_nota_belum_datang_tidak_mengaku_mengembalikan_stok(): void
+    {
+        $kopi = $this->buatProduk('Kopi Sachet');
+        $this->buatStok($this->outlet, $kopi, 10);
+
+        $sudah = $this->catatNota($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 5, 1500)]]);
+        $belum = $this->catatNotaBelumDatang($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 5, 1500)]]);
+
+        $komponen = Livewire::actingAs($this->owner)->test(Pembelian::class);
+
+        $komponen->call('batalkan', $belum->getKey())
+            ->assertDispatched('toast', function (string $nama, array $data): bool {
+                return str_contains($data['pesan'], 'belum datang')
+                    && ! str_contains($data['pesan'], 'Stok dikembalikan');
+            });
+
+        // Nota yang barangnya memang pernah masuk tetap memakai kalimat aslinya — kalau
+        // keduanya disamakan, keterangan yang benar-benar penting ikut hilang.
+        $komponen->call('batalkan', $sudah->getKey())
+            ->assertDispatched('toast', fn (string $nama, array $data): bool => str_contains($data['pesan'], 'Stok dikembalikan'));
+    }
+
     /** Saringan status memisahkan yang dibatalkan, tanpa menyembunyikannya dari "semua". */
     public function test_saringan_status_memisahkan_nota_dibatalkan(): void
     {

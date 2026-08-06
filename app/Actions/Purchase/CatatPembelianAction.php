@@ -2,10 +2,7 @@
 
 namespace App\Actions\Purchase;
 
-use App\Actions\Stock\AdjustStockAction;
-use App\Actions\Stock\SiapkanBarisStokAction;
 use App\Enums\DocumentStatus;
-use App\Enums\StockMovementType;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
@@ -20,28 +17,32 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Mencatat satu nota pembelian: barang masuk, harga beli diperbarui, total dihitung.
+ * Mencatat satu nota pembelian: barisnya tersimpan, totalnya dihitung.
  *
- * Urutan langkahnya bukan karangan baru — ini urutan yang sudah dijalankan
- * KelontongSeeder & WartegSeeder (Supplier → PO Diterima → item → stok masuk → total),
- * dipindahkan ke satu tempat supaya layar dan data demo memakai jalur yang sama.
+ * Aksi ini TIDAK MENYENTUH STOK dan tidak menyentuh harga beli master — semua itu milik
+ * TerimaPembelianAction, dan aksi ini hanya mendelegasikan ke sana kalau muatannya berkata
+ * barangnya sudah datang (`sudah_datang`, bawaan true).
+ *
+ * Kenapa dipisah, bukan cabang `if` di sini: dengan aksi tersendiri, AdjustStockAction dan
+ * SiapkanBarisStokAction punya TEPAT SATU pemanggil dari jalur pembelian. Cabang `if` di
+ * tengah aksi sepanjang ini adalah cabang yang suatu hari dibalik oleh perbaikan yang tidak
+ * berhubungan, tanpa satu pun galat saat itu terjadi.
  *
  * KEPUTUSAN YANG MENENTUKAN ANGKA, dan kenapa:
  *
- * 1. **Tidak ada alur draf.** Nota disimpan berarti barangnya SUDAH datang: status
- *    langsung Diterima, `diterima_pada` = sekarang, stok langsung bertambah. Pemilik
- *    warung mencatat sesudah menurunkan barang dari motor, bukan sebelum memesan; status
- *    "draft" yang tidak punya tombol lanjutan hanya menahan stok yang sudah ada di rak.
+ * 1. **Bawaannya "barangnya sudah saya terima".** Belanja warung yang biasa dicatat sesudah
+ *    barang diturunkan dari motor, jadi bawaan sebaliknya akan mengubah setiap nota biasa
+ *    menjadi nota menggantung yang stoknya tidak pernah masuk. Yang tidak bawaan adalah
+ *    keadaan yang jarang: barang dipesan hari ini, datang tujuh hari kemudian.
  *
- * 2. **Harga beli disimpan PER SATUAN DASAR** (`subtotal ÷ qty satuan dasar`), bukan per
- *    satuan beli. 2 dus @58.000 isi 12 = 4.833,33 per pcs, bukan 58.000 per pcs. Ini
- *    risiko terbesar fitur ini: menyimpan 58.000 tidak memunculkan satu pun galat, tapi
- *    nilai persediaan di layar stok melar 12 kali lipat dan setiap keputusan harga jual
- *    yang dibuat dari angka itu salah.
+ * 2. **Nota yang belum datang berstatus `Dikirim` ("Masih di jalan"), BUKAN `Draft`.**
+ *    Default kolom `status` di migrasi memang 'draft', dan justru karena itu aplikasi tidak
+ *    pernah menulisnya: nota berstatus draft berarti ada baris yang lahir tanpa lewat aksi
+ *    ini, dan itu anomali yang bisa dilihat, bukan keadaan sah yang harus ditebak-tebak.
  *
- * 3. **Baris berharga 0 TIDAK menimpa harga beli.** Bonus grosir ("beli 10 dapat 1")
- *    dicatat dengan harga 0, dan menimpakan nol berarti menghapus harga yang benar —
- *    barangnya lalu terbaca tidak bernilai di seluruh laporan persediaan.
+ * 3. **Harga beli master diperbarui saat DITERIMA, bukan saat nota disimpan.** Lihat
+ *    TerimaPembelianAction: nilai persediaan = saldo × harga_beli, jadi memperbarui harga
+ *    lebih awal menilai ulang barang yang sudah di rak dengan harga barang yang belum dibeli.
  *
  * 4. **Rata-rata bergerak DITOLAK.** Ia butuh saldo sebagai pembagi, sedangkan di POS ini
  *    saldo boleh minus dan boleh belum ada sama sekali. Rata-rata atas saldo −3
@@ -71,12 +72,11 @@ class CatatPembelianAction
     private const MAKS_PERCOBAAN = 5;
 
     public function __construct(
-        private SiapkanBarisStokAction $siapkanStok,
-        private AdjustStockAction $adjust,
+        private TerimaPembelianAction $terima,
     ) {}
 
     /**
-     * @param  array{beli_dari?: ?string, tanggal?: mixed, diskon?: mixed, ongkos_kirim?: mixed, catatan?: ?string, baris: array<int, array{product_id?: ?string, raw_material_id?: ?string, qty_beli?: mixed, harga_satuan?: mixed}>}  $muatan
+     * @param  array{beli_dari?: ?string, tanggal?: mixed, diskon?: mixed, ongkos_kirim?: mixed, catatan?: ?string, sudah_datang?: mixed, baris: array<int, array{product_id?: ?string, raw_material_id?: ?string, qty_beli?: mixed, harga_satuan?: mixed}>}  $muatan
      */
     public function execute(Outlet $outlet, User $oleh, array $muatan): PurchaseOrder
     {
@@ -104,6 +104,7 @@ class CatatPembelianAction
                     $ongkir,
                     $this->teksBersih($muatan['beli_dari'] ?? null),
                     $this->teksBersih($muatan['catatan'] ?? null),
+                    $this->sudahDatang($muatan['sudah_datang'] ?? null),
                 ));
             } catch (UniqueConstraintViolationException $bentrok) {
                 // Nomor notanya keburu dipakai perangkat lain di celah antara "hitung
@@ -125,6 +126,10 @@ class CatatPembelianAction
      * buruk daripada nota yang gagal seluruhnya, karena tidak ada yang tahu bagian mana
      * yang hilang dan mengulanginya akan menggandakan tiga baris pertama.
      *
+     * Penerimaannya ikut di dalam transaksi yang SAMA: nota yang tersimpan tapi stoknya
+     * gagal masuk adalah bentuk lain dari nota separuh, dan bentuk itu paling menyesatkan
+     * karena lencananya sudah berbunyi "Barang sudah datang".
+     *
      * @param  array<int, array<string, mixed>>  $baris
      */
     private function simpan(
@@ -136,6 +141,7 @@ class CatatPembelianAction
         float $ongkir,
         ?string $beliDari,
         ?string $catatan,
+        bool $sudahDatang,
     ): PurchaseOrder {
         $tenantId = $outlet->tenant_id;
 
@@ -146,8 +152,12 @@ class CatatPembelianAction
             // selebar seluruh sisa penyimpanan.
             'nomor_po' => $this->nomorNota($tenantId, $tanggal),
             'tanggal' => $tanggal->toDateString(),
-            'status' => DocumentStatus::Diterima,
-            'diterima_pada' => now(),
+            // Lahir SELALU sebagai "masih di jalan", bahkan untuk nota yang barangnya sudah
+            // datang — yang mengubahnya jadi Diterima cuma TerimaPembelianAction, di bawah.
+            // Dengan begitu tidak ada satu pun jalur yang bisa menulis "Diterima" tanpa
+            // mutasi stok yang berpasangan dengannya.
+            'status' => DocumentStatus::Dikirim,
+            'diterima_pada' => null,
             'diskon' => $diskon,
             'ongkos_kirim' => $ongkir,
             'catatan' => $catatan,
@@ -162,7 +172,7 @@ class CatatPembelianAction
         $subtotalNota = 0.0;
 
         foreach ($baris as $satu) {
-            $subtotalNota += $this->catatBaris($po, $outlet, $oleh, $satu);
+            $subtotalNota += $this->catatBaris($po, $satu);
         }
 
         // total = subtotal − diskon + ongkir. Diskon & ongkir TIDAK dibagi ke harga
@@ -170,16 +180,23 @@ class CatatPembelianAction
         $po->total = round($subtotalNota - $diskon + $ongkir, 2);
         $po->save();
 
+        if ($sudahDatang) {
+            // Satu-satunya jalur stok dari pembelian. Barisnya sudah tersimpan, jadi aksi
+            // itu membaca POTRET satuan dasarnya dari nota — bukan menghitung ulang dari
+            // master, yang bisa sudah berubah nanti saat notanya baru ditandai datang.
+            $this->terima->execute($po, $oleh);
+        }
+
         return $po;
     }
 
     /**
-     * Satu baris nota: item tersimpan, stok bertambah, harga beli master diperbarui.
+     * Satu baris nota. TIDAK menyentuh stok maupun harga beli master.
      *
      * @param  array<string, mixed>  $satu
      * @return float subtotal baris ini
      */
-    private function catatBaris(PurchaseOrder $po, Outlet $outlet, User $oleh, array $satu): float
+    private function catatBaris(PurchaseOrder $po, array $satu): float
     {
         $productId = $satu['product_id'] ?? null;
         $rawMaterialId = $satu['raw_material_id'] ?? null;
@@ -225,8 +242,10 @@ class CatatPembelianAction
             'isi_per_satuan_beli' => $barang instanceof Product && $barang->isi_per_satuan !== null
                 ? (float) $barang->isi_per_satuan
                 : null,
-            // Nota disimpan berarti barangnya sudah datang: yang dipesan = yang diterima.
-            'qty_diterima' => $qtyDasar,
+            // NOL sampai barangnya benar-benar ditandai datang. Mengisinya penuh di sini
+            // berarti nota yang barangnya masih di jalan mengaku sudah diterima seluruhnya,
+            // dan tidak ada satu pun angka di aplikasi yang membantahnya.
+            'qty_diterima' => 0,
             'harga_satuan' => $harga,
             'subtotal' => $subtotal,
         ]);
@@ -234,52 +253,7 @@ class CatatPembelianAction
         $item->tenant_id = $po->tenant_id;
         $item->save();
 
-        $stok = $this->siapkanStok->execute(
-            $po->tenant_id,
-            $outlet->getKey(),
-            $productId,
-            $rawMaterialId,
-        );
-
-        $this->adjust->execute(
-            $stok,
-            StockMovementType::Masuk,
-            $qtyDasar,
-            referensi: $po,
-            olehUserId: $oleh->getKey(),
-            catatan: 'Pembelian '.$po->nomor_po.($po->supplier_id !== null ? ' — '.($po->supplier?->nama ?? '') : ''),
-            // AlasanOpname tidak berlaku di sini: tipenya (Masuk) sudah menjelaskan
-            // sebabnya, dan mengisi kolom alasan membuat laporan selisih penuh baris
-            // yang bukan selisih.
-            alasan: null,
-        );
-
-        $this->perbaruiHargaBeli($barang, $subtotal, $qtyDasar);
-
         return $subtotal;
-    }
-
-    /**
-     * Harga beli master ditimpa dengan harga nota ini, PER SATUAN DASAR.
-     *
-     * Baris berharga nol dilewati: hadiah/bonus grosir tidak menyatakan apa pun tentang
-     * harga barangnya, dan menimpakan nol menghapus harga yang benar.
-     */
-    private function perbaruiHargaBeli(Product|RawMaterial $barang, float $subtotal, float $qtyDasar): void
-    {
-        if ($subtotal <= 0 || $qtyDasar <= 0) {
-            return;
-        }
-
-        $perSatuanDasar = round($subtotal / $qtyDasar, 2);
-
-        if ($barang instanceof Product) {
-            $barang->harga_beli = $perSatuanDasar;
-        } else {
-            $barang->harga_beli_terakhir = $perSatuanDasar;
-        }
-
-        $barang->save();
     }
 
     /**
@@ -401,6 +375,25 @@ class CatatPembelianAction
         }
 
         return round((float) $nilai, 2);
+    }
+
+    /**
+     * "Barangnya sudah saya terima" — BAWAAN true kalau muatannya tidak menyebutkannya.
+     *
+     * Bawaan ini yang menjaga belanja warung biasa tidak berubah jadi nota menggantung, dan
+     * juga yang membuat seluruh pemanggil lama (seeder data demo, uji yang sudah ada) tetap
+     * berarti hal yang sama seperti sebelum keadaan "belum datang" ada.
+     *
+     * Nilai yang tidak bisa ditafsirkan juga jatuh ke true dengan alasan yang sama: satu-
+     * satunya cara nota menjadi menggantung adalah pemiliknya memilihnya dengan sadar.
+     */
+    private function sudahDatang(mixed $nilai): bool
+    {
+        if ($nilai === null) {
+            return true;
+        }
+
+        return filter_var($nilai, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
     }
 
     private function angka(mixed $nilai, string $label): float
