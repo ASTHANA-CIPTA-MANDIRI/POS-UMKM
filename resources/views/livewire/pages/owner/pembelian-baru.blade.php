@@ -251,7 +251,7 @@
             </div>
 
             <div class="col-span-2 min-w-0 lg:col-span-1">
-                <label for="tanggal" class="block text-[0.8125rem] font-semibold text-ink">Tanggal nota</label>
+                <label for="tanggal" class="block text-[0.8125rem] font-semibold text-ink">Tanggal nota<x-wajib /></label>
                 <input id="tanggal" type="date" wire:model.blur="tanggal" value="{{ $tanggal }}"
                        class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink focus:border-terracotta focus:outline-none">
                 @error('tanggal')
@@ -365,8 +365,12 @@
                         </div>
 
                         <div class="min-w-0">
+                            {{-- Berbintang: `harga.<kunci>` ber-`required` begitu barisnya
+                                 terisi. Nol SAH (bonus grosir) — yang ditolak adalah kosong,
+                                 karena kosong yang lolos sebagai nol menghapus harga beli
+                                 barangnya di master. --}}
                             <label for="harga-hp-{{ $kunci }}" class="block text-[0.8125rem] font-semibold text-ink">
-                                Harga per {{ mb_strtolower($satuanBeli) }}
+                                Harga per {{ mb_strtolower($satuanBeli) }}<x-wajib />
                             </label>
                             <input id="harga-hp-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
                                    wire:model.live.debounce.600ms="harga.{{ $kunci }}" placeholder="0" value="{{ $harga[$kunci] ?? '' }}"
@@ -395,7 +399,7 @@
                         <th class="w-[34%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Barang</th>
                         <th class="w-[14%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Sisa sekarang</th>
                         <th class="w-[24%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Jumlah</th>
-                        <th class="w-[28%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Harga beli</th>
+                        <th class="w-[28%] px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Harga beli<x-wajib /></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line-soft">

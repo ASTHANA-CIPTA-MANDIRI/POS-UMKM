@@ -370,9 +370,15 @@
                          baris yang fisiknya terisi & berselisih — jadi keadaan itu selalu
                          membuat x-show bernilai benar. --}}
                     <div class="mt-3" x-cloak x-show="selisih || alasan !== ''">
+                        {{-- Bintangnya BERSYARAT: alasan hanya wajib kalau ada beda, dan
+                             menandainya selalu-wajib akan membuat orang memilih alasan untuk
+                             barang yang hitungannya pas. Menggantikan frasa "— wajib dipilih"
+                             yang dulu di sini: dengan bintangnya, dua-duanya jadi mengatakan
+                             hal yang sama di satu baris. Alasan LENGKAPNYA tetap ada di bawah
+                             kotak pilihan ("Wajib dipilih karena fisiknya berbeda…") — itu
+                             yang tidak bisa disampaikan sebuah bintang. --}}
                         <label for="alasan-hp-{{ $kunci }}" class="block text-[0.8125rem] font-semibold text-ink">
-                            Alasan selisih
-                            <span class="font-normal text-jingga-tua" x-cloak x-show="selisih">— wajib dipilih</span>
+                            Alasan selisih<span x-cloak x-show="selisih"><x-wajib :bersyarat="true" /></span>
                         </label>
                         <select id="alasan-hp-{{ $kunci }}" wire:model.blur="alasan.{{ $kunci }}"
                                 x-on:change="alasan = $event.target.value"
@@ -390,8 +396,13 @@
                              membuat kolomnya diisi "-" oleh orang yang sedang menghitung 200
                              barang, dan sesudah itu isinya tidak berarti apa pun. --}}
                         <div class="mt-3" x-cloak x-show="butuhCatatan">
+                            {{-- Kata "wajib" dilepas dari kurungnya: bintangnya sudah
+                                 mengatakan itu. Yang DIPERTAHANKAN alasannya ("untuk alasan
+                                 Lainnya") — tanpa itu orang tidak tahu kenapa kolom ini
+                                 mendadak muncul. --}}
                             <label for="catatan-hp-{{ $kunci }}" class="block text-[0.8125rem] font-semibold text-ink">
-                                Catatan (wajib untuk alasan "Lainnya")
+                                Catatan<x-wajib :bersyarat="true" />
+                                <span class="font-normal text-umber">(untuk alasan “Lainnya”)</span>
                             </label>
                             <input id="catatan-hp-{{ $kunci }}" type="text" wire:model.blur="catatan.{{ $kunci }}"
                                    placeholder="mis. dipakai sendiri untuk contoh"
