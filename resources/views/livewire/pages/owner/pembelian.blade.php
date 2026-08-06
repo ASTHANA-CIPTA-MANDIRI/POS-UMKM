@@ -39,6 +39,39 @@
         \App\Enums\DocumentStatus::Dikirim => 'jingga',
         default => 'netral',
     };
+
+    /*
+     * Nota yang MASIH BISA ditandai datang.
+     *
+     * Dipakai di tiga tempat (kartu daftar, baris tabel, kaki panel rincian), jadi
+     * syaratnya ditulis SEKALI di sini. Bentuk lama dari cacat yang sudah pernah terjadi di
+     * layar lain: syarat yang sama diketik ulang di beberapa tempat lalu salah satunya
+     * ketinggalan saat statusnya bertambah, sehingga satu tata letak menampilkan tombol yang
+     * tata letak lain sembunyikan.
+     *
+     * Dibatalkan dikecualikan — barang yang notanya sudah dibatalkan tidak boleh masuk stok.
+     * Diterima juga: tombolnya tidak perlu ada untuk nota yang barangnya memang sudah ada di
+     * rak, walau aksinya sendiri idempoten.
+     */
+    $bisaDitandaiDatang = fn (?\App\Enums\DocumentStatus $status) => $status !== null
+        && $status !== \App\Enums\DocumentStatus::Diterima
+        && $status !== \App\Enums\DocumentStatus::Dibatalkan;
+
+    $menunggu = $ringkasan['menunggu'];
+
+    /*
+     * Umur nota tertua dibacakan, bukan dicetak sebagai angka telanjang.
+     *
+     * "paling lama 0 hari" adalah kalimat yang tidak pernah diucapkan siapa pun; nota yang
+     * baru dipesan hari ini memang belum punya umur. `umur_hari` bisa null (tidak ada nota
+     * yang menunggu) DAN bisa 0 (dipesan hari ini) — keduanya keadaan yang berbeda dan
+     * dibedakan di sini, karena null berarti kartunya tidak punya cerita sama sekali.
+     */
+    $umurMenunggu = match (true) {
+        $menunggu['umur_hari'] === null => null,
+        $menunggu['umur_hari'] < 1 => 'baru dipesan hari ini',
+        default => 'paling lama '.$menunggu['umur_hari'].' hari',
+    };
 @endphp
 
 <div>
@@ -52,9 +85,12 @@
          angkanya 0,9375rem supaya nominal rupiah UTUH — angka uang yang terpotong lebih
          buruk daripada tidak ditampilkan, karena pembacanya menduga digit yang hilang.
 
-         Kartu ketiga selebar penuh di ponsel: petak dua kolom dengan tiga kartu
-         meninggalkan satu petak menganga di kanan bawah. --}}
-    <div class="mt-2 mb-4 grid grid-cols-2 gap-3 sm:mt-3 sm:mb-5 lg:grid-cols-[1.4fr_minmax(0,1fr)_minmax(0,1fr)]">
+         EMPAT kartu, jadi petak dua kolom di ponsel terisi penuh 2×2 — tidak ada lagi
+         kartu yang harus dilebarkan col-span-2 untuk menutup petak yang menganga. Di ≥lg
+         keempatnya sebaris, dan dua kartu pertama (keduanya berisi NOMINAL) diberi porsi
+         lebih besar: angka uang yang pecah dua baris adalah cacat tersendiri di CLAUDE.md,
+         sementara "5 nota" muat di kolom sesempit apa pun. --}}
+    <div class="mt-2 mb-4 grid grid-cols-2 gap-3 sm:mt-3 sm:mb-5 lg:grid-cols-[1.3fr_1.3fr_minmax(0,1fr)_minmax(0,1fr)]">
         <div class="kartu flex min-h-[5.625rem] items-center gap-2.5 px-3.5 sm:gap-4 sm:pr-5 sm:pl-[1.125rem]">
             <span class="lencana-ikon size-9 bg-cream-deep text-terracotta sm:size-[3.25rem]">
                 <svg viewBox="0 0 24 24" class="size-5 sm:size-6" fill="none" aria-hidden="true">
@@ -68,12 +104,55 @@
                 <p class="tabular text-[0.9375rem] leading-tight font-bold break-words text-ink sm:text-[1.25rem]">
                     {{ $rupiah($ringkasan['belanja']) }}
                 </p>
-                {{-- Dipendekkan sampai MUAT DUA BARIS di kolom ±135px pada 390px. Bentuk
+                {{-- Kalimat ini SALAH sebelumnya ("tanpa nota yang dibatalkan"), dan salahnya
+                     bukan soal kata: angkanya hanya menjumlah nota yang barangnya sudah
+                     datang, jadi keterangan yang menyebut satu-satunya pengecualian membuat
+                     pemilik menyimpulkan nota yang barangnya belum sampai IKUT terhitung.
+                     Sesudah itu ia mencari selisihnya di tempat yang salah. Uang untuk barang
+                     yang belum ada di rak punya kartunya sendiri di sebelah.
+
+                     Dipendekkan sampai MUAT DUA BARIS di kolom ±135px pada 390px. Bentuk
                      panjangnya ("nota yang dibatalkan tidak ikut dihitung") terpotong di
                      tengah kata, dan keterangan yang terpotong di tengah kata lebih buruk
                      daripada keterangan yang lebih ringkas: pembacanya berhenti membaca. --}}
                 <p class="mt-0.5 line-clamp-2 text-[0.6875rem] leading-snug text-umber-soft">
-                    tanpa nota yang dibatalkan
+                    yang barangnya sudah datang
+                </p>
+            </div>
+        </div>
+
+        {{-- ── Menunggu datang ──────────────────────────────────────────────
+             Kartu ini yang membuat keadaan "belum datang" punya wujud. Tanpa ia, nota yang
+             barangnya belum sampai hanya bisa ditemukan dengan menyaring daftar — dan yang
+             tidak terlihat tidak pernah ditanyakan ke grosirnya.
+
+             SENGAJA tidak dibatasi bulan ini (komponennya juga tidak): nota yang menggantung
+             sejak bulan lalu justru yang paling perlu ditagih. Karena itu umur nota tertua
+             ikut disebut — "paling lama 19 hari" adalah pertanyaan, sedangkan "3 nota
+             menunggu" cuma angka. --}}
+        <div class="kartu flex min-h-[5.625rem] items-center gap-2.5 px-3.5 sm:gap-4 sm:pr-5 sm:pl-[1.125rem]">
+            <span class="lencana-ikon size-9 bg-cream-deep sm:size-[3.25rem] {{ $menunggu['nota'] > 0 ? 'text-jingga-tua' : 'text-umber-soft' }}">
+                <svg viewBox="0 0 24 24" class="size-5 sm:size-6" fill="none" aria-hidden="true">
+                    <path d="M3 7.5h9v8H3v-8Zm9 2.5h4l2.5 2.5v3H12v-5.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <circle cx="7" cy="18" r="1.4" stroke="currentColor" stroke-width="1.4" />
+                    <circle cx="16" cy="18" r="1.4" stroke="currentColor" stroke-width="1.4" />
+                </svg>
+            </span>
+            <div class="min-w-0">
+                <p class="text-[0.75rem] font-medium text-umber sm:text-[0.875rem]">Menunggu datang</p>
+                {{-- Nominal kalau ada yang ditunggu, kalimat kalau tidak ada. "Rp 0" di kartu
+                     ini terbaca sebagai barang gratis yang sedang di jalan, bukan sebagai
+                     "tidak ada yang ditunggu" — dan nol yang ambigu di kartu uang adalah
+                     tepat jenis angka yang membuat orang berhenti memercayai kartunya. --}}
+                <p class="tabular text-[0.9375rem] leading-tight font-bold break-words text-ink sm:text-[1.25rem]">
+                    {{ $menunggu['nota'] > 0 ? $rupiah($menunggu['nilai']) : 'Tidak ada' }}
+                </p>
+                <p class="mt-0.5 line-clamp-2 text-[0.6875rem] leading-snug {{ $menunggu['nota'] > 0 ? 'text-jingga-tua' : 'text-umber-soft' }}">
+                    @if ($menunggu['nota'] > 0)
+                        {{ $menunggu['nota'] }} nota{{ $umurMenunggu !== null ? ' · '.$umurMenunggu : '' }}
+                    @else
+                        semua barang sudah sampai
+                    @endif
                 </p>
             </div>
         </div>
@@ -95,7 +174,10 @@
             </div>
         </div>
 
-        <div class="kartu col-span-2 flex min-h-[5.625rem] items-center gap-2.5 px-3.5 sm:gap-4 sm:pr-5 sm:pl-[1.125rem] lg:col-span-1">
+        {{-- TIDAK lagi col-span-2 di ponsel: dengan empat kartu petaknya sudah penuh 2×2, dan
+             kartu yang tetap dilebarkan akan menyisakan satu petak kosong di sebelahnya —
+             lubang yang persis kebalikan dari alasan col-span-2 dipasang dulu. --}}
+        <div class="kartu flex min-h-[5.625rem] items-center gap-2.5 px-3.5 sm:gap-4 sm:pr-5 sm:pl-[1.125rem]">
             <span class="lencana-ikon size-9 bg-cream-deep sm:size-[3.25rem] {{ $ringkasan['dibatalkan'] > 0 ? 'text-merah-deep' : 'text-umber-soft' }}">
                 <svg viewBox="0 0 24 24" class="size-5 sm:size-6" fill="none" aria-hidden="true">
                     <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.5" />
@@ -114,10 +196,15 @@
         </div>
     </div>
 
+    {{-- Keterangan seksinya ikut dibetulkan. Bunyi lamanya ("Nota yang tersimpan berarti
+         barangnya sudah datang") sudah tidak benar sejak nota bisa dicatat sebagai belum
+         datang, dan kalimat yang tidak benar di kepala daftar lebih merugikan daripada tidak
+         ada kalimat: pemilik yang membacanya menyimpulkan seluruh nota di bawahnya sudah
+         menambah stok. --}}
     <x-kartu-alat
         judul="Nota belanja"
         jumlah="{{ $daftar->total() }}"
-        keterangan="Nota yang tersimpan berarti barangnya sudah datang — stok outletnya langsung bertambah."
+        keterangan="Stok outletnya bertambah begitu notanya ditandai barangnya sudah datang."
     >
         <x-slot:aksi>
             {{-- Tautan, bukan tombol: mencatat nota adalah halaman tersendiri dan bisa
@@ -143,12 +230,12 @@
         </x-slot:aksi>
 
         <x-slot:saringan>
-            {{-- Pencarian selebar penuh, lalu kedua dropdown berbagi satu baris di ponsel —
-                 pola layar Stok. Dropdown outlet TIDAK dibuat selebar kartu di sini karena
-                 di layar ini ia hanya menyaring tampilan: salah membacanya tidak mengubah
-                 satu data pun. (Di layar catat nota ia selebar penuh — di sana ia menentukan
-                 ke cabang mana barangnya masuk.) --}}
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-[1fr_13rem_13rem]">
+            {{-- Pencarian selebar penuh, lalu dropdown outlet, lalu deret pil status — pola
+                 layar Stok. Dropdown outlet TIDAK dibuat selebar kartu di sini karena di layar
+                 ini ia hanya menyaring tampilan: salah membacanya tidak mengubah satu data
+                 pun. (Di layar catat nota ia selebar penuh — di sana ia menentukan ke cabang
+                 mana barangnya masuk.) --}}
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-[1fr_13rem]">
                 <div class="col-span-2 min-w-0 lg:col-span-1">
                     <label for="cari" class="sr-only">Cari nota belanja</label>
                     <div class="relative">
@@ -163,18 +250,11 @@
                     </div>
                 </div>
 
-                <div class="min-w-0">
-                    <label for="status" class="sr-only">Saringan status nota</label>
-                    <select id="status" wire:model.live="status"
-                            class="h-11 w-full rounded-xl border border-line bg-white px-3 text-[0.875rem] font-medium text-ink focus:border-terracotta focus:outline-none">
-                        <option value="semua">Semua nota</option>
-                        <option value="diterima">Barang sudah datang</option>
-                        <option value="dibatalkan">Dibatalkan</option>
-                    </select>
-                </div>
-
+                {{-- Outlet berbagi baris dengan pencarian di ≥lg, dan selebar petak di ponsel:
+                     dengan status berpindah ke deret pil, dropdown ini tinggal SATU-SATUNYA
+                     dropdown — separuh baris akan menyisakan petak menganga di sebelahnya. --}}
                 @if ($outletTersedia !== [])
-                    <div class="min-w-0">
+                    <div class="col-span-2 min-w-0 lg:col-span-1">
                         <label for="outlet" class="sr-only">Outlet</label>
                         <select id="outlet" wire:model.live="outletId"
                                 class="h-11 w-full rounded-xl border border-line bg-white px-3 text-[0.875rem] font-medium text-ink focus:border-terracotta focus:outline-none">
@@ -185,6 +265,49 @@
                         </select>
                     </div>
                 @endif
+
+                {{-- ── Pil status ───────────────────────────────────────────
+                     Dulu sebuah <select> bertiga pilihan. Diganti PIL karena keadaan
+                     "belum datang" harus terlihat tanpa dibuka: pilihan yang tersembunyi di
+                     dalam dropdown hanya ditemukan orang yang sudah tahu ia ada, dan yang
+                     paling perlu ditemukan di layar ini justru nota yang barangnya belum
+                     sampai. Bentuknya SAMA dengan pil saringan layar Stok.
+
+                     col-span-2 dan MEMBUNGKUS ke baris berikutnya — bukan digulir mendatar:
+                     pil yang harus dicari dengan menggeser sama saja tidak ada. Empatnya
+                     dibagi DUA-DUA di ponsel lewat petak, bukan flex-wrap+grow seperti tujuh
+                     pil di layar Stok: dengan empat pil, flex-wrap menyisakan pil keempat
+                     SENDIRIAN di baris kedua lalu melebarkannya sampai batas 20rem — dan pil
+                     selebar kartu yang sedang aktif terbaca sebagai tombol, bukan sebagai satu
+                     pilihan di antara empat. Petak dua kolom membuat keempatnya seukuran.
+
+                     SENGAJA tanpa angka di sebelah namanya, dan itu bukan kelalaian: angka
+                     yang tersedia di layar ini ("nota bulan ini", "menunggu datang" sepanjang
+                     waktu) punya cakupan yang berbeda-beda, sementara pilnya menyaring
+                     SELURUH daftar tanpa batas bulan. Chip yang angkanya tidak cocok dengan
+                     isi tabel membuat orang berhenti mempercayai keduanya — cacat yang sudah
+                     pernah terjadi di layar Stok. --}}
+                <div class="col-span-2 -m-px min-w-0 overflow-x-auto p-px lg:col-span-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div role="group" aria-label="Saringan keadaan nota"
+                         class="grid min-w-full grid-cols-2 gap-1 rounded-xl bg-white p-1 ring-1 ring-line sm:grid-cols-4">
+                        @foreach ([
+                            ['semua', 'Semua'],
+                            ['diterima', 'Sudah datang'],
+                            ['belum', 'Belum datang'],
+                            ['dibatalkan', 'Dibatalkan'],
+                        ] as [$nilai, $teks])
+                            <button type="button" wire:click="$set('status', '{{ $nilai }}')"
+                                    aria-pressed="{{ $status === $nilai ? 'true' : 'false' }}"
+                                    @class([
+                                        'flex h-9 min-w-0 cursor-pointer items-center justify-center rounded-lg px-2 text-[0.8125rem] whitespace-nowrap transition',
+                                        'bg-terracotta font-semibold text-white' => $status === $nilai,
+                                        'font-medium text-umber hover:bg-cream hover:text-ink' => $status !== $nilai,
+                                    ])>
+                                {{ $teks }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
             </div>
         </x-slot:saringan>
     </x-kartu-alat>
@@ -382,6 +505,55 @@
                     </div>
                 </div>
 
+                {{-- ── Tandai barang sudah datang ──────────────────────────
+                     BUKAN tindakan merusak: tidak ada yang hilang, dan aksinya idempoten.
+                     Karena itu TIDAK memakai `.tombol-bahaya` maupun tint merah — merah di
+                     sini akan melemahkan merah pada "Batalkan nota" tepat di bawahnya, dan
+                     begitu dua tombol yang berbeda akibat berwarna sama, warnanya berhenti
+                     jadi aturan (lihat CLAUDE.md).
+
+                     Tetap dua langkah, dengan alasan yang berbeda dari pembatalan: yang perlu
+                     dibaca sebelum ditekan adalah apa yang terjadi pada barang yang datang
+                     TIDAK SESUAI nota. Terima sebagian tidak dibangun (isi notanya masuk
+                     penuh), jadi kalimat $catatanTerimaSebagian dari komponen WAJIB terpasang
+                     di sini — tanpa itu pemilik yang menerima 8 dari 10 mengarang jalannya
+                     sendiri, dan yang dikarang biasanya "biarkan saja". --}}
+                @if ($bisaDitandaiDatang($notaRincian->status))
+                    <div class="mt-3" x-data="{ tanyaDatang: false }">
+                        <div x-show="! tanyaDatang" class="flex">
+                            <button type="button" x-on:click="tanyaDatang = true"
+                                    class="tombol-kedua h-11 w-full cursor-pointer px-4 text-[0.8125rem] sm:w-auto">
+                                <span class="tombol-ikon">
+                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                        <path d="M4 10.5l3.5 3.5L16 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                                Tandai barang sudah datang
+                            </button>
+                        </div>
+
+                        <div x-cloak x-show="tanyaDatang">
+                            <p class="text-[0.8125rem] text-ink">
+                                <span class="font-bold">Tandai nota {{ $notaRincian->nomor_po }} sudah datang?</span>
+                                Stok {{ $notaRincian->outlet?->outlet_name ?? 'outlet nota ini' }} langsung bertambah
+                                sebanyak isi nota ini, dan harga beli barangnya ikut diperbarui.
+                            </p>
+                            <p class="mt-1.5 text-[0.8125rem] text-umber">{{ $catatanTerimaSebagian }}</p>
+                            <div class="mt-2.5 flex gap-2">
+                                <button type="button" wire:click="tandaiDatang('{{ $notaRincian->getKey() }}')"
+                                        x-on:click="tanyaDatang = false" wire:loading.attr="disabled"
+                                        class="tombol-utama h-11 flex-1 cursor-pointer px-4 text-[0.8125rem] sm:flex-none">
+                                    Ya, barangnya sudah datang
+                                </button>
+                                <button type="button" x-on:click="tanyaDatang = false"
+                                        class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:flex-none">
+                                    Belum
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
                 @if ($notaRincian->status !== \App\Enums\DocumentStatus::Dibatalkan)
                     {{-- Pembatalan diletakkan DI SINI, bukan sebagai ikon di setiap baris
                          daftar: yang dibatalkan adalah seluruh nota beserta mutasi stoknya,
@@ -488,6 +660,7 @@
                          yang mana. --}}
                     <div class="mt-3 flex">
                         <button type="button" wire:click="bukaRincian('{{ $nota->getKey() }}')"
+                                aria-label="{{ $rincianId === $nota->getKey() ? 'Tutup rincian nota '.$nota->nomor_po : 'Lihat isi nota '.$nota->nomor_po }}"
                                 class="tombol-kedua h-11 w-full cursor-pointer px-3 text-[0.8125rem]">
                             <span class="tombol-ikon">
                                 @if ($rincianId === $nota->getKey())
@@ -503,11 +676,65 @@
                             {{ $rincianId === $nota->getKey() ? 'Tutup rincian' : 'Lihat isi nota' }}
                         </button>
                     </div>
+
+                    {{-- Tombol "sudah datang" HANYA pada nota yang barangnya belum masuk stok.
+                         Ditaruh di kartunya, bukan hanya di panel rincian: nota yang ditunggu
+                         biasanya ditandai sambil menurunkan barang dari motor, dan memaksa
+                         membuka rincian dulu berarti dua ketukan untuk pekerjaan satu ketukan.
+
+                         Keadaannya disimpan Alpine per kartu (`tanyaDatang`), bukan di
+                         komponen: pertanyaannya hanya hidup selama kartunya di layar dan
+                         server tidak perlu tahu. Tombol "Ya" ikut menutup pertanyaannya supaya
+                         daftar yang dirender ulang tidak tertinggal dalam keadaan bertanya. --}}
+                    @if ($bisaDitandaiDatang($nota->status))
+                        <div class="mt-2" x-data="{ tanyaDatang: false }">
+                            <div x-show="! tanyaDatang" class="flex">
+                                <button type="button" x-on:click="tanyaDatang = true"
+                                        class="tombol-kedua h-11 w-full cursor-pointer px-3 text-[0.8125rem]">
+                                    <span class="tombol-ikon">
+                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                            <path d="M4 10.5l3.5 3.5L16 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </span>
+                                    Tandai barang sudah datang
+                                </button>
+                            </div>
+
+                            <div x-cloak x-show="tanyaDatang" class="rounded-xl border border-line bg-cream/60 p-3">
+                                <p class="text-[0.8125rem] text-ink">
+                                    <span class="font-bold">Tandai nota {{ $nota->nomor_po }} sudah datang?</span>
+                                    Stok {{ $nota->outlet?->outlet_name ?? 'outlet nota ini' }} langsung bertambah
+                                    sebanyak isi notanya.
+                                </p>
+                                {{-- WAJIB ada, dan bukan sebagai hiasan: kalimat ini satu-satunya
+                                     tempat pemilik diberi tahu apa yang harus dilakukan kalau yang
+                                     datang tidak sama dengan notanya. --}}
+                                <p class="mt-1.5 text-[0.75rem] text-umber">{{ $catatanTerimaSebagian }}</p>
+                                <div class="mt-2.5 flex gap-2">
+                                    <button type="button" wire:click="tandaiDatang('{{ $nota->getKey() }}')"
+                                            x-on:click="tanyaDatang = false" wire:loading.attr="disabled"
+                                            class="tombol-utama h-11 flex-1 cursor-pointer px-3 text-[0.8125rem]">
+                                        Ya, sudah datang
+                                    </button>
+                                    <button type="button" x-on:click="tanyaDatang = false"
+                                            class="h-11 flex-1 cursor-pointer rounded-xl border border-line bg-white px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                                        Belum
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @endforeach
         </div>
 
-        <div class="kartu hidden overflow-hidden lg:block">
+        {{-- `tanyaDatang` dipegang SATU keadaan untuk seluruh tabel, berisi id nota yang
+             sedang ditanya — bukan satu keadaan per baris. Alasannya bentuk HTML-nya: blok
+             konfirmasinya berdiri sebagai <tr> tersendiri di bawah baris notanya (satu baris
+             tabel tidak bisa dibungkus <div> tanpa merusak tabelnya), jadi tombol dan bloknya
+             adalah dua elemen BERSAUDARA yang harus melihat keadaan yang sama. Efek
+             sampingnya justru diinginkan: hanya satu pertanyaan terbuka sekaligus. --}}
+        <div class="kartu hidden overflow-hidden lg:block" x-data="{ tanyaDatang: null }">
             <table class="w-full table-fixed text-center">
                 <thead>
                     <tr class="border-b border-line">
@@ -569,6 +796,7 @@
                                      Nomor notanya rata kiri di posisi yang sama tiap baris. --}}
                                 <button type="button" wire:click="bukaRincian('{{ $nota->getKey() }}')"
                                         class="tombol-kedua min-h-11 w-full cursor-pointer justify-between py-1.5 pr-1.5 pl-2.5 text-left"
+                                        aria-label="{{ $rincianId === $nota->getKey() ? 'Tutup rincian nota '.$nota->nomor_po : 'Lihat isi nota '.$nota->nomor_po }}">
                                     <span class="min-w-0">
                                         <span class="tabular block truncate text-[0.875rem] font-bold text-terracotta">{{ $nota->nomor_po }}</span>
                                         <span class="tabular block truncate text-[0.75rem] font-normal text-umber-soft">
@@ -600,8 +828,59 @@
                                 <x-lencana :warna="$warnaStatus($nota->status)" :denyut="$nota->status !== \App\Enums\DocumentStatus::Dibatalkan">
                                     {{ $labelStatus($nota->status) }}
                                 </x-lencana>
+
+                                {{-- Tombolnya di BAWAH lencananya, di kolom yang sama: lencana
+                                     menyatakan keadaannya, tombol mengubah keadaan itu — dan
+                                     tindakan yang berdiri jauh dari keterangan yang
+                                     menjelaskannya membuat mata berpindah dua kali tiap baris.
+                                     Teksnya dipendekkan ("Tandai sudah datang") karena kolomnya
+                                     ±180px bersih; kalimat penuhnya ada di blok konfirmasinya,
+                                     dan aria-label menyebut nomor notanya supaya pembaca layar
+                                     tidak mendengar sepuluh kalimat identik. --}}
+                                @if ($bisaDitandaiDatang($nota->status))
+                                    <button type="button" x-on:click="tanyaDatang = '{{ $nota->getKey() }}'"
+                                            aria-label="Tandai barang nota {{ $nota->nomor_po }} sudah datang"
+                                            class="tombol-kedua mt-2 h-9 w-full cursor-pointer px-2 text-[0.75rem]">
+                                        <span class="tombol-ikon">
+                                            <svg viewBox="0 0 20 20" class="size-3.5" fill="none" aria-hidden="true">
+                                                <path d="M4 10.5l3.5 3.5L16 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        </span>
+                                        Tandai sudah datang
+                                    </button>
+                                @endif
                             </td>
                         </tr>
+
+                        {{-- Blok konfirmasi selebar tabel, bukan di dalam sel Status yang ±180px:
+                             kalimat $catatanTerimaSebagian butuh ruang, dan keterangan yang
+                             dipadatkan jadi enam baris huruf kecil di dalam satu sel tidak akan
+                             dibaca siapa pun — padahal ia satu-satunya yang menjelaskan barang
+                             yang datang tidak sesuai nota. --}}
+                        @if ($bisaDitandaiDatang($nota->status))
+                            <tr x-cloak x-show="tanyaDatang === '{{ $nota->getKey() }}'"
+                                class="bg-cream/60" wire:key="tanya-datang-{{ $nota->getKey() }}">
+                                <td colspan="5" class="px-3 py-3.5 text-left">
+                                    <p class="text-[0.8125rem] text-ink">
+                                        <span class="font-bold">Tandai nota {{ $nota->nomor_po }} sudah datang?</span>
+                                        Stok {{ $nota->outlet?->outlet_name ?? 'outlet nota ini' }} langsung bertambah
+                                        sebanyak isi nota ini, dan harga beli barangnya ikut diperbarui.
+                                    </p>
+                                    <p class="mt-1 text-[0.8125rem] text-umber">{{ $catatanTerimaSebagian }}</p>
+                                    <div class="mt-2.5 flex gap-2">
+                                        <button type="button" wire:click="tandaiDatang('{{ $nota->getKey() }}')"
+                                                x-on:click="tanyaDatang = null" wire:loading.attr="disabled"
+                                                class="tombol-utama h-11 cursor-pointer px-4 text-[0.8125rem]">
+                                            Ya, barangnya sudah datang
+                                        </button>
+                                        <button type="button" x-on:click="tanyaDatang = null"
+                                                class="h-11 cursor-pointer rounded-xl border border-line bg-white px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                                            Belum
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endif
                     @endforeach
                 </tbody>
             </table>

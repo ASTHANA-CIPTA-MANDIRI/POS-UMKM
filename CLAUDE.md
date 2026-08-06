@@ -89,6 +89,28 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
   terbuka kosong dan terbaca sebagai "tidak ada data". `->links()` selalu dirender;
   `limit(n)` tanpa penunjuk halaman adalah pemotongan diam-diam.
 
+### Konfirmasi hapus memakai SweetAlert — dan dialognya BUKAN pengamannya
+
+Setiap tindakan yang menghapus atau membatalkan dikonfirmasi lewat SweetAlert2, memakai
+pembungkus bersama di `resources/js/` (jangan memanggil `Swal.fire` mentah per layar —
+teksnya, warnanya, dan urutan tombolnya akan bercabang).
+
+- **Bundel, bukan CDN.** `sweetalert2` sudah ada di `package.json` dan diimpor di
+  `resources/js/toast.js`. Aturan keras nomor 3 melarang aset dari CDN, dan layar kasir wajib
+  jalan tanpa jaringan — dialog yang gagal dimuat berarti tombolnya tidak bisa dipakai.
+- **Teks bahasa warung**, dan judulnya menyebut APA yang dihapus: "Hapus Kopi Sachet?" bukan
+  "Apakah Anda yakin?". Dialog yang tidak menyebut namanya membuat orang menekan "Ya" untuk
+  barang yang salah.
+- **Tombol pembenar berwarna bahaya** dan menyebut tindakannya ("Ya, hapus"), bukan "OK".
+  Tombol batal yang mendapat fokus awal — bukan tombol hapusnya.
+- **Sebutkan akibatnya kalau tidak bisa dibatalkan**, dan sebutkan pula kalau bisa: nota yang
+  dibatalkan tetap tersimpan, produk memakai soft delete. Peringatan yang lebih menakutkan
+  daripada kenyataannya membuat orang berhenti memercayai peringatan berikutnya.
+- **Dialog BUKAN pengaman.** Ia hanya mencegah salah-tekan. Wewenang tetap diperiksa di
+  server pada setiap aksi (tenant, outlet, peran) — muatan Livewire bisa dikirim tanpa
+  pernah melewati dialog apa pun. Uji keamanan memanggil aksinya langsung, tanpa dialog.
+- Target sentuh tombolnya ≥44px, dan Esc harus menutup dialog.
+
 ### Tindakan merusak berwarna bahaya — dan merahnya terlihat TANPA disentuh
 
 Hapus, batalkan, void: warnanya merah, dan merahnya ada sejak awal.

@@ -684,6 +684,19 @@ class PratinjauTest extends TestCase
                     'diskon' => $i % 4 === 1 ? 5000 : 0,
                     'ongkos_kirim' => $i % 2 === 0 ? 25000 : 0,
                     'catatan' => $i === 0 ? 'Diantar sore, ongkir dibayar tunai.' : null,
+                    /*
+                     * DUA nota berstatus "belum datang", dan salah satunya nota pertama —
+                     * yaitu nota yang panel rinciannya ikut dipotret.
+                     *
+                     * Tanpa satu pun nota begini, seluruh tampilan keadaan "belum datang"
+                     * TIDAK PERNAH terpotret: lencana "Masih di jalan", tombol "Tandai sudah
+                     * datang" beserta blok konfirmasinya di tiga tempat, dan kartu "Menunggu
+                     * datang" yang berisi nominal sungguhan. Tangkapan yang tidak memuat
+                     * keadaannya menghasilkan tujuh angka nol untuk markup yang tidak ada di
+                     * halamannya — lolos tanpa terukur, cacat yang persis diperingatkan di
+                     * CLAUDE.md.
+                     */
+                    'sudah_datang' => ! in_array($i, [0, 6], true),
                     'baris' => [
                         ['raw_material_id' => $bahan['Beras']->getKey(), 'qty_beli' => 25, 'harga_satuan' => 13000],
                         ['raw_material_id' => $bahan['Ayam Potong']->getKey(), 'qty_beli' => 10, 'harga_satuan' => 38000],

@@ -293,6 +293,53 @@
                     <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
                 @enderror
             </div>
+
+            {{-- ── Barangnya sudah datang? ──────────────────────────────────
+                 Pertanyaan ini yang menentukan apakah stok bertambah SEKARANG. Bawaannya
+                 "sudah saya terima", karena belanja warung biasanya dicatat sesudah barangnya
+                 diturunkan dari motor — bawaan sebaliknya akan mengubah setiap nota biasa
+                 menjadi nota menggantung, dan pemiliknya baru sadar saat kasir mengabari
+                 "Habis" untuk rak yang penuh.
+
+                 TANPA <x-wajib />: validatornya `boolean`, bukan `required`, dan pilihan yang
+                 sudah punya bawaan tidak pernah bisa kosong. Bintang di sini akan menjadi
+                 bintang yang tidak pernah bisa dilanggar — dan sesudah dua bintang seperti itu
+                 orang berhenti memercayai bintangnya lalu melewatkan yang sungguh wajib
+                 (aturan medan wajib di CLAUDE.md).
+
+                 Dua pilihan berdampingan, bukan satu sakelar: sakelar hanya menyebut SATU
+                 keadaan dan pembacanya harus menyimpulkan sendiri arti keadaan sebaliknya.
+                 Di sini keduanya tertulis, beserta akibatnya masing-masing pada stok.
+
+                 `wire:model.live`, bukan `.blur`: sorotan pilihan yang sedang aktif digambar
+                 dari keadaan di server, jadi tanpa `.live` kotak yang tersorot akan tertinggal
+                 satu langkah di belakang titik radionya — dan pemilik yang melihat dua penanda
+                 tidak sepakat akan berhenti memercayai keduanya. --}}
+            <fieldset class="col-span-2 min-w-0 lg:col-span-4">
+                <legend class="text-[0.8125rem] font-semibold text-ink">Barangnya sudah datang?</legend>
+                <div class="mt-1.5 grid gap-2 sm:grid-cols-2">
+                    @foreach ([
+                        ['1', true, 'Barangnya sudah saya terima', 'Stok outletnya langsung bertambah begitu nota ini tersimpan.'],
+                        ['0', false, 'Barangnya belum datang', 'Stok belum bertambah. Tandai datang nanti dari daftar nota.'],
+                    ] as [$nilai, $aktif, $judulPilihan, $akibat])
+                        <label @class([
+                                   'flex min-h-12 min-w-0 cursor-pointer items-start gap-2.5 rounded-xl border px-3.5 py-2.5 transition-colors',
+                                   'border-terracotta bg-cream' => $sudahDatang === $aktif,
+                                   'border-line bg-white hover:bg-cream/60' => $sudahDatang !== $aktif,
+                               ])>
+                            <input type="radio" wire:model.live="sudahDatang" value="{{ $nilai }}"
+                                   class="mt-0.5 size-4 shrink-0 cursor-pointer accent-terracotta">
+                            <span class="min-w-0">
+                                <span class="block text-[0.875rem] font-semibold text-ink">{{ $judulPilihan }}</span>
+                                <span class="mt-0.5 block text-[0.75rem] leading-snug text-umber">{{ $akibat }}</span>
+                            </span>
+                        </label>
+                    @endforeach
+                </div>
+                @error('sudahDatang')
+                    <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
+                @enderror
+            </fieldset>
         </div>
     </div>
 
@@ -525,10 +572,19 @@
             {{-- Dua bentuk teks: "Simpan nota — barang masuk stok" 31 karakter, di 390px ia
                  terbelah dua baris dan tombol utama layar ini menjadi kotak tinggi
                  bertumpuk. Yang dijanjikan tombolnya (stok bertambah) tetap tertulis di
-                 kalimat pembuka kartu alat di atas. --}}
+                 kalimat pembuka kartu alat di atas.
+
+                 Janjinya MENGIKUTI pilihan "barangnya sudah datang". Bunyi tetap "barang masuk
+                 stok" adalah kebohongan pada nota yang barangnya belum sampai — dan tombol
+                 simpan adalah tempat terakhir orang membaca sebelum menekan, jadi kalimat yang
+                 salah di situ tidak pernah terbantah oleh apa pun sesudahnya. --}}
             <span wire:loading.remove wire:target="simpan">
                 <span class="sm:hidden">Simpan nota</span>
-                <span class="hidden sm:inline">Simpan nota — barang masuk stok</span>
+                @if ($sudahDatang)
+                    <span class="hidden sm:inline">Simpan nota — barang masuk stok</span>
+                @else
+                    <span class="hidden sm:inline">Simpan nota — belum masuk stok</span>
+                @endif
             </span>
             <span wire:loading wire:target="simpan">Menyimpan…</span>
         </button>
