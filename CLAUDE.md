@@ -89,6 +89,25 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
   terbuka kosong dan terbaca sebagai "tidak ada data". `->links()` selalu dirender;
   `limit(n)` tanpa penunjuk halaman adalah pemotongan diam-diam.
 
+### Medan wajib ditandai bintang merah — tapi HANYA yang benar-benar wajib
+
+Setiap medan yang validatornya `required` diberi `<x-wajib />` sesudah labelnya: bintang
+merah `*` dengan keterangan pembaca layar. Pemilik proyek meminta ini untuk seluruh fitur.
+
+**Yang menentukan bukan selera, melainkan aturan validasinya.** Bintang pada medan yang
+sebenarnya `nullable` membuat orang mengisi hal yang tidak perlu, dan sesudah dua kali begitu
+ia berhenti memercayai bintangnya — lalu melewatkan yang sungguh wajib. Jadi:
+
+- `required` di validator → **selalu** berbintang
+- `nullable` → **tidak pernah** berbintang, walaupun terasa penting
+- wajib BERSYARAT (mis. alasan hanya wajib kalau ada beda) → bintangnya **muncul saat
+  syaratnya aktif**, tidak sebelum itu. Alpine sudah tahu syaratnya di lembar hitung stok.
+
+Keadaan yang mudah salah, dan sudah pernah dipertimbangkan: kolom jumlah di lembar hitung
+stok **TIDAK berbintang**. Kosong di situ berarti "barangnya belum dihitung" — itu pernyataan
+yang sah, bukan kelalaian, dan menandainya wajib akan memaksa orang mengetik nol yang berarti
+"rak kosong".
+
 ### Uji mutasi pada berkas Blade: WAJIB `view:clear` sesudah memulihkan
 
 Blade dikompilasi dan hasilnya di-cache. Kalau kamu merusak sebuah `.blade.php` untuk uji
