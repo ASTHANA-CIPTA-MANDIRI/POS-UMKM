@@ -11,6 +11,7 @@ use App\Models\RawMaterial;
 use App\Models\Scopes\TenantScope;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Support\Uang;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -173,6 +174,27 @@ class CatatPembelianAction
 
         foreach ($baris as $satu) {
             $subtotalNota += $this->catatBaris($po, $satu);
+        }
+
+        /*
+         * Diskon lebih besar daripada belanjaannya selalu salah ketik — dan sesudah titik
+         * ribuan dibaca dengan benar, keadaan ini JADI MUNGKIN di jalur ini.
+         *
+         * Dulu "1.000.000" di kolom diskon berhenti lebih awal sebagai "harus berupa angka"
+         * (is_numeric menolaknya), jadi tidak pernah sampai ke hitungan total. Sekarang ia
+         * terbaca 1.000.000 dengan benar, dan tanpa penjaga ini nota Rp 116.000 akan
+         * tersimpan bertotal −884.000: uang MASUK menurut catatan, padahal pemiliknya baru
+         * saja membayar. Layar punya penjaga yang sama (PembelianBaru), tapi seeder dan
+         * perintah artisan tidak melewatinya.
+         *
+         * Toleransi 0,005 supaya diskon yang persis sebesar belanjaannya (gratis total) tidak
+         * ikut tertolak karena pembulatan sen.
+         */
+        if ($diskon > $subtotalNota + 0.005) {
+            throw new InvalidArgumentException(
+                'Diskon tidak boleh lebih besar daripada total belanjaannya — belanja Rp '
+                .number_format($subtotalNota, 0, ',', '.').', diskon Rp '.number_format($diskon, 0, ',', '.').'.'
+            );
         }
 
         // total = subtotal − diskon + ongkir. Diskon & ongkir TIDAK dibagi ke harga
@@ -359,22 +381,42 @@ class CatatPembelianAction
         return Carbon::parse($nilai)->startOfDay();
     }
 
-    /** Uang: wajib angka, tidak boleh negatif. Nol sah (bonus grosir). */
+    /**
+     * Uang: wajib angka rupiah yang bisa dibaca, tidak boleh negatif. Nol sah (bonus grosir).
+     *
+     * PENJAGANYA DI SINI, BUKAN CUMA DI LAYAR. Aksi ini juga dipanggil dari seeder, perintah
+     * artisan, dan uji — jalur yang tidak pernah melewati satu pun aturan validasi Livewire.
+     *
+     * Kenapa BUKAN `is_numeric` + `(float)`, bentuk yang dulu ada di sini: pemilik warung
+     * mengetik titik ribuan dengan sendirinya, dan `is_numeric('58.000')` bernilai true
+     * sementara `(float) '58.000'` bernilai 58,0. Nota Rp 116.000 tersimpan Rp 116, diskon
+     * "1.000" menjadi Rp 1, totalnya Rp 115, dan harga beli di master produk tertimpa jadi
+     * Rp 58 — tanpa satu pun galat di layar. Lihat App\Support\Uang.
+     *
+     * Yang dibatasi hanya angka yang DIKETIK. Hasil hitungan tetap boleh berdesimal: harga
+     * per satuan dasar (116.000 ÷ 24 pcs = 4.833,33) dihitung di TerimaPembelianAction dan
+     * disimpan di kolom decimal(15,2). Konversi dus→pcs tidak lewat sini sama sekali.
+     */
     private function uang(mixed $nilai, string $label): float
     {
         if (blank($nilai)) {
             return 0.0;
         }
 
-        if (! is_numeric($nilai)) {
-            throw new InvalidArgumentException($label.' harus berupa angka.');
-        }
-
-        if ((float) $nilai < 0) {
+        // Minus diperiksa LEBIH DULU supaya pesannya menyebut sebab yang sebenarnya.
+        // Uang::baca juga menolak minus, tapi pesannya akan berbunyi "bentuknya tidak
+        // terbaca" untuk angka yang bentuknya justru benar — cuma salah tanda.
+        if (is_numeric($nilai) && (float) $nilai < 0) {
             throw new InvalidArgumentException($label.' tidak boleh negatif.');
         }
 
-        return round((float) $nilai, 2);
+        if (! Uang::sah($nilai)) {
+            throw new InvalidArgumentException(
+                $label.' ditulis dengan angka rupiah saja — mis. 58000 atau 58.000. Yang tertulis: '.$this->mentah($nilai).'.'
+            );
+        }
+
+        return (float) (Uang::baca($nilai) ?? 0);
     }
 
     /**
@@ -396,13 +438,45 @@ class CatatPembelianAction
         return filter_var($nilai, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
     }
 
+    /**
+     * KUANTITAS — aturannya kebalikan dari uang, dan itu disengaja.
+     *
+     * Pecahan SAH: pemilik warteg membeli 2,5 kg beras, dan koma adalah cara ia menulisnya.
+     * Yang ditolak justru titik ribuan ("1.500"), karena kalau dibaca 1,5 orang yang baru
+     * belajar "titik boleh di kolom harga" akan menerima 1,5 kg tanpa satu pun galat —
+     * seribu kali lebih sedikit daripada yang ia maksud. Aturannya di App\Support\Uang.
+     *
+     * Nol dan minus lolos dari sini dengan sengaja: keduanya berbentuk angka yang benar,
+     * dan yang menolaknya adalah aturan domain di catatBaris() ("harus lebih dari nol") yang
+     * pesannya jauh lebih bisa dipahami daripada "bentuknya tidak terbaca".
+     */
     private function angka(mixed $nilai, string $label): float
     {
-        if (! is_numeric($nilai)) {
-            throw new InvalidArgumentException($label.' harus berupa angka.');
+        if (blank($nilai)) {
+            throw new InvalidArgumentException($label.' wajib diisi — tulis angkanya, mis. 2 atau 2,5.');
         }
 
-        return (float) $nilai;
+        try {
+            return (float) (Uang::bacaJumlah($nilai) ?? 0);
+        } catch (InvalidArgumentException) {
+            throw new InvalidArgumentException(
+                $label.' ditulis dengan angka saja — mis. 2 atau 2,5 untuk setengah. Yang tertulis: '.$this->mentah($nilai).'.'
+            );
+        }
+    }
+
+    /**
+     * Nilai mentah untuk pesan galat, dikutip supaya spasi & titiknya kelihatan.
+     *
+     * Pesan yang tidak menyebut apa yang ditolak membuat orang mengetik ulang hal yang sama.
+     */
+    private function mentah(mixed $nilai): string
+    {
+        if (is_scalar($nilai)) {
+            return '"'.(is_bool($nilai) ? ($nilai ? 'true' : 'false') : $nilai).'"';
+        }
+
+        return is_array($nilai) ? 'daftar nilai' : get_debug_type($nilai);
     }
 
     private function teksBersih(?string $teks): ?string
