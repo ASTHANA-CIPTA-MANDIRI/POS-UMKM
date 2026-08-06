@@ -1,0 +1,331 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Actions\Purchase\BatalkanPembelianAction;
+use App\Actions\Purchase\SimpanBuktiBelanjaAction;
+use App\Enums\UserRole;
+use App\Livewire\Pages\Owner\Pembelian;
+use App\Livewire\Pages\Owner\PembelianBaru;
+use App\Models\Outlet;
+use App\Models\PurchaseOrder;
+use App\Models\Tenant;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
+use Tests\Concerns\MembuatDataPembelian;
+use Tests\Concerns\MembuatDataUji;
+use Tests\TestCase;
+
+/**
+ * Sisi TAMPILAN foto bukti belanja: kotak unggah di formulir nota, dan blok kwitansi di
+ * panel rincian nota.
+ *
+ * Sisi datanya sudah dijaga PembelianBuktiTest. Yang dijaga DI SINI adalah hal-hal yang
+ * hanya bisa salah di Blade, dan tiap butirnya lahir dari aturan yang sudah pernah dibayar
+ * mahal di repo ini:
+ *
+ * 1. **Batas ukuran & jenis berkas tertulis SEBELUM orang memilih**, dan angkanya dari
+ *    $batasBukti — bukan "4 MB" yang diketik ulang di Blade lalu ketinggalan saat setelannya
+ *    diubah. Keterangan batas yang salah membuat orang mencoba berkali-kali dengan foto yang
+ *    memang akan ditolak.
+ *
+ * 2. **TANPA bintang wajib.** Validatornya `nullable`; bintang pada medan yang tidak wajib
+ *    membuat bintang di seluruh formulir berhenti dipercaya, lalu yang sungguh wajib
+ *    dilewatkan (CLAUDE.md).
+ *
+ * 3. **Nota dibatalkan: tombol pasang/hapus TIDAK dirender.** Tombol yang aksinya pasti
+ *    menolak membuat orang menekannya berkali-kali lalu menyimpulkan aplikasinya rusak.
+ *
+ * 4. **Tombol hapus foto merah SEJAK ISTIRAHAT dan berkonfirmasi SweetAlert bersama.** Di
+ *    tablet & HP tidak ada hover, jadi merah yang menunggu disorot tidak pernah muncul.
+ *
+ * `Storage::fake` dipakai untuk KEDUA disk — 'public' (tujuan akhir) dan disk bawaan (tempat
+ * Livewire menaruh unggahan sementara). Tanpa yang kedua, uji ini menulis berkas sungguhan ke
+ * `storage/app/private/livewire-tmp`, dan cleanupOldUploads() Livewire pernah menghapus
+ * berkas uji lain di tengah jalan sehingga ujinya kelap-kelip.
+ */
+class PembelianBuktiTampilanTest extends TestCase
+{
+    use MembuatDataPembelian, MembuatDataUji, RefreshDatabase;
+
+    private Tenant $tenant;
+
+    private Outlet $outlet;
+
+    private User $owner;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->tenant = $this->buatTenant('Toko Tampilan Bukti');
+        $this->outlet = $this->buatOutlet($this->tenant, 'Cabang Tampilan');
+        $this->owner = $this->buatUser($this->tenant, UserRole::Owner, [
+            'name' => 'Pemilik Tampilan',
+            'email' => 'owner@tampilanbukti.test',
+            'password' => 'rahasia123',
+        ]);
+
+        $this->konteks()->setTenant($this->tenant->getKey());
+
+        Storage::fake('public');
+        Storage::fake(config('filesystems.default'));
+    }
+
+    /* ── Formulir nota baru ──────────────────────────────────────────────── */
+
+    /**
+     * Batas ukuran & jenis berkas terbaca SEBELUM berkasnya dipilih.
+     *
+     * Pemilik yang baru tahu batasnya dari pesan penolakan sudah kehilangan satu menit
+     * menunggu unggahan 8 MB lewat sinyal warung — dan dua kali begitu, ia berhenti memasang
+     * foto sama sekali. Angkanya dibandingkan dengan labelBatas() supaya tidak ada dua
+     * kebenaran: kalau config('nampan.bukti_maks_kb') diubah, layarnya ikut berubah sendiri.
+     */
+    public function test_formulir_menyebut_batas_ukuran_dan_jenis_berkas_sebelum_memilih(): void
+    {
+        $html = Livewire::actingAs($this->owner)->test(PembelianBaru::class)->html();
+
+        $this->assertStringContainsString('Foto kwitansi atau struk', $html);
+        $this->assertStringContainsString('Pilih foto struk', $html);
+        $this->assertStringContainsString(SimpanBuktiBelanjaAction::labelBatas(), $html,
+            'batas ukurannya harus tertulis, dan angkanya dari labelBatas() — bukan diketik di Blade');
+        $this->assertStringContainsString('JPG, PNG, atau WEBP', $html);
+
+        // Kotak berkasnya benar-benar terikat ke properti komponennya.
+        $this->assertMatchesRegularExpression('/<input[^>]+wire:model="bukti"/', $html);
+    }
+
+    /**
+     * TIDAK berbintang wajib — validatornya `nullable`, selamanya.
+     *
+     * Diperiksa dari markupnya, bukan dari kata: <x-wajib /> merender sebuah <span> berisi
+     * bintang, dan yang dicari di sini adalah bintang itu di dekat label fotonya.
+     */
+    public function test_kotak_foto_tidak_pernah_berbintang_wajib(): void
+    {
+        $html = Livewire::actingAs($this->owner)->test(PembelianBaru::class)->html();
+
+        $posisi = strpos($html, 'Foto kwitansi atau struk');
+
+        $this->assertNotFalse($posisi);
+
+        // Potongan setelah labelnya: kalau <x-wajib /> terpasang, bintangnya ada persis di
+        // sini (pola yang sama dengan label "Tanggal nota<x-wajib />" di layar ini).
+        $sesudahLabel = substr($html, $posisi, 120);
+
+        $this->assertStringNotContainsString('wajib diisi', $sesudahLabel,
+            'foto bukti nullable: bintang wajib di sini membuat bintang di formulir ini berhenti dipercaya');
+    }
+
+    /**
+     * Foto yang ditolak TIDAK ikut ke ringkasan "N hal harus dibetulkan dulu".
+     *
+     * Cacat yang dicegah: ringkasan itu berdiri di bawah kalimat "belum ada satu barang pun
+     * yang masuk stok", jadi memasukkan galat foto ke sana membuat pemilik menyangka notanya
+     * batal tersimpan gara-gara fotonya — padahal foto tidak pernah menahan simpan. Pesannya
+     * tetap muncul, tapi menempel di kotak fotonya.
+     */
+    public function test_galat_foto_tidak_masuk_ringkasan_yang_menahan_simpan(): void
+    {
+        $komponen = Livewire::actingAs($this->owner)
+            ->test(PembelianBaru::class)
+            // Berkas yang bukan gambar: ditolak updatedBukti(), tapi tidak boleh mengubah
+            // status nota apa pun.
+            ->set('bukti', UploadedFile::fake()->create('struk.pdf', 20, 'application/pdf'));
+
+        $komponen->assertHasErrors('bukti');
+
+        $html = $komponen->html();
+
+        $this->assertStringNotContainsString('hal harus dibetulkan dulu', $html,
+            'galat foto tidak boleh muncul sebagai penahan simpan — ia tidak menahan apa pun');
+        $this->assertStringContainsString('Bukti belanja harus berupa foto', $html,
+            'pesannya tetap harus terbaca, menempel di kotak fotonya');
+
+        // Dan jalan keluarnya ada: pilihannya bisa dibuang tanpa menyentuh isian nota.
+        $this->assertStringContainsString('Tidak pakai foto ini', $html);
+
+        $komponen->call('buangBuktiPilihan')
+            ->assertHasNoErrors()
+            ->assertSet('bukti', null);
+    }
+
+    /* ── Panel rincian: sudah ada fotonya ────────────────────────────────── */
+
+    /**
+     * Foto yang ada bisa DIBUKA (ukuran penuh), diganti, dan dibuang.
+     *
+     * URL-nya wajib lewat urlBukti() — yang memakai asset('storage/…'). Kalau Blade menyusun
+     * alamatnya sendiri lewat Storage::url(), tablet yang membuka aplikasi lewat alamat LAN
+     * kehilangan seluruh gambar tanpa satu pun pesan galat.
+     */
+    public function test_panel_rincian_menampilkan_foto_yang_bisa_dibuka_besar(): void
+    {
+        $nota = $this->notaBerbukti();
+
+        $html = Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $nota->getKey())
+            ->html();
+
+        $url = (string) $nota->fresh()->urlBukti();
+
+        $this->assertStringContainsString($url, $html, 'fotonya harus benar-benar dirender');
+        $this->assertStringContainsString('/storage/'.SimpanBuktiBelanjaAction::FOLDER.'/', $url);
+        $this->assertStringContainsString('target="_blank"', $html,
+            'struk difoto dengan kamera ponsel dan tulisannya kecil: harus bisa dibuka ukuran penuh');
+        $this->assertStringContainsString('Ganti fotonya', $html);
+        $this->assertStringContainsString('Hapus foto', $html);
+    }
+
+    /**
+     * Tombol hapus foto: merah SEJAK ISTIRAHAT, dan konfirmasinya lewat pembungkus bersama.
+     *
+     * Dua cacat nyata yang dijaga sekaligus. (a) Merah yang hanya muncul lewat `hover:` tidak
+     * pernah muncul di tablet & HP — tempat layar owner benar-benar dipakai. (b) `Swal.fire`
+     * mentah per layar membuat teks, warna, dan urutan tombolnya bercabang; pembungkusnya ada
+     * di resources/js/toast.js dan dipasang sebagai window.konfirmasiNampan.
+     */
+    public function test_tombol_hapus_foto_merah_dan_berkonfirmasi_sweetalert(): void
+    {
+        $nota = $this->notaBerbukti();
+
+        $html = Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $nota->getKey())
+            ->html();
+
+        $cocok = [];
+        preg_match('/<button(?:"[^"]*"|\'[^\']*\'|[^>"\'])*>\s*(?:<[^>]*>|\s)*Hapus foto\s*<\/button>/s', $html, $cocok);
+
+        $this->assertNotEmpty($cocok, 'tombol "Hapus foto" tidak ditemukan di panel rincian');
+
+        $tombol = $cocok[0];
+
+        $this->assertStringContainsString('text-merah-tua', $tombol,
+            'merahnya harus ada tanpa hover: di HP hover TIDAK ADA');
+        $this->assertStringContainsString('bg-merah/10', $tombol);
+        $this->assertStringContainsString('konfirmasiNampan', $tombol,
+            'pakai pembungkus SweetAlert bersama, bukan Swal.fire mentah per layar');
+        $this->assertStringContainsString('hapusBukti', $tombol);
+
+        // Judul dialognya MENYEBUT nomor notanya: dialog yang tidak menyebut apa yang dihapus
+        // membuat orang menekan "Ya" untuk nota yang salah.
+        $this->assertStringContainsString($nota->nomor_po, $tombol);
+    }
+
+    /* ── Panel rincian: belum ada fotonya ────────────────────────────────── */
+
+    /**
+     * Keadaan kosong yang MENOLONG, dan NETRAL — bukan peringatan merah.
+     *
+     * 90% nota warteg memang tanpa struk; kalau keadaan itu digambar merah, 90% panel jadi
+     * merah dan orang belajar mengabaikan merah — termasuk merah yang penting. Yang harus ada
+     * bukan kalimat "belum ada bukti", melainkan alasan kenapa menyimpannya berguna: tanpa itu
+     * tidak ada sebab untuk memotret apa pun.
+     */
+    public function test_keadaan_belum_ada_foto_menjelaskan_gunanya_dan_tidak_merah(): void
+    {
+        $nota = $this->catatNota($this->outlet, $this->owner, [
+            'baris' => [$this->baris($this->buatProduk('Gula Pasir'), 5, 14000)],
+        ]);
+
+        $html = Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $nota->getKey())
+            ->html();
+
+        $blok = $this->blokBukti($html);
+
+        $this->assertStringContainsString('Belum ada fotonya', $blok);
+        $this->assertStringContainsString('menagih ulang', $blok,
+            'keadaan kosong harus menyebut KENAPA menyimpan struk itu berguna');
+        $this->assertStringContainsString('Pilih foto struk', $blok);
+        $this->assertStringContainsString(SimpanBuktiBelanjaAction::labelBatas(), $blok);
+
+        $this->assertStringNotContainsString('text-merah-tua', $blok,
+            'belum ada foto adalah keadaan NETRAL, bukan galat');
+        $this->assertStringNotContainsString('Hapus foto', $blok,
+            'tidak ada yang bisa dihapus kalau fotonya belum ada');
+    }
+
+    /* ── Panel rincian: nota dibatalkan (terkunci) ───────────────────────── */
+
+    /**
+     * Nota dibatalkan: fotonya tetap TAMPIL, kedua tombolnya TIDAK dirender, dan alasannya
+     * tertulis dengan bahasa orang warung.
+     *
+     * Aksinya di server sudah menolak (SimpanBuktiBelanjaAction::bolehDiubah), jadi tombol
+     * yang tetap dirender hanya akan ditekan berkali-kali sampai orangnya menyimpulkan
+     * aplikasinya rusak. Dan fotonya sengaja tidak disembunyikan: nota batal biasanya berarti
+     * barangnya dikembalikan ke grosir, dan struk itu justru buktinya.
+     */
+    public function test_nota_dibatalkan_fotonya_tampil_tanpa_tombol_yang_pasti_menolak(): void
+    {
+        $nota = $this->notaBerbukti();
+        app(BatalkanPembelianAction::class)->execute($nota, $this->owner);
+        $nota = $nota->fresh();
+
+        $this->assertTrue($nota->buktiTerkunci());
+
+        $html = Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $nota->getKey())
+            ->html();
+
+        $blok = $this->blokBukti($html);
+
+        $this->assertStringContainsString((string) $nota->urlBukti(), $html,
+            'foto nota yang dibatalkan tetap boleh dilihat');
+        $this->assertStringContainsString('dikunci', $blok,
+            'alasannya harus tertulis, bukan tombol yang diam-diam hilang');
+        $this->assertStringContainsString('dikembalikan ke', $blok);
+
+        $this->assertStringNotContainsString('Hapus foto', $blok);
+        $this->assertStringNotContainsString('Ganti fotonya', $blok);
+        $this->assertStringNotContainsString('wire:model="bukti"', $blok,
+            'kotak pilih berkas pun tidak dirender: tidak ada yang bisa dipasang di nota terkunci');
+    }
+
+    /* ── Bantuan ─────────────────────────────────────────────────────────── */
+
+    /**
+     * Potongan HTML yang berisi HANYA blok foto kwitansi di panel rincian.
+     *
+     * Batas atasnya labelnya, batas bawahnya blok tindakan nota (`x-data="{ tanya: null }"`).
+     * Batas bawah itu bukan kerapian: tombol "Batalkan nota" di bawahnya MEMANG merah dan
+     * memang harus merah, jadi jendela yang kelewat lebar membuat uji "belum ada foto tidak
+     * merah" gagal karena warna milik tombol lain. Uji pertama saya begitu.
+     */
+    private function blokBukti(string $html): string
+    {
+        $awal = strpos($html, 'Foto kwitansi atau struk');
+
+        $this->assertNotFalse($awal, 'blok foto kwitansi tidak ada di panel rincian');
+
+        $akhir = strpos($html, 'tanya: null', $awal);
+
+        // Nota yang dibatalkan tidak punya blok tindakan sama sekali (tidak ada yang bisa
+        // ditandai datang maupun dibatalkan lagi), jadi batas bawahnya jatuh ke panjang tetap.
+        return substr($html, $awal, $akhir === false ? 4000 : $akhir - $awal);
+    }
+
+    /** Nota yang sudah berfoto, lewat jalur aksinya — bukan kolom yang diisi tangan. */
+    private function notaBerbukti(): PurchaseOrder
+    {
+        $nota = $this->catatNota($this->outlet, $this->owner, [
+            'baris' => [$this->baris($this->buatProduk('Kopi Sachet'), 10, 1500)],
+        ]);
+
+        $this->assertTrue(
+            app(SimpanBuktiBelanjaAction::class)->execute($nota, UploadedFile::fake()->image('struk.jpg')),
+            'penyiapan uji: fotonya harus benar-benar terpasang',
+        );
+
+        return $nota->fresh();
+    }
+}

@@ -176,6 +176,23 @@ class Pembelian extends Component
     }
 
     /**
+     * Membuang foto yang baru DIPILIH — bukan foto yang sudah terpasang di nota.
+     *
+     * Nama & perilakunya sama dengan PembelianBaru::buangBuktiPilihan() supaya satu
+     * pekerjaan ("salah pilih berkas, mau memilih ulang") tidak punya dua nama di dua layar.
+     * Sengaja BUKAN `$set('bukti', null)` dari Blade: itu meninggalkan pesan galat dari
+     * berkas sebelumnya menggantung di layar padahal berkasnya sudah tidak ada, dan pesan
+     * galat yang tidak bisa dihilangkan membuat orang mengira layarnya macet.
+     *
+     * TIDAK menyentuh disk dan TIDAK menyentuh nota: yang dibuang hanya unggahan sementara.
+     */
+    public function buangBuktiPilihan(): void
+    {
+        $this->bukti = null;
+        $this->resetValidation('bukti');
+    }
+
+    /**
      * Memasang/mengganti foto bukti pada nota yang rinciannya sedang dibuka.
      *
      * Gerbangnya kueri() — tersaring tenant DAN outlet — jadi nota cabang lain maupun

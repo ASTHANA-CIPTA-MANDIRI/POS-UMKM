@@ -53,8 +53,58 @@ export function tampilkanToast(pesan, jenis = 'info') {
     toast.fire({ icon: PETA_IKON[jenis] ?? 'info', title: pesan });
 }
 
+/**
+ * Dialog konfirmasi BERSAMA untuk tindakan merusak (hapus, buang, void).
+ *
+ * Kenapa satu pembungkus dan bukan `Swal.fire` mentah di tiap layar: kalau setiap layar
+ * menyusun dialognya sendiri, teksnya, warna tombolnya, dan URUTAN tombolnya akan
+ * bercabang — dan "tombol kanan berarti melanjutkan" berhenti bisa dipelajari. Satu-satunya
+ * yang berbeda antar-pemanggil adalah kalimatnya.
+ *
+ * Empat hal yang ditetapkan di sini, semuanya dari aturan CLAUDE.md:
+ *  - `buttonsStyling: false` supaya kelas bersama (`.tombol-bahaya`, `.tombol-kedua`)
+ *    benar-benar terpakai; gaya bawaan SweetAlert punya kekhususan lebih tinggi dan akan
+ *    menang, sehingga tombol pembenarnya keluar biru — bukan merah.
+ *  - `min-h-11` (44px) di kedua tombol: sasaran sentuh di tablet & HP.
+ *  - `focusCancel` — yang mendapat fokus awal adalah tombol BATAL, bukan tombol hapusnya,
+ *    jadi Enter yang tertekan sambil lalu tidak menghapus apa pun.
+ *  - Esc menutup dialog (bawaan SweetAlert, dibiarkan hidup dengan sengaja).
+ *
+ * Dialognya BUKAN pengaman: ia hanya mencegah salah-tekan. Wewenang tetap diperiksa server
+ * pada setiap aksi — muatan Livewire bisa dikirim tanpa pernah melewati dialog apa pun.
+ *
+ * @param {{judul: string, pesan?: string, tombolYa?: string, tombolBatal?: string}} opsi
+ * @returns {Promise<boolean>} true kalau pemakainya benar-benar menekan tombol pembenarnya.
+ */
+export function konfirmasiNampan({
+    judul,
+    pesan = '',
+    tombolYa = 'Ya, lanjutkan',
+    tombolBatal = 'Tidak jadi',
+} = {}) {
+    return Swal.fire({
+        title: judul,
+        text: pesan,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: tombolYa,
+        cancelButtonText: tombolBatal,
+        focusCancel: true,
+        allowEscapeKey: true,
+        buttonsStyling: false,
+        customClass: {
+            popup: 'konfirmasi-nampan',
+            confirmButton: 'tombol-bahaya mx-1 min-h-11 cursor-pointer px-5 text-[0.875rem]',
+            cancelButton: 'tombol-kedua mx-1 min-h-11 cursor-pointer px-5 text-[0.875rem]',
+        },
+    }).then((hasil) => hasil?.isConfirmed === true);
+}
+
 export function pasangToast() {
     window.toastNampan = tampilkanToast;
+    // Dipasang di window supaya bisa dipanggil dari Alpine di Blade tanpa tiap layar
+    // mengimpor SweetAlert sendiri.
+    window.konfirmasiNampan = konfirmasiNampan;
 
     /*
      * Livewire mengirim toast lewat event peramban, bukan lewat session flash.

@@ -505,6 +505,197 @@
                     </div>
                 </div>
 
+                {{-- ── Kwitansi / struk ────────────────────────────────────────────────
+                     Inilah jawaban untuk "di mana saya menyimpan foto strukmya": di nota yang
+                     bersangkutan, bukan di album ponsel yang tidak bisa dicari.
+
+                     TIGA keadaan, dan ketiganya berbunyi berbeda karena artinya berbeda:
+
+                     1. Sudah ada fotonya  → fotonya bisa dibuka besar, boleh diganti, boleh
+                        dibuang (dengan konfirmasi).
+                     2. Belum ada fotonya  → keadaan NETRAL, bukan peringatan merah. 90% nota
+                        warteg memang tanpa struk; kalau barisnya merah, 90% daftar jadi merah
+                        dan orang belajar mengabaikan merah — termasuk merah yang penting.
+                        Yang ditulis bukan "belum ada bukti" saja, tapi KENAPA menyimpannya
+                        berguna: tanpa itu tidak ada alasan untuk memotret apa pun.
+                     3. Notanya dibatalkan → fotonya TERKUNCI. Tombol yang tidak akan bekerja
+                        tidak dirender sama sekali (aksinya di server menolak juga), dan
+                        alasannya ditulis apa adanya: kalau barangnya sudah dikembalikan ke
+                        grosir, struk itu justru buktinya.
+
+                     URL fotonya SELALU dari $notaRincian->urlBukti() — ia yang memakai
+                     asset('storage/…'). Menyusunnya di Blade dengan Storage::url() membuat
+                     tablet yang membuka lewat alamat LAN kehilangan seluruh gambar tanpa satu
+                     pun pesan galat; ada penjaga sumber kode di PembelianBuktiTest. --}}
+                @php
+                    $urlBukti = $notaRincian->urlBukti();
+                    $buktiDikunci = $notaRincian->buktiTerkunci();
+                @endphp
+
+                <div class="mt-4 border-t border-line-soft pt-4">
+                    <div class="flex flex-col gap-3.5 sm:flex-row sm:items-start">
+                        <div class="shrink-0">
+                            {{-- Yang dipratinjau adalah berkas yang BARU DIPILIH kalau ada —
+                                 itulah yang akan tersimpan kalau tombolnya ditekan. Kalau tidak
+                                 ada, foto yang sudah terpasang. isPreviewable() diperiksa lebih
+                                 dulu karena temporaryUrl() melempar untuk berkas yang bukan
+                                 gambar. --}}
+                            @if ($bukti && $bukti->isPreviewable())
+                                <img src="{{ $bukti->temporaryUrl() }}" alt="Pratinjau foto struk yang dipilih"
+                                     class="size-20 rounded-xl object-cover ring-2 ring-terracotta">
+                            @elseif ($bukti)
+                                <span class="grid size-20 place-items-center rounded-xl bg-merah/10 px-2 text-center text-[0.6875rem] font-semibold text-merah-tua">
+                                    Bukan foto
+                                </span>
+                            @elseif ($urlBukti !== null)
+                                {{-- Tautan, bukan dialog gambar: struk difoto dengan kamera ponsel
+                                     dan tulisannya kecil, jadi yang dibutuhkan pemilik adalah
+                                     gambar UKURAN ASLI yang bisa diperbesar dengan cubitan
+                                     peramban — bukan gambar yang dipaskan ke dalam kotak dialog
+                                     lalu tetap tidak terbaca. Tab baru juga berarti panel
+                                     rinciannya tidak tertutup. --}}
+                                <a href="{{ $urlBukti }}" target="_blank" rel="noopener"
+                                   aria-label="Buka foto struk nota {{ $notaRincian->nomor_po }} ukuran penuh"
+                                   class="block rounded-xl border border-line transition-colors hover:border-terracotta">
+                                    <img src="{{ $urlBukti }}" alt="Foto kwitansi nota {{ $notaRincian->nomor_po }}"
+                                         class="size-20 rounded-[11px] object-cover">
+                                </a>
+                            @else
+                                <span class="grid size-20 place-items-center rounded-xl bg-cream text-umber-soft" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" class="size-7" fill="none">
+                                        <path d="M4 8.5h3l1.2-2h7.6l1.2 2h3v10H4v-10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                        <circle cx="12" cy="13.5" r="3" stroke="currentColor" stroke-width="1.5" />
+                                    </svg>
+                                </span>
+                            @endif
+                        </div>
+
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[0.8125rem] font-semibold text-ink">Foto kwitansi atau struk</p>
+
+                            @if ($urlBukti !== null)
+                                <p class="mt-0.5 text-[0.75rem] text-umber">
+                                    Fotonya tersimpan di nota ini. Ketuk fotonya untuk melihat ukuran
+                                    penuh — tulisan di struk biasanya kecil.
+                                </p>
+                            @elseif ($buktiDikunci)
+                                <p class="mt-0.5 text-[0.75rem] text-umber">
+                                    Nota ini sudah dibatalkan dan tidak berfoto, jadi fotonya tidak bisa
+                                    ditambah lagi. Catatan notanya sendiri tetap tersimpan.
+                                </p>
+                            @else
+                                <p class="mt-0.5 text-[0.75rem] text-umber">
+                                    Belum ada fotonya. Simpan strukmu di sini kalau ada: waktu grosirnya
+                                    menagih ulang, waktu harga di struk beda dengan yang dicatat, atau
+                                    waktu barangnya harus dikembalikan — foto ini yang jadi pegangan, dan
+                                    akhir bulan notanya tidak perlu dicari lagi di laci.
+                                </p>
+                            @endif
+
+                            @if ($buktiDikunci)
+                                {{-- Tombolnya TIDAK dirender, bukan dirender lalu dimatikan: tombol
+                                     mati yang ditekan berkali-kali membuat orang menyimpulkan
+                                     aplikasinya rusak. Yang menggantikannya kalimat yang menyebut
+                                     sebabnya — dan sebab itu masuk akal begitu dibaca. --}}
+                                @if ($urlBukti !== null)
+                                    <p class="mt-2 text-[0.75rem] text-umber-soft">
+                                        Nota ini sudah dibatalkan, jadi fotonya dikunci: tidak bisa diganti
+                                        maupun dibuang. Itu disengaja — kalau barangnya sudah dikembalikan ke
+                                        grosir, struk inilah buktinya.
+                                    </p>
+                                @endif
+                            @else
+                                <div class="mt-2.5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                                    <label for="bukti-nota"
+                                           class="tombol-kedua h-10 w-full cursor-pointer px-3.5 text-[0.8125rem] sm:w-auto">
+                                        <span class="tombol-ikon">
+                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                <path d="M10 13V4m0 0L6.5 7.5M10 4l3.5 3.5M3.5 13v2A1.5 1.5 0 0 0 5 16.5h10a1.5 1.5 0 0 0 1.5-1.5v-2"
+                                                      stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        </span>
+                                        {{ $urlBukti !== null ? 'Ganti fotonya' : 'Pilih foto struk' }}
+                                    </label>
+
+                                    {{-- wire:key MEMUAT id notanya: tanpa itu morph Livewire memakai
+                                         ulang kotak berkas yang sama saat panel nota lain dibuka, dan
+                                         berkas yang masih menempel di elemen lama bisa terpasang ke
+                                         nota yang TIDAK sedang dilihat pemiliknya. --}}
+                                    <input id="bukti-nota" type="file" wire:model="bukti"
+                                           wire:key="bukti-{{ $notaRincian->getKey() }}"
+                                           accept="image/jpeg,image/png,image/webp" class="sr-only">
+
+                                    @if ($bukti)
+                                        {{-- Pasang dulu, baru tersimpan: memilih berkas TIDAK langsung
+                                             mengubah notanya, supaya salah pilih berkas tidak menimpa
+                                             foto lama yang masih benar. --}}
+                                        <button type="button" wire:click="pasangBukti" wire:loading.attr="disabled"
+                                                class="tombol-utama h-10 w-full cursor-pointer px-4 text-[0.8125rem] sm:w-auto">
+                                            <span wire:loading.remove wire:target="pasangBukti">
+                                                {{ $urlBukti !== null ? 'Pakai foto ini' : 'Pasang foto ke nota' }}
+                                            </span>
+                                            <span wire:loading wire:target="pasangBukti">Menyimpan…</span>
+                                        </button>
+
+                                        {{-- Membatalkan PILIHAN, bukan menghapus yang tersimpan — jadi
+                                             tidak merah. Merah disimpan untuk "Hapus foto" di bawah. --}}
+                                        <button type="button" wire:click="buangBuktiPilihan"
+                                                class="h-10 w-full cursor-pointer rounded-xl border border-line px-3.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:w-auto">
+                                            Tidak pakai foto ini
+                                        </button>
+                                    @endif
+
+                                    @if ($urlBukti !== null)
+                                        {{-- Pemicu tindakan MERUSAK: tint `bg-merah/10` + `text-merah-tua`,
+                                             merah SEJAK ISTIRAHAT — di tablet dan HP tidak ada hover, jadi
+                                             merah yang menunggu disorot tidak pernah muncul. Bukan
+                                             `.tombol-bahaya`: itu untuk tombol pembenar di dalam dialognya.
+
+                                             Konfirmasinya lewat pembungkus SweetAlert bersama
+                                             (window.konfirmasiNampan, resources/js/toast.js) — bukan
+                                             Swal.fire mentah per layar, supaya teks, warna, dan urutan
+                                             tombolnya tidak bercabang. Judulnya MENYEBUT nomor notanya:
+                                             dialog yang tidak menyebut apa yang dihapus membuat orang
+                                             menekan "Ya" untuk nota yang salah. Dan dialog ini bukan
+                                             pengamannya — hapusBukti() di server tetap menolak nota yang
+                                             terkunci, tanpa peduli dialognya pernah muncul atau tidak. --}}
+                                        <button type="button" x-data
+                                                x-on:click="window.konfirmasiNampan({
+                                                    judul: 'Hapus foto struk nota {{ $notaRincian->nomor_po }}?',
+                                                    pesan: 'Yang dibuang hanya fotonya; catatan notanya tetap tersimpan lengkap. Fotonya sendiri tidak bisa dikembalikan — pasang lagi kalau struk kertasnya masih ada.',
+                                                    tombolYa: 'Ya, hapus fotonya',
+                                                    tombolBatal: 'Tidak jadi',
+                                                }).then((ya) => ya && $wire.hapusBukti())"
+                                                class="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-merah/25 bg-merah/10 px-3.5 text-[0.8125rem] font-semibold text-merah-tua transition-colors hover:border-merah/45 hover:bg-merah/15 sm:w-auto">
+                                            <span class="tombol-ikon bg-merah/15 text-merah-tua">
+                                                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                    <path d="M4 6h12M8 6V4.5h4V6m-6 0 .8 10h6.4L14 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            </span>
+                                            Hapus foto
+                                        </button>
+                                    @endif
+                                </div>
+
+                                <p class="mt-2 text-[0.75rem] text-umber-soft">
+                                    JPG, PNG, atau WEBP, paling besar {{ $batasBukti }}.
+                                    @if ($urlBukti !== null)
+                                        Foto lamanya dibuang begitu yang baru terpasang — satu nota satu foto.
+                                    @endif
+                                </p>
+
+                                <p wire:loading wire:target="bukti" class="mt-1.5 text-[0.75rem] font-semibold text-terracotta">
+                                    Mengunggah foto…
+                                </p>
+
+                                @error('bukti')
+                                    <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
+                                @enderror
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
                 @php
                     $bolehTandaiDatang = $bisaDitandaiDatang($notaRincian->status);
                     $bolehBatalkan = $notaRincian->status !== \App\Enums\DocumentStatus::Dibatalkan;

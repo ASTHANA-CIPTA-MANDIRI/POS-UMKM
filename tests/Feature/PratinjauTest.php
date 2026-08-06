@@ -30,6 +30,8 @@ use Database\Seeders\PlanSeeder;
 use Database\Seeders\SuperAdminSeeder;
 use Database\Seeders\WartegSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -615,6 +617,35 @@ class PratinjauTest extends TestCase
         );
 
         /*
+         * Blok "foto kwitansi/struk" punya TIGA keadaan yang bunyinya berbeda, dan yang
+         * tidak terpotret tidak pernah terukur — angka nol untuk markup yang tidak ada di
+         * halamannya lolos sebagai bersih (CLAUDE.md).
+         *
+         * Yang dipotret di sini dua sisanya: nota TANPA foto (keadaan netral + kalimat
+         * "kenapa menyimpan struk itu berguna" + tombol pilih foto), dan nota DIBATALKAN yang
+         * berfoto (fotonya tetap tampil, kedua tombolnya TIDAK dirender, dan alasannya
+         * tertulis). Keadaan pertama — nota berfoto yang masih hidup — ada di tangkapan
+         * rincian di atas.
+         */
+        $fragmenTanpaBukti = Livewire::actingAs($owner)->test(Pembelian::class)
+            ->call('bukaRincian', $kunci['notaTanpaBukti'])
+            ->html();
+
+        file_put_contents(
+            "{$tujuan}/owner-pembelian-rincian-tanpa-bukti.html",
+            $this->suntik($this->ambil('owner.pembelian', $owner), $fragmenTanpaBukti),
+        );
+
+        $fragmenDibatalkan = Livewire::actingAs($owner)->test(Pembelian::class)
+            ->call('bukaRincian', $kunci['notaDibatalkan'])
+            ->html();
+
+        file_put_contents(
+            "{$tujuan}/owner-pembelian-rincian-dibatalkan.html",
+            $this->suntik($this->ambil('owner.pembelian', $owner), $fragmenDibatalkan),
+        );
+
+        /*
          * Formulir dalam keadaan yang paling padat: baris terisi (bar uang berisi nominal
          * sungguhan), ringkasan galat karena harga belum diisi, DAN blok pergantian cabang
          * yang ditolak. Ketiganya blok berteks panjang, dan ketiganya paling mungkin
@@ -670,6 +701,8 @@ class PratinjauTest extends TestCase
 
         $pemasok = ['CV Sumber Pangan', 'Pasar Kranggan', 'Grosir Bu Yanti', 'Toko Berkah Jaya'];
         $notaPertama = null;
+        $notaTanpaBukti = null;
+        $notaDibatalkan = null;
 
         // 11 nota: dengan 10 baris per halaman, navigasi halamannya benar-benar muncul.
         for ($i = 0; $i < 11; $i++) {
@@ -707,15 +740,52 @@ class PratinjauTest extends TestCase
 
             $notaPertama ??= $nota;
 
+            // Nota kedua sengaja DIBIARKAN tanpa foto: keadaan "belum ada fotonya" adalah
+            // keadaan yang paling sering (belanja pasar tidak berstruk), jadi ia harus ikut
+            // terukur — termasuk kalimat yang menjelaskan kenapa menyimpan struk itu berguna.
+            if ($i === 1) {
+                $notaTanpaBukti = $nota;
+            }
+
             // Satu nota dibatalkan: stoknya kembali, notanya TETAP ada di daftar, dan
             // lencananya harus terbaca berbeda dari nota yang barangnya sudah datang.
             if ($i === 3) {
                 app(BatalkanPembelianAction::class)->execute($nota, $owner);
+                $notaDibatalkan = $nota->fresh();
             }
         }
 
+        /*
+         * Foto bukti untuk pratinjau ditulis ke folder `pratinjau/`, BUKAN lewat
+         * SimpanBuktiBelanjaAction.
+         *
+         * Aksinya akan menaruh berkasnya di `bukti-belanja/{tenant_id}/`, dan itu folder
+         * unggahan sungguhan yang TIDAK boleh dibersihkan sesudah pengukuran — sampah
+         * pratinjau di situ hanya bisa dipisahkan dari bukti asli dengan menebak. Satu-satunya
+         * folder yang boleh dihapus adalah `storage/app/public/pratinjau` (aturan keras nomor 1
+         * CLAUDE.md), jadi berkas pratinjaunya ditaruh di sana dan kolomnya diisi langsung.
+         *
+         * Berkasnya HARUS benar-benar ada di disk: punyaBukti() memeriksa keberadaannya, dan
+         * urlBukti() mengembalikan null untuk path yang menggantung — panelnya lalu terpotret
+         * dalam keadaan "belum ada foto" sementara yang mau diukur justru keadaan sebaliknya.
+         * Gambar yang gagal dimuat juga tercatat oleh ukur.mjs.
+         */
+        Storage::disk('public')->put(
+            'pratinjau/bukti-struk.jpg',
+            UploadedFile::fake()->image('struk.jpg', 720, 1040)->get(),
+        );
+        Storage::disk('public')->put(
+            'pratinjau/bukti-struk-dibatalkan.jpg',
+            UploadedFile::fake()->image('struk-dikembalikan.jpg', 720, 1040)->get(),
+        );
+
+        $notaPertama->forceFill(['bukti_path' => 'pratinjau/bukti-struk.jpg'])->save();
+        $notaDibatalkan->forceFill(['bukti_path' => 'pratinjau/bukti-struk-dibatalkan.jpg'])->save();
+
         return [
             'nota' => $notaPertama->getKey(),
+            'notaTanpaBukti' => $notaTanpaBukti->getKey(),
+            'notaDibatalkan' => $notaDibatalkan->getKey(),
             'beras' => $bahan['Beras']->getKey(),
             'gula' => $bahan['Gula Pasir']->getKey(),
         ];

@@ -603,7 +603,12 @@ class PembelianBuktiTest extends TestCase
                 continue;
             }
 
-            if (preg_match('/Storage::url\(|Storage::disk\([^)]*\)->url\(/', $isi) === 1) {
+            // Komentar dibuang DULU, karena penjaga ini pernah menuduh peringatannya sendiri:
+            // komentar yang berbunyi "jangan pakai Storage::url()" ikut tertangkap. Kalau
+            // dibiarkan, satu-satunya cara menghijaukannya adalah menulis komentar yang tidak
+            // menyebut hal yang dilarangnya — dan peringatan yang tidak boleh menyebut namanya
+            // sendiri berhenti mengajari siapa pun.
+            if (preg_match('/Storage::url\(|Storage::disk\([^)]*\)->url\(/', $this->tanpaKomentar($berkas, $isi)) === 1) {
                 $pelanggar[] = str_replace(base_path().'/', '', $berkas);
             }
         }
@@ -645,6 +650,34 @@ class PembelianBuktiTest extends TestCase
      *
      * @return array<int, string>
      */
+    /**
+     * Isi berkas tanpa komentar, supaya penjaga sumber membaca KODE dan bukan prosa.
+     *
+     * Blade: `{{-- … --}}` dibuang dengan regex, karena berkas Blade bukan PHP yang sah
+     * sehingga token_get_all tidak bisa dipakai atasnya.
+     *
+     * PHP: lewat token_get_all, bukan regex. Regex `//.*` akan memotong separuh alamat
+     * `https://…` di tengah string dan bisa membuang kode yang sebenarnya ada.
+     */
+    private function tanpaKomentar(string $berkas, string $isi): string
+    {
+        if (str_ends_with($berkas, '.blade.php')) {
+            return (string) preg_replace('/\{\{--.*?--\}\}/s', '', $isi);
+        }
+
+        $bersih = '';
+
+        foreach (token_get_all($isi) as $token) {
+            if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                continue;
+            }
+
+            $bersih .= is_array($token) ? $token[1] : $token;
+        }
+
+        return $bersih;
+    }
+
     private function berkasSumber(): array
     {
         $hasil = [];

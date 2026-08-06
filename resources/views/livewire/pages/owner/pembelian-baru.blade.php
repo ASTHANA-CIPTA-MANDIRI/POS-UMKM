@@ -184,18 +184,29 @@
         </div>
     @endif
 
-    {{-- Ringkasan galat SELURUH nota — termasuk baris yang sedang tidak tampak. --}}
-    @if ($errors->any())
+    {{-- Ringkasan galat SELURUH nota — termasuk baris yang sedang tidak tampak.
+
+         `bukti` DIKELUARKAN dari ringkasan ini dengan sengaja: foto tidak pernah masuk
+         validator yang menahan simpan(), jadi memasukkannya ke daftar "hal yang harus
+         dibetulkan dulu" — di bawah kalimat "belum ada satu barang pun yang masuk stok" —
+         akan membuat pemilik menyangka notanya batal tersimpan gara-gara fotonya, lalu
+         mengetik ulang 12 baris yang sebenarnya masih utuh. Pesannya tetap muncul, tapi di
+         tempat yang benar: menempel di kotak fotonya sendiri. --}}
+    @php
+        $galatNota = array_values(array_filter($errors->keys(), fn (string $k) => $k !== 'bukti'));
+    @endphp
+
+    @if ($galatNota !== [])
         <div role="alert" class="kartu mb-4 border border-merah/30 px-5 py-4 sm:mb-5 sm:px-6">
             <p class="text-[0.875rem] font-bold text-merah-deep">
-                {{ $errors->count() }} hal harus dibetulkan dulu
+                {{ count($galatNota) }} hal harus dibetulkan dulu
             </p>
             <p class="mt-0.5 text-[0.8125rem] text-umber">
                 Nota disimpan sekaligus, jadi belum ada satu barang pun yang masuk stok —
                 angka yang sudah diketik tetap ada.
             </p>
             <ul class="mt-2 space-y-1">
-                @foreach ($errors->keys() as $kunciGalat)
+                @foreach ($galatNota as $kunciGalat)
                     @php
                         $kunciBaris = str($kunciGalat)->after('.')->toString();
                         $sebutan = str_contains($kunciGalat, '.')
@@ -340,6 +351,112 @@
                     <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
                 @enderror
             </fieldset>
+
+            {{-- ── Foto kwitansi / struk ────────────────────────────────────
+                 TANPA <x-wajib />, dan itu keputusan yang tidak boleh berubah: validatornya
+                 `nullable`, dan warteg yang belanja di pasar pagi memang tidak berstruk.
+                 Bintang di sini akan memaksa separuh pengguna mencari sesuatu yang tidak ada
+                 — lalu berhenti mencatat belanja sama sekali.
+
+                 Batas ukuran & jenis berkasnya tertulis SEBELUM orang memilih, bukan sesudah
+                 fotonya ditolak: pemilik yang baru tahu batasnya dari pesan galat sudah
+                 kehilangan satu menit menunggu unggahan 8 MB dari sinyal warung. Angkanya
+                 datang dari $batasBukti (satu setelan, config('nampan.bukti_maks_kb')) —
+                 mengetik "4 MB" sendiri di sini berarti keterangannya akan ketinggalan saat
+                 setelannya diubah, dan keterangan batas yang salah lebih buruk daripada
+                 tidak ada.
+
+                 Kotaknya bergaris rambut dengan bentuk yang SAMA dengan kotak gambar produk
+                 di layar Produk: petak foto 64px di kiri, tombol + keterangan di kanan. Dua
+                 layar owner yang memakai dua bentuk untuk pekerjaan yang sama (memilih satu
+                 foto) terbaca seperti dua aplikasi. --}}
+            <div class="col-span-2 min-w-0 lg:col-span-4">
+                <span class="block text-[0.8125rem] font-semibold text-ink">Foto kwitansi atau struk</span>
+
+                <div class="mt-1.5 flex items-start gap-3.5 rounded-xl border border-line p-3.5">
+                    <div class="shrink-0">
+                        {{-- isPreviewable() WAJIB diperiksa lebih dulu: temporaryUrl() melempar
+                             exception untuk berkas yang bukan gambar, jadi memilih PDF akan
+                             merusak halaman alih-alih memunculkan pesan validasinya. --}}
+                        @if ($bukti && $bukti->isPreviewable())
+                            <img src="{{ $bukti->temporaryUrl() }}" alt="Pratinjau foto struk yang dipilih"
+                                 class="size-16 rounded-xl object-cover ring-2 ring-terracotta">
+                        @elseif ($bukti)
+                            <span class="grid size-16 place-items-center rounded-xl bg-merah/10 px-2 text-center text-[0.6875rem] font-semibold text-merah-tua">
+                                Bukan foto
+                            </span>
+                        @else
+                            <span class="grid size-16 place-items-center rounded-xl bg-cream text-umber-soft" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" class="size-6" fill="none">
+                                    <path d="M4 8.5h3l1.2-2h7.6l1.2 2h3v10H4v-10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                    <circle cx="12" cy="13.5" r="3" stroke="currentColor" stroke-width="1.5" />
+                                </svg>
+                            </span>
+                        @endif
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            {{-- <label for>, bukan <button>: kotak berkas aslinya disembunyikan
+                                 (sr-only) supaya bentuknya sama dengan tombol lain di layar ini,
+                                 dan label itulah yang membukanya. Tingginya 40px — tombol
+                                 pendamping di dalam kartu, bukan tindakan utama. --}}
+                            <label for="bukti"
+                                   class="tombol-kedua h-10 cursor-pointer px-3.5 text-[0.8125rem]">
+                                <span class="tombol-ikon">
+                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                        <path d="M10 13V4m0 0L6.5 7.5M10 4l3.5 3.5M3.5 13v2A1.5 1.5 0 0 0 5 16.5h10a1.5 1.5 0 0 0 1.5-1.5v-2"
+                                              stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                                {{ $bukti ? 'Pilih foto lain' : 'Pilih foto struk' }}
+                            </label>
+
+                            <input id="bukti" type="file" wire:model="bukti"
+                                   accept="image/jpeg,image/png,image/webp" class="sr-only">
+
+                            {{-- Membatalkan PILIHAN, bukan menghapus apa pun yang tersimpan:
+                                 belum ada nota, belum ada berkas di disk. Karena itu tombolnya
+                                 TIDAK merah — merah dipakai untuk yang benar-benar merusak
+                                 (lihat tombol "Hapus foto" di panel rincian nota), dan merah
+                                 yang dipakai untuk hal yang tidak merugikan membuat merah
+                                 berikutnya berhenti dibaca sebagai peringatan. --}}
+                            @if ($bukti)
+                                <button type="button" wire:click="buangBuktiPilihan"
+                                        class="h-10 cursor-pointer rounded-xl border border-line px-3.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
+                                    Tidak pakai foto ini
+                                </button>
+                            @endif
+                        </div>
+
+                        <p class="mt-2 text-[0.75rem] text-umber">
+                            JPG, PNG, atau WEBP, paling besar {{ $batasBukti }}. Boleh dikosongkan —
+                            belanja di pasar sering tidak berstruk, dan nota ini tetap tersimpan tanpa foto.
+                        </p>
+                        {{-- KENAPA menyimpan struk itu berguna, bukan sekadar "boleh unggah foto".
+                             Pemilik yang tidak tahu gunanya tidak akan pernah memotret struknya,
+                             dan yang paling mahal justru keadaan yang jarang: grosir menagih ulang
+                             barang yang sudah dibayar. --}}
+                        <p class="mt-1 text-[0.75rem] text-umber-soft">
+                            Gunanya nanti: kalau grosirnya menagih ulang atau harganya beda dengan
+                            yang dicatat di sini, fotonya jadi pegangan. Bisa juga dipasang belakangan
+                            dari daftar nota.
+                        </p>
+
+                        <p wire:loading wire:target="bukti" class="mt-1.5 text-[0.75rem] font-semibold text-terracotta">
+                            Mengunggah foto…
+                        </p>
+
+                        {{-- Galatnya dicetak DI SINI, dan hanya di sini: ia sengaja TIDAK ikut ke
+                             ringkasan "N hal harus dibetulkan dulu" di atas, karena foto tidak
+                             pernah menahan tombol simpan. Ringkasan yang menghitungnya membuat
+                             pemilik menyangka notanya batal tersimpan. --}}
+                        @error('bukti')
+                            <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
