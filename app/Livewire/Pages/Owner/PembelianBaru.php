@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages\Owner;
 
 use App\Actions\Purchase\CatatPembelianAction;
+use App\Actions\Purchase\SimpanBuktiBelanjaAction;
 use App\Actions\Stock\SusunBarisStokAction;
 use App\Enums\Satuan;
 use App\Livewire\Concerns\MengirimToast;
@@ -16,6 +17,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 /**
@@ -47,7 +49,7 @@ use Livewire\WithPagination;
 #[Layout('layouts.aplikasi')]
 class PembelianBaru extends Component
 {
-    use MengirimToast, TerikatTenant, WithPagination;
+    use MengirimToast, TerikatTenant, WithFileUploads, WithPagination;
 
     private const NAMA_HALAMAN = 'page';
 
@@ -87,6 +89,21 @@ class PembelianBaru extends Component
     public ?string $ongkosKirim = null;
 
     public string $catatan = '';
+
+    /**
+     * Foto kwitansi/struk belanja. SATU berkas, dan OPSIONAL selamanya.
+     *
+     * TIDAK PERNAH ikut ke dalam validator di periksa(). Itu bukan kelalaian, itu inti
+     * fiturnya: nota belanja adalah catatan uang keluar, dan foto hanyalah penguatnya.
+     * Kalau `bukti` ada di aturan yang bisa melempar ValidationException, satu foto 6 MB
+     * dari kamera ponsel membuang nota 12 baris yang sudah diketik di depan grosir — dan
+     * orang yang kehilangan isian sekali akan berhenti mencatat.
+     *
+     * Yang menggantikannya: updatedBukti() memberi tahu SEKARANG kalau fotonya bermasalah
+     * (jadi pemiliknya bisa memilih foto lain sebelum menyimpan), dan simpan() tetap
+     * menyimpan notanya apa pun keadaan fotonya lalu berterus terang di toastnya.
+     */
+    public $bukti = null;
 
     /**
      * "Barangnya sudah saya terima" (true, BAWAAN) / "Barangnya belum datang" (false).
@@ -151,6 +168,37 @@ class PembelianBaru extends Component
     public function updatedJumlah(): void
     {
         $this->segarkanKunciOutlet();
+    }
+
+    /**
+     * Kabar SEKARANG kalau fotonya bermasalah — tapi TIDAK membuang berkasnya, dan TIDAK
+     * pernah menghalangi simpan().
+     *
+     * Dua hal yang sengaja dipisah dan mudah tertukar:
+     *
+     * - Pesan galat di sini ada supaya pemilik bisa memilih foto lain SEBELUM menyimpan.
+     *   Tanpa ini, satu-satunya kabar bahwa fotonya kelewat besar datang dari toast sesudah
+     *   notanya tersimpan, dan pada saat itu ia sudah tidak tahu harus memperbaiki apa.
+     *
+     * - Berkasnya TIDAK dinolkan walaupun ditolak. Kalau dinolkan, uji "gagal unggah tidak
+     *   menggagalkan nota" akan hijau karena alasan yang salah (tidak ada berkas sama sekali
+     *   saat simpan), dan penjagaan yang sesungguhnya — bahwa berkas bermasalah pun tidak
+     *   membuang nota — berhenti teruji. Aksinya yang memeriksa ulang secara diam.
+     */
+    public function updatedBukti(): void
+    {
+        $this->validate(
+            ['bukti' => SimpanBuktiBelanjaAction::aturan()],
+            SimpanBuktiBelanjaAction::pesan(),
+            ['bukti' => 'foto bukti'],
+        );
+    }
+
+    /** Membuang foto yang baru dipilih sebelum notanya disimpan. */
+    public function buangBuktiPilihan(): void
+    {
+        $this->bukti = null;
+        $this->resetValidation('bukti');
     }
 
     /* ── Kunci outlet ────────────────────────────────────────────────────── */
@@ -380,6 +428,22 @@ class PembelianBaru extends Component
         // dipercaya lagi.
         $sudahDatang = $this->sudahDatang;
 
+        /*
+         * Foto bukti dipasang SESUDAH notanya tersimpan, dan kegagalannya tidak pernah
+         * dilempar ke atas.
+         *
+         * null = tidak ada foto yang dipilih (keadaan paling umum: warteg belanja pasar pagi
+         * tidak berstruk). false = ada yang dipilih tapi tidak terpasang — dan itu HARUS
+         * dikatakan, karena pemilik yang menyangka notanya sudah berfoto tidak akan pernah
+         * memasangnya lagi.
+         */
+        $buktiTerpasang = $this->bukti === null
+            ? null
+            : app(SimpanBuktiBelanjaAction::class)->execute($nota, $this->bukti);
+
+        $this->bukti = null;
+        $this->resetValidation('bukti');
+
         // Dikosongkan supaya tekanan tombol kedua tidak mencatat nota kembar, dan supaya
         // nota berikutnya (belanja di dua grosir dalam satu hari itu biasa) mulai bersih.
         $this->jumlah = [];
@@ -396,10 +460,32 @@ class PembelianBaru extends Component
         $this->resetValidation();
         $this->resetPage();
 
+        $kabarStok = $sudahDatang
+            ? 'Stok sudah bertambah.'
+            : 'Stok belum bertambah — tandai datang begitu barangnya sampai.';
+
+        /*
+         * Toast yang JUJUR, dan itu keputusan yang paling menentukan di fitur ini.
+         *
+         * "Nota tersimpan" saja untuk foto yang gagal terpasang adalah kebohongan kecil yang
+         * mahal: pemiliknya baru menyadarinya berbulan-bulan kemudian, saat ia membuka nota
+         * untuk mencari struk yang tidak pernah ada di sana. Kalimatnya menyebut apa yang
+         * BISA ia lakukan sekarang, bukan hanya bahwa ada yang gagal.
+         */
+        if ($buktiTerpasang === false) {
+            $this->toast(
+                'Nota '.$nota->nomor_po.' tersimpan. Fotonya belum terpasang — pasang dari daftar nota kalau sinyal sudah bagus. '.$kabarStok,
+                'peringatan',
+            );
+
+            return;
+        }
+
         $this->toast(
-            $sudahDatang
-                ? 'Nota '.$nota->nomor_po.' tersimpan. Stok sudah bertambah.'
-                : 'Nota '.$nota->nomor_po.' tersimpan sebagai belum datang. Stok belum bertambah — tandai datang begitu barangnya sampai.',
+            ($sudahDatang
+                ? 'Nota '.$nota->nomor_po.' tersimpan. '.$kabarStok
+                : 'Nota '.$nota->nomor_po.' tersimpan sebagai belum datang. '.$kabarStok)
+            .($buktiTerpasang === true ? ' Fotonya ikut tersimpan.' : ''),
         );
     }
 
@@ -700,6 +786,11 @@ class PembelianBaru extends Component
             // outlet yang boleh dilihat pengguna ini — dan dalam kedua keadaan itu tidak
             // ada nama yang boleh dicetak.
             'namaOutletDiminta' => $this->namaOutletDiminta(),
+            // Batas ukuran foto, sudah berbentuk kata ("4 MB"). Dikirim dari sini supaya
+            // keterangan di layar tidak pernah berbeda dari batas yang benar-benar dipakai
+            // validatornya — angka yang diketik ulang di Blade akan ketinggalan saat
+            // setelannya diubah, dan keterangan yang salah lebih buruk daripada tidak ada.
+            'batasBukti' => SimpanBuktiBelanjaAction::labelBatas(),
         ]);
     }
 }

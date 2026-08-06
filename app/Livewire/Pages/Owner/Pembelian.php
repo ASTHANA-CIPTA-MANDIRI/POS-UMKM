@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages\Owner;
 
 use App\Actions\Purchase\BatalkanPembelianAction;
+use App\Actions\Purchase\SimpanBuktiBelanjaAction;
 use App\Actions\Purchase\TerimaPembelianAction;
 use App\Enums\DocumentStatus;
 use App\Livewire\Concerns\MengirimToast;
@@ -17,6 +18,7 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 /**
@@ -40,7 +42,7 @@ use Livewire\WithPagination;
 #[Layout('layouts.aplikasi')]
 class Pembelian extends Component
 {
-    use MengirimToast, TerikatTenant, WithPagination;
+    use MengirimToast, TerikatTenant, WithFileUploads, WithPagination;
 
     private const NAMA_HALAMAN = 'page';
 
@@ -72,6 +74,15 @@ class Pembelian extends Component
     /** Nota yang rinciannya sedang dibuka; null berarti tidak ada. */
     public ?string $rincianId = null;
 
+    /**
+     * Foto kwitansi/struk yang baru dipilih untuk nota yang rinciannya sedang dibuka.
+     *
+     * Inilah nilai utama fiturnya: catat cepat di depan grosir, foto belakangan. Berlaku
+     * untuk nota yang barangnya SUDAH datang MAUPUN yang BELUM — pemilik ingin menyimpan
+     * kwitansinya begitu ia punya, bukan menunggu barangnya sampai lebih dulu.
+     */
+    public $bukti = null;
+
     public function mount(): void
     {
         // Manager outlet tidak punya pilihan: nilainya dikunci ke outletnya sendiri
@@ -88,6 +99,10 @@ class Pembelian extends Component
         if (in_array($properti, ['cari', 'status', 'outletId'], true)) {
             $this->resetPage();
             $this->rincianId = null;
+            // Foto yang dipilih ikut dilepas: panelnya sudah tertutup, jadi berkas yang
+            // masih menempel akan terpasang ke nota yang TIDAK sedang dilihat pemiliknya
+            // pada penekanan tombol berikutnya.
+            $this->bukti = null;
         }
     }
 
@@ -126,11 +141,139 @@ class Pembelian extends Component
         // sebelumnya terbawa ke nota yang barisnya cuma dua, dan panelnya terbuka KOSONG
         // — terbaca sebagai "nota ini tidak ada isinya", padahal ada.
         $this->resetPage(self::HALAMAN_RINCIAN);
+
+        // Foto yang tadi dipilih untuk nota LAIN tidak boleh terbawa ke panel berikutnya.
+        // Tanpa ini, foto struk grosir A terpasang ke nota grosir B hanya karena panelnya
+        // ditutup lalu nota lain dibuka — dan bukti yang menempel di nota yang salah lebih
+        // buruk daripada tidak ada bukti.
+        $this->bukti = null;
+        $this->resetValidation('bukti');
     }
 
     public function tutupRincian(): void
     {
         $this->rincianId = null;
+        $this->bukti = null;
+        $this->resetValidation('bukti');
+    }
+
+    /* ── Bukti belanja ───────────────────────────────────────────────────── */
+
+    /**
+     * Kabar SEKARANG kalau fotonya bermasalah — tanpa membuang berkasnya.
+     *
+     * Sama dengan PembelianBaru::updatedBukti(): pesannya ada supaya pemilik bisa memilih
+     * foto lain sebelum menekan tombol, dan aksinya tetap memeriksa ulang secara diam supaya
+     * tidak ada satu pun jalur yang bisa membuat nota gagal karena berkas.
+     */
+    public function updatedBukti(): void
+    {
+        $this->validate(
+            ['bukti' => SimpanBuktiBelanjaAction::aturan()],
+            SimpanBuktiBelanjaAction::pesan(),
+            ['bukti' => 'foto bukti'],
+        );
+    }
+
+    /**
+     * Memasang/mengganti foto bukti pada nota yang rinciannya sedang dibuka.
+     *
+     * Gerbangnya kueri() — tersaring tenant DAN outlet — jadi nota cabang lain maupun
+     * merchant lain terbaca sebagai "tidak ada". rincianId datang dari klien dan boleh
+     * datang dari klien: yang menentukan bukan nilainya, melainkan kueri yang membatasi
+     * apa yang bisa ditemukan dengan nilai itu.
+     *
+     * Berlaku pada nota BELUM DATANG maupun SUDAH DATANG. Membatasinya ke nota yang sudah
+     * diterima akan mematikan justru keadaan yang paling sering: pemilik membayar di depan
+     * grosir, struknya dipegang, barangnya menyusul besok.
+     */
+    public function pasangBukti(): void
+    {
+        $nota = $this->rincianId === null
+            ? null
+            : $this->kueri()->whereKey($this->rincianId)->first();
+
+        if ($nota === null) {
+            $this->bukti = null;
+            $this->toast('Nota belanja tidak ditemukan.', 'peringatan');
+
+            return;
+        }
+
+        if ($this->bukti === null) {
+            $this->toast('Pilih dulu foto kwitansi atau struknya.', 'peringatan');
+
+            return;
+        }
+
+        if ($nota->buktiTerkunci()) {
+            // Dinyatakan sendiri, bukan dibiarkan jatuh ke pesan kegagalan umum: "fotonya
+            // belum terpasang" untuk nota yang memang DIKUNCI membuat pemilik mencoba lagi
+            // berkali-kali dan menyimpulkan aplikasinya rusak.
+            $this->bukti = null;
+            $this->toast(
+                'Nota '.$nota->nomor_po.' sudah dibatalkan, jadi fotonya dikunci. Yang sudah ada tetap bisa dilihat.',
+                'peringatan',
+            );
+
+            return;
+        }
+
+        // Dibaca SEBELUM aksinya jalan: sesudah itu kolomnya sudah menunjuk berkas baru dan
+        // pertanyaan "tadi sudah ada fotonya atau belum" tidak bisa dijawab lagi.
+        $adaSebelumnya = filled($nota->bukti_path);
+
+        $berhasil = app(SimpanBuktiBelanjaAction::class)->execute($nota, $this->bukti);
+
+        $this->bukti = null;
+        $this->resetValidation('bukti');
+
+        $this->toast(
+            match (true) {
+                $berhasil && $adaSebelumnya => 'Foto bukti nota '.$nota->nomor_po.' diganti. Foto lamanya dibuang.',
+                $berhasil => 'Foto bukti nota '.$nota->nomor_po.' tersimpan.',
+                default => 'Fotonya belum terpasang, dan nota '.$nota->nomor_po.' tidak berubah. Coba lagi dengan foto yang lebih kecil atau kalau sinyal sudah bagus.',
+            },
+            $berhasil ? 'sukses' : 'peringatan',
+        );
+    }
+
+    /**
+     * Membuang foto bukti sebuah nota.
+     *
+     * Boleh: bukti yang salah foto (struk warung lain, foto layar yang kabur) lebih buruk
+     * daripada tidak ada bukti. Tidak boleh untuk nota yang DIBATALKAN — lihat
+     * SimpanBuktiBelanjaAction, dan aturan keras nomor 6.
+     */
+    public function hapusBukti(): void
+    {
+        $nota = $this->rincianId === null
+            ? null
+            : $this->kueri()->whereKey($this->rincianId)->first();
+
+        if ($nota === null) {
+            $this->toast('Nota belanja tidak ditemukan.', 'peringatan');
+
+            return;
+        }
+
+        if ($nota->buktiTerkunci()) {
+            $this->toast(
+                'Nota '.$nota->nomor_po.' sudah dibatalkan, jadi fotonya dikunci — justru itu bukti barangnya dikembalikan.',
+                'peringatan',
+            );
+
+            return;
+        }
+
+        $terjadi = app(SimpanBuktiBelanjaAction::class)->hapus($nota);
+
+        $this->toast(
+            $terjadi
+                ? 'Foto bukti nota '.$nota->nomor_po.' dibuang. Notanya sendiri tetap tersimpan.'
+                : 'Nota '.$nota->nomor_po.' memang belum ada fotonya.',
+            $terjadi ? 'sukses' : 'info',
+        );
     }
 
     /**
@@ -366,6 +509,11 @@ class Pembelian extends Component
             // dibangun (qty_diterima selalu penuh), jadi tanpa kalimat ini pemilik yang
             // menerima 8 dari 10 mengarang jalannya sendiri.
             'catatanTerimaSebagian' => TerimaPembelianAction::CATATAN_TERIMA_SEBAGIAN,
+            // Batas ukuran foto bukti, sudah berbentuk kata ("4 MB"). Sama dengan yang
+            // dikirim PembelianBaru, dan dengan alasan yang sama: angka yang diketik ulang
+            // di Blade akan ketinggalan saat setelannya diubah, dan keterangan batas yang
+            // salah membuat orang mencoba berkali-kali dengan foto yang memang akan ditolak.
+            'batasBukti' => SimpanBuktiBelanjaAction::labelBatas(),
         ]);
     }
 }

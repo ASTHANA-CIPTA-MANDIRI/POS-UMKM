@@ -45,4 +45,23 @@ return [
 
     'sisa_stok_kedaluwarsa_menit' => (int) env('NAMPAN_SISA_STOK_MENIT', 30),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Batas ukuran foto bukti belanja (KB)
+    |--------------------------------------------------------------------------
+    |
+    | Bukti belanja (kwitansi/struk grosir) dibatasi 4 MB — DUA KALI batas gambar
+    | produk, dan itu disengaja. Gambar produk diunduh tablet kasir setiap kali grid
+    | produk dirender, jadi setiap MB-nya dibayar berkali-kali di jaringan warung yang
+    | paling lemah. Bukti belanja dibuka pemiliknya sekali, saat ada selisih yang
+    | dipertanyakan; membatasinya seketat gambar produk hanya membuat foto struk dari
+    | kamera ponsel ditolak justru pada saat pemiliknya sedang rajin mencatat.
+    |
+    | Bukan 10 MB juga: unggahan yang tidak pernah selesai sama saja dengan tidak ada
+    | bukti, dan yang menanggungnya adalah orang yang mengira notanya sudah berfoto.
+    |
+    */
+
+    'bukti_maks_kb' => (int) env('NAMPAN_BUKTI_MAKS_KB', 4096),
+
 ];

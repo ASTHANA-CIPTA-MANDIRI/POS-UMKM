@@ -11,11 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 #[Fillable([
     'outlet_id', 'supplier_id', 'nomor_po', 'tanggal', 'total',
     'diskon', 'ongkos_kirim',
-    'status', 'catatan', 'dibuat_oleh', 'diterima_pada',
+    'status', 'catatan', 'bukti_path', 'dibuat_oleh', 'diterima_pada',
 ])]
 class PurchaseOrder extends Model
 {
@@ -70,5 +71,52 @@ class PurchaseOrder extends Model
     public function hitungTotal(): string
     {
         return (string) $this->items()->sum('subtotal');
+    }
+
+    /* ── Bukti belanja (foto kwitansi/struk) ─────────────────────────────── */
+
+    /**
+     * Apakah foto buktinya benar-benar ada di disk.
+     *
+     * Path di database bisa menggantung: berkasnya terhapus di luar aplikasi, disk dipindah,
+     * atau salinan database dibawa ke mesin lain tanpa berkasnya. Tanpa pemeriksaan ini
+     * layar menampilkan ikon gambar rusak — dan ikon rusak tidak menjelaskan apa pun selain
+     * "ada yang salah". Pola yang sama dengan Produk::punyaGambar().
+     */
+    public function punyaBukti(): bool
+    {
+        $path = (string) $this->bukti_path;
+
+        return $path !== '' && Storage::disk('public')->exists($path);
+    }
+
+    /**
+     * URL foto bukti; null kalau tidak ada buktinya atau berkasnya hilang.
+     *
+     * asset(), dan itu BUKAN pilihan gaya: pembangun URL milik Storage selalu menyusun
+     * alamat dari APP_URL, jadi tablet yang membuka aplikasi lewat alamat LAN
+     * (192.168.x.x:8000) akan mencari gambarnya di host yang tidak melayani apa pun —
+     * tanpa satu pun pesan galat, jadi gejalanya cuma "fotonya tidak muncul".
+     * PembelianBuktiTest menjaga ini dari sisi sumber kode.
+     */
+    public function urlBukti(): ?string
+    {
+        if (! $this->punyaBukti()) {
+            return null;
+        }
+
+        return asset('storage/'.$this->bukti_path);
+    }
+
+    /**
+     * Nota dibatalkan = buktinya TERKUNCI: boleh dilihat, tidak boleh diganti/dihapus.
+     *
+     * Nota batal biasanya berarti barangnya dikembalikan ke grosir, dan struk itu justru
+     * satu-satunya bukti pengembaliannya. Yang benar-benar menahannya ada di
+     * SimpanBuktiBelanjaAction — ini hanya supaya layar bisa mengatakannya lebih dulu.
+     */
+    public function buktiTerkunci(): bool
+    {
+        return $this->status === DocumentStatus::Dibatalkan;
     }
 }

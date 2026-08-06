@@ -45,6 +45,7 @@ tidak sesuai** — sekarang masih perkiraan.
 - [x] Pembelian sisi data: nota, batal, harga beli, kunci outlet | 2026-08-05 | owner | 5j
 - [x] Pembelian: tampilan daftar + formulir + rincian nota | 2026-08-05 | owner | 3j
 - [x] Pembelian sisi data: keadaan "barang belum datang", stok masuk saat ditandai datang | 2026-08-06 | data | 4j
+- [x] Pembelian sisi data: foto bukti belanja (kwitansi/struk) — opsional, folder sendiri, terkunci saat nota dibatalkan | 2026-08-06 | data | 3j
 
 ## Wajib sebelum deploy
 
@@ -161,6 +162,35 @@ menunggu jawaban.
   kartu ringkasan "Menunggu datang" (`$ringkasan['menunggu']` → nilai, nota, umur_hari, tertua).
   Kartu "Belanja bulan ini" sekarang hanya nota yang sudah datang, jadi keterangan kecilnya
   perlu menyebutkannya — bukan lagi cuma "tanpa nota yang dibatalkan".
+- **Pembelian: foto bukti belanja — sisi data selesai 2026-08-06.** Satu kolom
+  `purchase_orders.bukti_path` (string nullable), SATU berkas per nota, dan **opsional
+  selamanya**: warteg yang belanja di pasar pagi tidak berstruk, dan mewajibkannya berarti
+  separuh pengguna berhenti mencatat belanja. Keputusan yang tidak boleh ditawar ulang:
+  (1) **kegagalan unggah TIDAK PERNAH menggagalkan penyimpanan nota** — `bukti` tidak boleh
+  masuk ke aturan validasi mana pun yang bisa melempar dari `simpan()`; `SimpanBuktiBelanjaAction`
+  mengembalikan bool, dan toastnya berterus terang ("Nota PB-… tersimpan. Fotonya belum
+  terpasang — pasang dari daftar nota kalau sinyal sudah bagus."); (2) foldernya
+  `storage/app/public/bukti-belanja/{tenant_id}/`, **BUKAN `produk/`** — aturan keras nomor 1
+  melindungi `produk/` dan pembersih "gambar produk yatim" kelak akan menghapus bukti belanja
+  yang menumpang di situ; (3) bisa dipasang belakangan pada nota **berstatus apa pun** (belum
+  datang maupun sudah datang) — itulah nilai utamanya: catat cepat di depan grosir, foto nanti;
+  (4) nota **dibatalkan = buktinya TERKUNCI**: boleh dilihat, tidak boleh diganti/dihapus, dan
+  berkasnya tidak pernah disentuh oleh pembatalan (nota batal berarti barangnya dikembalikan, dan
+  struk itu justru bukti pengembaliannya — aturan keras 6). Batas ukuran
+  `config('nampan.bukti_maks_kb')` (bawaan 4096 = dua kali batas gambar produk, karena gambar
+  produk diunduh tablet kasir berkali-kali sedangkan bukti dibuka pemiliknya sekali), mimes
+  `jpg,jpeg,png,webp`. URL berkas WAJIB `asset('storage/'.$path)`; ada penjaga sumber kode di
+  `PembelianBuktiTest` yang menolak `Storage::url()` di berkas apa pun yang menyentuh
+  `bukti_path`, termasuk Blade. Yang SENGAJA tidak dibangun: tabel lampiran, banyak berkas per
+  nota, unggah dari layar kasir, dan pemangkasan/kompresi gambar di server.
+- **Sisa sisi tampilan untuk bukti belanja** (FE): kotak pilih foto di formulir nota baru
+  (`wire:model="bukti"`, TANPA bintang wajib — validatornya `nullable`; keterangan batas ambil
+  dari `$batasBukti`, jangan mengetik "4 MB" sendiri), tombol buang pilihan
+  (`buangBuktiPilihan()`), dan di panel rincian nota: pratinjau `$nota->urlBukti()` (null =
+  tampilkan keadaan **netral** "Belum ada foto", BUKAN peringatan merah — 90% nota warteg tanpa
+  bukti berarti 90% baris merah, lalu orang belajar mengabaikan merah), tombol pasang/ganti
+  (`pasangBukti()`), tombol hapus bertint merah + konfirmasi SweetAlert (`hapusBukti()`), dan
+  untuk nota **dibatalkan**: fotonya tetap ditampilkan tapi kedua tombolnya TIDAK dirender.
 - **Kontras lencana merah belum selesai — 21 pemakaian masih gagal.** Token
   `--color-merah-tua` (#9b1c1c, 7,14:1) sudah ada dan sudah dipakai lencana kasir, tapi
   `text-merah-deep` di atas `bg-merah/…` masih 4,15:1 di 21 tempat. Perbaikan terbesar per
