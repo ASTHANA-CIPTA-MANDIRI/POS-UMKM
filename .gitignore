@@ -29,3 +29,6 @@ Thumbs.db
 # HTML tangkapan dari PratinjauTest — hanya alat bantu potret, bukan sumber.
 /storage/pratinjau
 /public/pratinjau
+
+# Cadangan basis data (mysqldump) — berisi data pelanggan sungguhan, JANGAN pernah masuk git.
+/storage/cadangan
