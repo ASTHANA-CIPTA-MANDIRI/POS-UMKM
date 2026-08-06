@@ -397,7 +397,7 @@
                     <div class="mt-3" x-data="{ tanya: false }">
                         <div x-show="! tanya" class="flex">
                             <button type="button" x-on:click="tanya = true"
-                                    class="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-umber transition-colors hover:border-merah/40 hover:bg-merah/5 hover:text-merah-deep sm:w-auto">
+                                    class="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-umber transition-colors hover:border-merah/40 hover:bg-merah/5 hover:text-merah-tua sm:w-auto">
                                 <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                                     <path d="M4 6h12M8 6V4.5h4V6m-6 0 .8 10h6.4L14 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
@@ -414,7 +414,7 @@
                             <div class="mt-2.5 flex gap-2">
                                 <button type="button" wire:click="batalkan('{{ $notaRincian->getKey() }}')"
                                         x-on:click="tanya = false" wire:loading.attr="disabled"
-                                        class="h-11 flex-1 cursor-pointer rounded-xl bg-merah-deep px-4 text-[0.8125rem] font-bold text-white transition hover:brightness-110 disabled:opacity-60 sm:flex-none">
+                                        class="tombol-bahaya h-11 flex-1 cursor-pointer px-4 text-[0.8125rem] sm:flex-none">
                                     Ya, batalkan nota
                                 </button>
                                 <button type="button" x-on:click="tanya = false"

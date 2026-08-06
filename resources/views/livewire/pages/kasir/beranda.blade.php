@@ -233,7 +233,7 @@
                             x-show="nilai !== null"
                             x-cloak
                             @click="nilai = null; $wire.set('modalAwal', null, false)"
-                            class="h-9 cursor-pointer rounded-lg px-2.5 text-xs font-semibold text-merah-deep transition-colors hover:bg-merah/10"
+                            class="h-9 cursor-pointer rounded-lg px-2.5 text-xs font-semibold text-merah-tua transition-colors hover:bg-merah/10"
                         >
                             Hapus
                         </button>
@@ -358,7 +358,7 @@
                                     </span>
 
                                     @if ($dibatalkan)
-                                        <span class="rounded-full bg-merah/10 px-2 py-0.5 text-[0.6875rem] font-semibold text-merah-deep"
+                                        <span class="rounded-full bg-merah/10 px-2 py-0.5 text-[0.6875rem] font-semibold text-merah-tua"
                                         >{{ $trx->status->label() }}</span>
                                     @elseif ($belumLunas)
                                         <span class="rounded-full bg-jingga/15 px-2 py-0.5 text-[0.6875rem] font-semibold text-jingga-tua">

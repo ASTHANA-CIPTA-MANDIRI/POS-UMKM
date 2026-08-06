@@ -17,9 +17,22 @@
         'utama' => 'border-line bg-white text-ink hover:border-terracotta hover:text-terracotta',
         // Bisa dibalik kapan saja: tanpa garis, bobotnya paling ringan.
         'netral' => 'border-transparent text-umber hover:bg-cream hover:text-ink',
-        // Tidak bisa dibatalkan: kelabu dulu, merah hanya saat disentuh, supaya
-        // tidak memancing untuk ditekan sambil lalu.
-        'bahaya' => 'border-transparent text-umber-soft hover:bg-merah/10 hover:text-merah-deep',
+        /*
+         * Tidak bisa dibatalkan: MERAH SEJAK AWAL.
+         *
+         * Bentuk lama kelabu dan baru merah saat disentuh, dengan alasan "supaya tidak
+         * memancing untuk ditekan sambil lalu". Alasannya sah untuk tetikus, tapi salah
+         * untuk aplikasi ini: layar owner dipakai di tablet dan HP, dan di sana HOVER TIDAK
+         * ADA — jadi tanda bahayanya tidak pernah muncul, tepat di tempat salah-tekan paling
+         * mungkin terjadi. Tombol hapus yang terlihat sama dengan tombol lain adalah tombol
+         * hapus yang akan tertekan.
+         *
+         * Yang menahannya tetap tidak memancing: tanpa latar dan tanpa garis, jadi bobotnya
+         * tetap paling ringan di barisnya — yang membedakan warnanya, bukan besarnya.
+         * merah-tua (7,14:1 di atas putih), bukan merah-deep yang jatuh ke 4,15:1 begitu
+         * latarnya bertint saat disentuh.
+         */
+        'bahaya' => 'border-transparent text-merah-tua hover:bg-merah/10 hover:text-merah-tua',
         default => 'border-transparent text-umber hover:bg-cream',
     };
 @endphp

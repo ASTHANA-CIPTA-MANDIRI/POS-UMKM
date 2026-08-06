@@ -177,7 +177,7 @@
                         @if ($produkMauDihapus === $produk->id)
                             <div class="flex gap-2">
                                 <button type="button" wire:click="hapus('{{ $produk->id }}')"
-                                        class="h-10 cursor-pointer rounded-lg bg-merah-deep px-3 text-[0.8125rem] font-bold text-white transition hover:brightness-110">
+                                        class="tombol-bahaya h-10 cursor-pointer px-3 text-[0.8125rem]">
                                     Ya, hapus
                                 </button>
                                 <button type="button" wire:click="batalHapus"
@@ -334,7 +334,7 @@
                                          tanpa terbaca. --}}
                                     <div class="flex justify-end gap-2">
                                         <button type="button" wire:click="hapus('{{ $produk->id }}')"
-                                                class="h-9 cursor-pointer rounded-lg bg-merah-deep px-3 text-[0.8125rem] font-bold text-white transition hover:brightness-110">
+                                                class="tombol-bahaya h-9 cursor-pointer px-3 text-[0.8125rem]">
                                             Ya, hapus
                                         </button>
                                         <button type="button" wire:click="batalHapus"
@@ -761,7 +761,7 @@
                                             <img src="{{ $gambar->temporaryUrl() }}" alt="Pratinjau gambar"
                                                  class="size-16 rounded-xl object-cover ring-2 ring-terracotta">
                                         @elseif ($gambar)
-                                            <span class="grid size-16 place-items-center rounded-xl bg-merah/10 px-2 text-center text-[0.6875rem] font-semibold text-merah-deep">
+                                            <span class="grid size-16 place-items-center rounded-xl bg-merah/10 px-2 text-center text-[0.6875rem] font-semibold text-merah-tua">
                                                 Bukan gambar
                                             </span>
                                         @elseif ($gambarLama && ! $hapusGambar && $this->punyaGambar($gambarLama))
@@ -791,7 +791,7 @@
 
                                         @if (($gambarLama && ! $hapusGambar && $this->punyaGambar($gambarLama)) || $gambar)
                                             <button type="button" wire:click="tandaiHapusGambar"
-                                                    class="ml-2 h-10 cursor-pointer rounded-lg px-3 text-[0.8125rem] font-semibold text-merah-deep transition-colors hover:bg-merah/10">
+                                                    class="ml-2 h-10 cursor-pointer rounded-lg px-3 text-[0.8125rem] font-semibold text-merah-tua transition-colors hover:bg-merah/10">
                                                 Hapus
                                             </button>
                                         @endif

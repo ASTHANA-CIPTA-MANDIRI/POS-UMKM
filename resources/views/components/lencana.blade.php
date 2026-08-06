@@ -12,7 +12,11 @@
     $gaya = match ($warna) {
         'hijau' => 'bg-hijau/12 text-hijau-tua',
         'jingga' => 'bg-jingga/15 text-jingga-tua',
-        'merah' => 'bg-merah/10 text-merah-deep',
+        // merah-tua, bukan merah-deep: di atas tint `bg-merah/10` yang terukur
+        // rgb(253,238,238), merah-deep hanya 4,15:1 sementara merah-tua 7,14:1. Lencana
+        // "Minus"/"Habis"/"Dibatalkan"/"Void" semuanya lahir dari baris ini, jadi satu
+        // pergantian di sini menutup 21 pemakaian sekaligus.
+        'merah' => 'bg-merah/10 text-merah-tua',
         default => 'bg-cream-deep text-umber',
     };
 

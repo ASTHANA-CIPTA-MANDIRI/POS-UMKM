@@ -89,6 +89,36 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
   terbuka kosong dan terbaca sebagai "tidak ada data". `->links()` selalu dirender;
   `limit(n)` tanpa penunjuk halaman adalah pemotongan diam-diam.
 
+### Tindakan merusak berwarna bahaya — dan merahnya terlihat TANPA disentuh
+
+Hapus, batalkan, void: warnanya merah, dan merahnya ada sejak awal.
+
+| Peran tombol | Pakai |
+|---|---|
+| Tindakan merusaknya sendiri ("Ya, hapus", "Buang N baris") | `.tombol-bahaya` (merah pekat, gradien) |
+| Pemicu konfirmasi ("Batalkan nota…", "Hapus foto") | latar tint `bg-merah/10` + `text-merah-tua` |
+| Tombol ikon di baris tabel | `<x-aksi warna="bahaya">` |
+
+Dua hal yang menentukan, keduanya lahir dari cacat nyata:
+
+1. **Jangan menunggu hover.** Bentuk lama tombol ikon hapus kelabu dan baru merah saat
+   disorot, dengan alasan "supaya tidak memancing ditekan sambil lalu". Alasan itu sah untuk
+   tetikus dan salah untuk aplikasi ini: layar owner dipakai di tablet dan HP, dan di sana
+   hover TIDAK ADA — jadi tanda bahayanya tidak pernah muncul, tepat di tempat salah-tekan
+   paling mungkin. Yang menahannya tetap tidak memancing bukan warnanya yang diredam,
+   melainkan bobotnya: tanpa latar, tanpa garis.
+2. **Merah yang dipakai `merah-tua`, bukan `merah-deep`.** Di atas tint `bg-merah/10`,
+   merah-deep hanya 4,15:1 sementara merah-tua 7,14:1 — terukur, bukan dikira. Teks putih di
+   atas merah-deep juga cuma 3,9:1. Tombol yang paling perlu dibaca sebelum ditekan tidak
+   boleh jadi yang paling sulit dibaca.
+
+`TombolBahayaTest` menjaganya, termasuk larangan mengetik warna merah pekat sendiri per layar
+— kalau tiap layar memilih merahnya sendiri, "merah = merusak" berhenti terbaca sebagai
+aturan. Bentuk bertint sengaja DIKECUALIKAN dari larangan itu.
+
+Satu layar tetap punya SATU tindakan utama. `.tombol-bahaya` dipakai di dalam blok
+konfirmasi, bukan berdiri sendiri di kepala halaman.
+
 ### Medan wajib ditandai bintang merah — tapi HANYA yang benar-benar wajib
 
 Setiap medan yang validatornya `required` diberi `<x-wajib />` sesudah labelnya: bintang

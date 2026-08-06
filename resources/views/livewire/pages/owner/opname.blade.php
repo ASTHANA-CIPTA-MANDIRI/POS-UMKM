@@ -207,7 +207,7 @@
                 </button>
 
                 <button type="button" wire:click="pindahOutlet('{{ $outletDiminta }}')" wire:loading.attr="disabled"
-                        class="min-h-11 cursor-pointer rounded-xl bg-merah-deep px-4 py-2.5 text-[0.8125rem] font-bold text-white transition hover:brightness-110 disabled:opacity-60">
+                        class="tombol-bahaya min-h-11 cursor-pointer px-4 py-2.5 text-[0.8125rem]">
                     Buang {{ $jumlahTerisi }} baris, pindah ke {{ $sebutDiminta }}
                 </button>
 

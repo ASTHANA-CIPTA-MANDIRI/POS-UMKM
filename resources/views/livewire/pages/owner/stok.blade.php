@@ -430,7 +430,7 @@
             <div class="border-b border-line-soft px-5 py-4 sm:px-6">
                 <div class="flex flex-wrap items-center gap-2">
                     <h2 class="text-[1.0625rem] font-bold text-ink">Harus belanja</h2>
-                    <span class="tabular rounded-full bg-merah/10 px-2.5 py-0.5 text-[0.75rem] font-semibold text-merah-deep">
+                    <span class="tabular rounded-full bg-merah/10 px-2.5 py-0.5 text-[0.75rem] font-semibold text-merah-tua">
                         {{ $harusBelanja->count() }} barang
                     </span>
                 </div>

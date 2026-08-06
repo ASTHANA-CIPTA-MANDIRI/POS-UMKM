@@ -30,7 +30,7 @@
                 </p>
 
                 @if ($galat)
-                    <p class="mt-4 rounded-xl bg-merah/10 px-4 py-3 text-sm text-merah-deep">{{ $galat }}</p>
+                    <p class="mt-4 rounded-xl bg-merah/10 px-4 py-3 text-sm text-merah-tua">{{ $galat }}</p>
                 @endif
 
                 <label for="modal-awal" class="mt-5 block text-sm font-semibold text-ink">
@@ -551,7 +551,7 @@
                                      layar sentuh. --}}
                                 <button type="button" x-show="pakaiBill && billTerpilih" x-cloak
                                         @click="lepasBill()"
-                                        class="h-9 rounded-lg px-2.5 text-sm font-semibold text-merah-deep transition hover:bg-merah/10">
+                                        class="h-9 rounded-lg px-2.5 text-sm font-semibold text-merah-tua transition hover:bg-merah/10">
                                     Lepas
                                 </button>
 
@@ -559,7 +559,7 @@
                                      bersebelahan dengan tinggi dan bobot berbeda
                                      terbaca sebagai kekeliruan, bukan hierarki. --}}
                                 <button type="button" @click="kosongkan()" x-show="keranjang.length > 0" x-cloak
-                                        class="h-9 rounded-lg px-2.5 text-sm font-semibold text-merah-deep transition hover:bg-merah/10">
+                                        class="h-9 rounded-lg px-2.5 text-sm font-semibold text-merah-tua transition hover:bg-merah/10">
                                     Kosongkan
                                 </button>
                             </div>
@@ -699,7 +699,7 @@
 
                                             <button type="button" @click="hapusPembayaran(i)" x-show="pembayaran.length > 1"
                                                     x-cloak
-                                                    class="grid size-11 shrink-0 place-items-center rounded-lg text-merah-deep transition hover:bg-merah/10"
+                                                    class="grid size-11 shrink-0 place-items-center rounded-lg text-merah-tua transition hover:bg-merah/10"
                                                     aria-label="Hapus pembayaran">
                                                 <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                                                     <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
@@ -957,14 +957,14 @@
                                              pesanan yang sudah dicatat. --}}
                                         <button type="button" x-show="billMauDibatalkan !== b.id" x-cloak
                                                 @click="billMauDibatalkan = b.id"
-                                                class="h-10 flex-1 rounded-lg border border-merah/35 text-sm font-semibold text-merah-deep transition hover:bg-merah/10">
+                                                class="h-10 flex-1 rounded-lg border border-merah/35 text-sm font-semibold text-merah-tua transition hover:bg-merah/10">
                                             Batalkan bill
                                         </button>
 
                                         <template x-if="billMauDibatalkan === b.id">
                                             <div class="flex flex-1 gap-2">
                                                 <button type="button" @click="batalkanBill(b.id)"
-                                                        class="h-10 flex-1 rounded-lg bg-merah-deep text-sm font-bold text-white transition hover:brightness-110"
+                                                        class="tombol-bahaya h-10 flex-1 cursor-pointer text-sm"
                                                         x-text="b.pesanan.length > 0 ? 'Ya, buang ' + b.pesanan.length + ' pesanan' : 'Ya, batalkan'"></button>
                                                 <button type="button" @click="billMauDibatalkan = null"
                                                         class="h-10 rounded-lg border border-line px-3 text-sm font-semibold text-ink transition hover:bg-cream">
@@ -1017,7 +1017,7 @@
                     </div>
 
                     @if ($galat)
-                        <p class="mt-3 rounded-xl bg-merah/10 px-4 py-2.5 text-sm text-merah-deep">{{ $galat }}</p>
+                        <p class="mt-3 rounded-xl bg-merah/10 px-4 py-2.5 text-sm text-merah-tua">{{ $galat }}</p>
                     @endif
 
                     <div class="mt-5 flex gap-2">

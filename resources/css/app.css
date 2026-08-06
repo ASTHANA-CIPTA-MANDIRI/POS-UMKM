@@ -337,6 +337,62 @@
     }
 
     /*
+     * Tombol tindakan MERUSAK — hapus, batalkan, void.
+     *
+     * Bentuknya sengaja mirip `.tombol-utama` (gradien + bayangan berwarna sendiri) supaya
+     * terbaca sebagai tombol sungguhan, tapi merah: warnanya yang membedakan, bukan
+     * bobotnya. Tindakan merusak yang tampil sebagai tautan lemah justru berbahaya — ia
+     * ditekan sambil lalu karena tidak terlihat penting.
+     *
+     * Yang TIDAK dilakukan: menempatkannya sebagai tombol utama layar. Satu layar tetap
+     * punya satu tindakan utama; ini dipakai di dalam blok konfirmasi ("Ya, hapus"),
+     * bukan berdiri sendiri di kepala halaman.
+     *
+     * Merah-tua, bukan merah-deep: teks putih di atas merah-deep hanya 3,9:1, sementara di
+     * atas merah-tua 6,4:1. Tombol yang paling perlu dibaca sebelum ditekan tidak boleh
+     * jadi yang paling sulit dibaca.
+     */
+    .tombol-bahaya {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.625rem;
+        border-radius: 0.75rem;
+        background: linear-gradient(180deg, var(--color-merah), var(--color-merah-tua));
+        color: #fff;
+        font-weight: 700;
+        box-shadow:
+            0 1px 0 rgb(255 255 255 / 0.18) inset,
+            0 10px 20px -10px color-mix(in srgb, var(--color-merah-tua) 65%, transparent);
+        transition:
+            background 0.15s ease,
+            box-shadow 0.15s ease,
+            transform 0.1s ease;
+    }
+
+    .tombol-bahaya:hover {
+        background: linear-gradient(180deg, var(--color-merah-deep), var(--color-merah-tua));
+        box-shadow:
+            0 1px 0 rgb(255 255 255 / 0.18) inset,
+            0 14px 26px -10px color-mix(in srgb, var(--color-merah-tua) 75%, transparent);
+    }
+
+    .tombol-bahaya:active {
+        transform: translateY(1px);
+        box-shadow: 0 1px 0 rgb(255 255 255 / 0.18) inset;
+    }
+
+    .tombol-bahaya:disabled {
+        opacity: 0.6;
+        box-shadow: none;
+        transform: none;
+    }
+
+    .tombol-bahaya .tombol-ikon {
+        background: rgb(255 255 255 / 0.2);
+    }
+
+    /*
      * Tombol pendamping: tetap jelas bisa ditekan, tapi TIDAK bersaing dengan tombol
      * utama. Dua tombol berwarna penuh di satu layar membuat keduanya berhenti berarti.
      * Resep gradien putih→cream-nya sama dengan tombol di panel 3D, supaya tidak ada dua
