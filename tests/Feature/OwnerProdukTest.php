@@ -39,6 +39,24 @@ class OwnerProdukTest extends TestCase
         ]);
 
         Storage::fake('public');
+
+        /*
+         * Disk BAWAAN juga dipalsukan — dan itu bukan kerapian, itu memperbaiki kegagalan
+         * palsu yang benar-benar terjadi.
+         *
+         * Livewire menaruh unggahan sementara di disk bawaan ('local'), jadi tanpa baris ini
+         * uji ini menulis berkas SUNGGUHAN ke storage/app/private/livewire-tmp setiap kali
+         * dijalankan. Berkas itu menumpuk lintas hari, dan Livewire menjalankan
+         * cleanupOldUploads() pada setiap unggahan selesai — yang membuang apa pun di
+         * livewire-tmp yang berumur lebih dari 24 jam. Akibatnya suite bisa gagal dengan
+         * "Unable to retrieve the file_size for file at location: livewire-tmp/…" tanpa ada
+         * satu pun kode aplikasi yang berubah (terjadi 2026-08-06 pada
+         * test_menyimpan_tanpa_menyentuh_gambar_mempertahankan_gambar_lama).
+         *
+         * Kegagalan palsu lebih berbahaya daripada tidak ada angka: laporan progres otomatis
+         * menyebut cacat yang tidak ada, lalu orang belajar mengabaikan angkanya.
+         */
+        Storage::fake(config('filesystems.default'));
     }
 
     /**

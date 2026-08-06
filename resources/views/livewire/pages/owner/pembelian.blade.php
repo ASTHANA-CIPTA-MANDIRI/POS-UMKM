@@ -505,96 +505,120 @@
                     </div>
                 </div>
 
-                {{-- ── Tandai barang sudah datang ──────────────────────────
-                     BUKAN tindakan merusak: tidak ada yang hilang, dan aksinya idempoten.
-                     Karena itu TIDAK memakai `.tombol-bahaya` maupun tint merah — merah di
-                     sini akan melemahkan merah pada "Batalkan nota" tepat di bawahnya, dan
-                     begitu dua tombol yang berbeda akibat berwarna sama, warnanya berhenti
-                     jadi aturan (lihat CLAUDE.md).
+                @php
+                    $bolehTandaiDatang = $bisaDitandaiDatang($notaRincian->status);
+                    $bolehBatalkan = $notaRincian->status !== \App\Enums\DocumentStatus::Dibatalkan;
+                @endphp
 
-                     Tetap dua langkah, dengan alasan yang berbeda dari pembatalan: yang perlu
-                     dibaca sebelum ditekan adalah apa yang terjadi pada barang yang datang
-                     TIDAK SESUAI nota. Terima sebagian tidak dibangun (isi notanya masuk
-                     penuh), jadi kalimat $catatanTerimaSebagian dari komponen WAJIB terpasang
-                     di sini — tanpa itu pemilik yang menerima 8 dari 10 mengarang jalannya
-                     sendiri, dan yang dikarang biasanya "biarkan saja". --}}
-                @if ($bisaDitandaiDatang($notaRincian->status))
-                    <div class="mt-3" x-data="{ tanyaDatang: false }">
-                        <div x-show="! tanyaDatang" class="flex">
-                            <button type="button" x-on:click="tanyaDatang = true"
-                                    class="tombol-kedua h-11 w-full cursor-pointer px-4 text-[0.8125rem] sm:w-auto">
-                                <span class="tombol-ikon">
-                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                        <path d="M4 10.5l3.5 3.5L16 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </span>
-                                Tandai barang sudah datang
-                            </button>
+                {{-- ── Pemicu tindakan nota: SATU baris, terbaca sebagai sepasang ──────
+                     Sebelum ini kedua tombol berdiri di dua `div` bertumpuk `mt-3` dan
+                     kelasnya ditulis terpisah — yang satu `.tombol-kedua` dengan wadah ikon,
+                     yang lain rangkaian utilitas yang diketik sendiri tanpa wadah ikon. Di
+                     desktop hasilnya dua tombol rata kiri di dua baris dengan lebar berbeda:
+                     berdampingan keduanya terbaca seperti dari dua aplikasi. Sekarang
+                     silhouette-nya SAMA (tinggi 44px, ikon berwadah, sudut & tepi sejajar);
+                     yang membedakan hanya WARNA, sesuai perannya.
+
+                     Satu `x-data` untuk keduanya (`tanya`: null | 'datang' | 'batal'), jadi
+                     membuka satu pertanyaan menutup yang lain — dua pertanyaan terbuka
+                     sekaligus di kaki panel yang sama membuat orang menjawab yang salah.
+                     `x-cloak` menutup kedipan sebelum Alpine hidup, dan tombol "Ya" ikut
+                     menutup pertanyaannya supaya panel yang dirender ulang tidak tertinggal
+                     dalam keadaan bertanya. --}}
+                @if ($bolehTandaiDatang || $bolehBatalkan)
+                    <div class="mt-4 border-t border-line-soft pt-4" x-data="{ tanya: null }">
+                        {{-- Jalur pemicu. Di ponsel bertumpuk lebar penuh; di ≥sm sebaris,
+                             seukuran isinya, dengan tinggi yang sama. --}}
+                        <div x-show="tanya === null" class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                            {{-- "Tandai barang sudah datang" TETAP tidak merah: bukan tindakan
+                                 merusak, tidak ada yang hilang, dan aksinya idempoten. Kalau ia
+                                 ikut merah, merah pada "Batalkan nota" di sebelahnya melemah dan
+                                 warnanya berhenti jadi aturan (lihat CLAUDE.md). --}}
+                            @if ($bolehTandaiDatang)
+                                <button type="button" x-on:click="tanya = 'datang'"
+                                        class="tombol-kedua h-11 w-full cursor-pointer px-4 text-[0.8125rem] sm:w-auto">
+                                    <span class="tombol-ikon">
+                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                            <path d="M4 10.5l3.5 3.5L16 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </span>
+                                    Tandai barang sudah datang
+                                </button>
+                            @endif
+
+                            {{-- Pemicu tindakan MERUSAK: tint `bg-merah/10` + `text-merah-tua`,
+                                 merah SEJAK ISTIRAHAT. Bentuk lamanya kelabu dan baru merah saat
+                                 disorot — cacat yang identik dengan tombol ikon hapus dulu: layar
+                                 owner dipakai di tablet dan HP, dan di sana hover TIDAK ADA, jadi
+                                 tanda bahayanya tidak pernah muncul. `merah-tua` (7,14:1 di atas
+                                 tint), bukan `merah-deep` (4,15:1). Bukan `.tombol-bahaya` — itu
+                                 untuk tindakan merusaknya sendiri di dalam blok konfirmasi. --}}
+                            @if ($bolehBatalkan)
+                                <button type="button" x-on:click="tanya = 'batal'"
+                                        class="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-merah/25 bg-merah/10 px-4 text-[0.8125rem] font-semibold text-merah-tua transition-colors hover:border-merah/45 hover:bg-merah/15 sm:w-auto">
+                                    <span class="tombol-ikon bg-merah/15 text-merah-tua">
+                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                            <path d="M4 6h12M8 6V4.5h4V6m-6 0 .8 10h6.4L14 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </span>
+                                    Batalkan nota
+                                </button>
+                            @endif
                         </div>
 
-                        <div x-cloak x-show="tanyaDatang">
-                            <p class="text-[0.8125rem] text-ink">
-                                <span class="font-bold">Tandai nota {{ $notaRincian->nomor_po }} sudah datang?</span>
-                                Stok {{ $notaRincian->outlet?->outlet_name ?? 'outlet nota ini' }} langsung bertambah
-                                sebanyak isi nota ini, dan harga beli barangnya ikut diperbarui.
-                            </p>
-                            <p class="mt-1.5 text-[0.8125rem] text-umber">{{ $catatanTerimaSebagian }}</p>
-                            <div class="mt-2.5 flex gap-2">
-                                <button type="button" wire:click="tandaiDatang('{{ $notaRincian->getKey() }}')"
-                                        x-on:click="tanyaDatang = false" wire:loading.attr="disabled"
-                                        class="tombol-utama h-11 flex-1 cursor-pointer px-4 text-[0.8125rem] sm:flex-none">
-                                    Ya, barangnya sudah datang
-                                </button>
-                                <button type="button" x-on:click="tanyaDatang = false"
-                                        class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:flex-none">
-                                    Belum
-                                </button>
+                        {{-- Konfirmasi "sudah datang". Dua langkah dengan alasan yang berbeda dari
+                             pembatalan: yang perlu dibaca sebelum ditekan adalah apa yang terjadi
+                             pada barang yang datang TIDAK SESUAI nota. Terima sebagian tidak
+                             dibangun (isi notanya masuk penuh), jadi kalimat
+                             $catatanTerimaSebagian dari komponen WAJIB terpasang di sini — tanpa
+                             itu pemilik yang menerima 8 dari 10 mengarang jalannya sendiri, dan
+                             yang dikarang biasanya "biarkan saja". --}}
+                        @if ($bolehTandaiDatang)
+                            <div x-cloak x-show="tanya === 'datang'">
+                                <p class="text-[0.8125rem] text-ink">
+                                    <span class="font-bold">Tandai nota {{ $notaRincian->nomor_po }} sudah datang?</span>
+                                    Stok {{ $notaRincian->outlet?->outlet_name ?? 'outlet nota ini' }} langsung bertambah
+                                    sebanyak isi nota ini, dan harga beli barangnya ikut diperbarui.
+                                </p>
+                                <p class="mt-1.5 text-[0.8125rem] text-umber">{{ $catatanTerimaSebagian }}</p>
+                                <div class="mt-2.5 flex gap-2">
+                                    <button type="button" wire:click="tandaiDatang('{{ $notaRincian->getKey() }}')"
+                                            x-on:click="tanya = null" wire:loading.attr="disabled"
+                                            class="tombol-utama h-11 flex-1 cursor-pointer px-4 text-[0.8125rem] sm:flex-none">
+                                        Ya, barangnya sudah datang
+                                    </button>
+                                    <button type="button" x-on:click="tanya = null"
+                                            class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:flex-none">
+                                        Belum
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                @endif
+                        @endif
 
-                @if ($notaRincian->status !== \App\Enums\DocumentStatus::Dibatalkan)
-                    {{-- Pembatalan diletakkan DI SINI, bukan sebagai ikon di setiap baris
-                         daftar: yang dibatalkan adalah seluruh nota beserta mutasi stoknya,
-                         dan tindakan sebesar itu tidak boleh berjarak satu ketukan jempol
-                         dari tombol "lihat".
-
-                         Dua langkah, pola yang sama dengan hapus produk — bedanya keadaannya
-                         disimpan Alpine, bukan komponen: pertanyaannya hanya hidup selama
-                         panelnya terbuka dan tidak perlu diketahui server. `x-cloak` menutup
-                         kedipan sebelum Alpine hidup, dan tombol "Ya" ikut menutup
-                         pertanyaannya supaya panel yang dirender ulang tidak tertinggal dalam
-                         keadaan bertanya. --}}
-                    <div class="mt-3" x-data="{ tanya: false }">
-                        <div x-show="! tanya" class="flex">
-                            <button type="button" x-on:click="tanya = true"
-                                    class="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-umber transition-colors hover:border-merah/40 hover:bg-merah/5 hover:text-merah-tua sm:w-auto">
-                                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                    <path d="M4 6h12M8 6V4.5h4V6m-6 0 .8 10h6.4L14 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                                Batalkan nota
-                            </button>
-                        </div>
-
-                        <div x-cloak x-show="tanya">
-                            <p class="text-[0.8125rem] text-ink">
-                                <span class="font-bold">Batalkan nota {{ $notaRincian->nomor_po }}?</span>
-                                Stok yang masuk dari nota ini dikembalikan seperti sebelum dicatat. Notanya tetap
-                                tersimpan supaya riwayat barangnya masih bisa dibuka.
-                            </p>
-                            <div class="mt-2.5 flex gap-2">
-                                <button type="button" wire:click="batalkan('{{ $notaRincian->getKey() }}')"
-                                        x-on:click="tanya = false" wire:loading.attr="disabled"
-                                        class="tombol-bahaya h-11 flex-1 cursor-pointer px-4 text-[0.8125rem] sm:flex-none">
-                                    Ya, batalkan nota
-                                </button>
-                                <button type="button" x-on:click="tanya = false"
-                                        class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:flex-none">
-                                    Tidak jadi
-                                </button>
+                        {{-- Konfirmasi pembatalan. Diletakkan DI SINI, bukan sebagai ikon di
+                             setiap baris daftar: yang dibatalkan adalah seluruh nota beserta
+                             mutasi stoknya, dan tindakan sebesar itu tidak boleh berjarak satu
+                             ketukan jempol dari tombol "lihat". --}}
+                        @if ($bolehBatalkan)
+                            <div x-cloak x-show="tanya === 'batal'">
+                                <p class="text-[0.8125rem] text-ink">
+                                    <span class="font-bold">Batalkan nota {{ $notaRincian->nomor_po }}?</span>
+                                    Stok yang masuk dari nota ini dikembalikan seperti sebelum dicatat. Notanya tetap
+                                    tersimpan supaya riwayat barangnya masih bisa dibuka.
+                                </p>
+                                <div class="mt-2.5 flex gap-2">
+                                    <button type="button" wire:click="batalkan('{{ $notaRincian->getKey() }}')"
+                                            x-on:click="tanya = null" wire:loading.attr="disabled"
+                                            class="tombol-bahaya h-11 flex-1 cursor-pointer px-4 text-[0.8125rem] sm:flex-none">
+                                        Ya, batalkan nota
+                                    </button>
+                                    <button type="button" x-on:click="tanya = null"
+                                            class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:flex-none">
+                                        Tidak jadi
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        @endif
                     </div>
                 @endif
             </div>
