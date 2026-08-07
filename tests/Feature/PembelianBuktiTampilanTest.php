@@ -42,10 +42,19 @@ use Tests\TestCase;
  * 4. **Tombol hapus foto merah SEJAK ISTIRAHAT dan berkonfirmasi SweetAlert bersama.** Di
  *    tablet & HP tidak ada hover, jadi merah yang menunggu disorot tidak pernah muncul.
  *
- * `Storage::fake` dipakai untuk KEDUA disk — 'public' (tujuan akhir) dan disk bawaan (tempat
+ * `Storage::fake` dipakai untuk KEDUA disk — 'lampiran' (tujuan akhir) dan disk bawaan (tempat
  * Livewire menaruh unggahan sementara). Tanpa yang kedua, uji ini menulis berkas sungguhan ke
  * `storage/app/private/livewire-tmp`, dan cleanupOldUploads() Livewire pernah menghapus
  * berkas uji lain di tengah jalan sehingga ujinya kelap-kelip.
+ *
+ * Disk tujuannya 'lampiran', dan sempat SALAH: berkas ini masih memalsukan 'public' sesudah
+ * aksinya dipindah ke disk lampiran, jadi ujinya menulis SUNGGUHAN ke
+ * `storage/app/private/bukti-belanja/` — enam berkas 695 byte tertinggal di sana sebelum
+ * ketahuan. Yang membuatnya tidak terasa: uji tetap HIJAU. Memalsukan disk yang salah tidak
+ * pernah menggagalkan apa pun, ia cuma memindahkan tulisannya ke cakram sungguhan; dan
+ * `local` yang ikut dipalsukan berakar di direktori yang SAMA dengan lampiran, jadi
+ * kebocorannya makin tidak kelihatan. Nama disknya sengaja diketik apa adanya di sini, bukan
+ * lewat konstanta — kalau disknya berpindah lagi, uji inilah yang harus merah.
  */
 class PembelianBuktiTampilanTest extends TestCase
 {
@@ -71,7 +80,7 @@ class PembelianBuktiTampilanTest extends TestCase
 
         $this->konteks()->setTenant($this->tenant->getKey());
 
-        Storage::fake('public');
+        Storage::fake('lampiran');
         Storage::fake(config('filesystems.default'));
     }
 
@@ -269,9 +278,18 @@ class PembelianBuktiTampilanTest extends TestCase
     /**
      * Foto yang ada bisa DIBUKA (ukuran penuh), diganti, dan dibuang.
      *
-     * URL-nya wajib lewat urlBukti() — yang memakai asset('storage/…'). Kalau Blade menyusun
-     * alamatnya sendiri lewat Storage::url(), tablet yang membuka aplikasi lewat alamat LAN
-     * kehilangan seluruh gambar tanpa satu pun pesan galat.
+     * URL-nya wajib lewat urlBukti(), dan urlBukti() sekarang memakai rute berpenjaga
+     * `owner.lampiran.lihat` — bukan lagi `asset('storage/…')`.
+     *
+     * Yang dijaga di sini TIDAK berubah, cuma alamatnya: Blade tidak boleh menyusun alamat
+     * fotonya sendiri. Dulu bahayanya `Storage::url()`, yang selalu memakai APP_URL sehingga
+     * tablet di alamat LAN kehilangan seluruh gambar tanpa satu pun pesan galat. Sekarang
+     * bahayanya menyusun path `/storage/…` dengan tangan — yang akan 404 karena berkasnya
+     * sudah tidak ada di folder publik, dan 404-nya sunyi: kotaknya cuma kosong.
+     *
+     * Dibandingkan dengan `route()` yang dihitung ulang di uji, BUKAN dengan potongan teks
+     * seperti '/kelola/lampiran'. Potongan teks tetap hijau kalau Blade menuliskan alamat
+     * yang mirip tapi salah id; `route()` tidak.
      */
     public function test_panel_rincian_menampilkan_foto_yang_bisa_dibuka_besar(): void
     {
@@ -285,7 +303,16 @@ class PembelianBuktiTampilanTest extends TestCase
         $url = (string) $nota->fresh()->urlBukti();
 
         $this->assertStringContainsString($url, $html, 'fotonya harus benar-benar dirender');
-        $this->assertStringContainsString('/storage/'.SimpanBuktiBelanjaAction::FOLDER.'/', $url);
+
+        $this->assertSame(
+            route('owner.lampiran.lihat', ['nota' => $nota->getKey(), 'penanda' => 'bukti']),
+            $url,
+            'alamat fotonya harus rute berpenjaga untuk nota INI — bukan alamat statis dan '
+            .'bukan rute nota lain',
+        );
+        $this->assertStringNotContainsString('/storage/', $url,
+            'jangan pulang ke penyajian statis: berkasnya sudah tidak ada di folder publik, '
+            .'jadi alamat /storage/ akan 404 dengan sunyi dan kotaknya cuma kosong');
         $this->assertStringContainsString('target="_blank"', $html,
             'struk difoto dengan kamera ponsel dan tulisannya kecil: harus bisa dibuka ukuran penuh');
         $this->assertStringContainsString('Ganti fotonya', $html);

@@ -45,9 +45,15 @@ use Tests\TestCase;
  *    biasanya berarti barangnya dikembalikan ke grosir, dan struk itu justru satu-satunya
  *    bukti pengembaliannya (aturan keras nomor 6: jangan menghapus data permanen).
  *
- * `Storage::fake` dipakai untuk KEDUA disk: 'public' (tujuan akhir) dan 'local' (tempat
- * Livewire menaruh unggahan sementara). Tanpa yang kedua, uji ini menulis berkas sungguhan ke
- * `storage/app/private/livewire-tmp` setiap kali dijalankan.
+ * `Storage::fake` dipakai untuk KEDUA disk: 'lampiran' (tujuan akhir) dan disk bawaan
+ * 'local' (tempat Livewire menaruh unggahan sementara). Tanpa yang kedua, uji ini menulis
+ * berkas sungguhan ke `storage/app/private/livewire-tmp` setiap kali dijalankan.
+ *
+ * Disk tujuannya 'lampiran' — DULU 'public'. Disk lampiran tidak punya `url` dan tidak
+ * disajikan web server, jadi bukti belanja tidak bisa lagi dibuka tanpa login: satu-satunya
+ * jalannya rute berpenjaga `owner.lampiran.lihat`. Nama disknya sengaja diketik apa adanya di
+ * uji ini, bukan lewat SimpanBuktiBelanjaAction::DISK — kalau disknya diganti diam-diam
+ * kembali ke 'public', uji ini yang harus MERAH, bukan ikut berpindah tanpa suara.
  */
 class PembelianBuktiTest extends TestCase
 {
@@ -73,7 +79,7 @@ class PembelianBuktiTest extends TestCase
 
         $this->konteks()->setTenant($this->tenant->getKey());
 
-        Storage::fake('public');
+        Storage::fake('lampiran');
         // Disk bawaan: ke sinilah Livewire menaruh berkas unggahan sementara.
         Storage::fake(config('filesystems.default'));
     }
@@ -105,7 +111,7 @@ class PembelianBuktiTest extends TestCase
         $this->assertNull($nota->urlBukti());
 
         // Dan tidak ada satu pun berkas yang lahir dari nota tanpa foto.
-        $this->assertSame([], Storage::disk('public')->allFiles(SimpanBuktiBelanjaAction::FOLDER));
+        $this->assertSame([], Storage::disk('lampiran')->allFiles(SimpanBuktiBelanjaAction::FOLDER));
     }
 
     /* ── Folder ──────────────────────────────────────────────────────────── */
@@ -143,13 +149,13 @@ class PembelianBuktiTest extends TestCase
             'JANGAN menulis ke produk/: dilindungi aturan keras nomor 1, dan pembersih '
             .'"gambar produk yatim" akan menghapus bukti belanja yang menumpang di situ');
 
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('lampiran')->assertExists($path);
         $this->assertTrue($nota->punyaBukti());
 
         // Tidak ada satu pun berkas yang mendarat di folder produk.
-        $this->assertSame([], Storage::disk('public')->allFiles('produk'),
+        $this->assertSame([], Storage::disk('lampiran')->allFiles('produk'),
             'folder produk/ tidak boleh ikut terisi oleh bukti belanja');
-        Storage::disk('public')->assertDirectoryEmpty('produk');
+        Storage::disk('lampiran')->assertDirectoryEmpty('produk');
     }
 
     /* ── Batas & jenis berkas ────────────────────────────────────────────── */
@@ -213,7 +219,7 @@ class PembelianBuktiTest extends TestCase
         $nota = PurchaseOrder::query()->sole();
 
         $this->assertNull($nota->bukti_path, 'berkas bukan gambar tidak boleh masuk ke kolomnya');
-        $this->assertSame([], Storage::disk('public')->allFiles(SimpanBuktiBelanjaAction::FOLDER),
+        $this->assertSame([], Storage::disk('lampiran')->allFiles(SimpanBuktiBelanjaAction::FOLDER),
             'berkas yang ditolak tidak boleh tertulis ke disk sama sekali');
     }
 
@@ -275,7 +281,7 @@ class PembelianBuktiTest extends TestCase
             && str_contains($data['pesan'], 'belum terpasang'));
 
         // Dan berkasnya tidak meninggalkan sampah di disk.
-        $this->assertSame([], Storage::disk('public')->allFiles(SimpanBuktiBelanjaAction::FOLDER));
+        $this->assertSame([], Storage::disk('lampiran')->allFiles(SimpanBuktiBelanjaAction::FOLDER));
     }
 
     /**
@@ -298,7 +304,7 @@ class PembelianBuktiTest extends TestCase
         ]);
 
         // Berkas, bukan folder — jadi 'bukti-belanja/{tenant}/apa-pun.jpg' tidak bisa ditulis.
-        Storage::disk('public')->put(
+        Storage::disk('lampiran')->put(
             SimpanBuktiBelanjaAction::FOLDER.'/'.$this->tenant->getKey(),
             'ini berkas, bukan folder',
         );
@@ -338,12 +344,12 @@ class PembelianBuktiTest extends TestCase
         $baru = (string) $nota->fresh()->bukti_path;
 
         $this->assertNotSame($lama, $baru);
-        Storage::disk('public')->assertExists($baru);
-        Storage::disk('public')->assertMissing($lama);
+        Storage::disk('lampiran')->assertExists($baru);
+        Storage::disk('lampiran')->assertMissing($lama);
 
         // SATU berkas per nota, tegas: berkas lama yang tertinggal berarti disk warung penuh
         // oleh foto yang tidak pernah dibuka lagi.
-        $this->assertCount(1, Storage::disk('public')->allFiles(
+        $this->assertCount(1, Storage::disk('lampiran')->allFiles(
             SimpanBuktiBelanjaAction::FOLDER.'/'.$this->tenant->getKey(),
         ));
     }
@@ -370,7 +376,7 @@ class PembelianBuktiTest extends TestCase
         $this->assertSame(DocumentStatus::Dibatalkan, $segar->status);
         $this->assertSame($path, $segar->bukti_path,
             'kolom buktinya tidak boleh dikosongkan oleh pembatalan');
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('lampiran')->assertExists($path);
         $this->assertTrue($segar->punyaBukti(), 'buktinya tetap BISA DILIHAT sesudah nota dibatalkan');
         $this->assertNotNull($segar->urlBukti());
     }
@@ -401,10 +407,10 @@ class PembelianBuktiTest extends TestCase
             'nota dibatalkan: fotonya tidak boleh dihapus');
 
         $this->assertSame($path, $nota->fresh()->bukti_path);
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('lampiran')->assertExists($path);
 
         // Dan berkas PENGGANTINYA tidak boleh ikut tertulis: satu berkas, yang asli.
-        $this->assertCount(1, Storage::disk('public')->allFiles(
+        $this->assertCount(1, Storage::disk('lampiran')->allFiles(
             SimpanBuktiBelanjaAction::FOLDER.'/'.$this->tenant->getKey(),
         ));
 
@@ -421,7 +427,7 @@ class PembelianBuktiTest extends TestCase
             ->assertDispatched('toast', fn (string $nama, array $data): bool => str_contains($data['pesan'], 'dikunci'));
 
         $this->assertSame($path, $nota->fresh()->bukti_path);
-        Storage::disk('public')->assertExists($path);
+        Storage::disk('lampiran')->assertExists($path);
     }
 
     /* ── Dipasang belakangan, pada status APA PUN ────────────────────────── */
@@ -458,7 +464,7 @@ class PembelianBuktiTest extends TestCase
         $segar = $nota->fresh();
 
         $this->assertNotNull($segar->bukti_path, 'nota belum datang WAJIB bisa dipasangi foto');
-        Storage::disk('public')->assertExists($segar->bukti_path);
+        Storage::disk('lampiran')->assertExists($segar->bukti_path);
         $this->assertSame(DocumentStatus::Dikirim, $segar->status,
             'memasang foto tidak boleh mengubah status notanya');
         $this->assertEqualsWithDelta(7.0, $this->saldo($this->outlet, $kopi), 0.001,
@@ -486,7 +492,7 @@ class PembelianBuktiTest extends TestCase
         $segar = $nota->fresh();
 
         $this->assertNotNull($segar->bukti_path);
-        Storage::disk('public')->assertExists($segar->bukti_path);
+        Storage::disk('lampiran')->assertExists($segar->bukti_path);
         $this->assertSame(DocumentStatus::Diterima, $segar->status);
     }
 
@@ -521,7 +527,7 @@ class PembelianBuktiTest extends TestCase
         });
 
         $pathLain = SimpanBuktiBelanjaAction::FOLDER.'/'.$lain->getKey().'/struk-sebelah.jpg';
-        Storage::disk('public')->put($pathLain, 'struk milik warung sebelah');
+        Storage::disk('lampiran')->put($pathLain, 'struk milik warung sebelah');
         $notaLain->bukti_path = $pathLain;
         $notaLain->save();
 
@@ -542,40 +548,74 @@ class PembelianBuktiTest extends TestCase
 
         $this->assertSame($pathLain, $segar->bukti_path,
             'bukti merchant lain tidak boleh tergantikan maupun terhapus');
-        Storage::disk('public')->assertExists($pathLain);
+        Storage::disk('lampiran')->assertExists($pathLain);
 
         // Berkas sisipan tidak boleh mendarat di mana pun: tidak di folder tenant sendiri,
         // dan terutama tidak di folder tenant lain.
-        $this->assertSame([], Storage::disk('public')->allFiles(
+        $this->assertSame([], Storage::disk('lampiran')->allFiles(
             SimpanBuktiBelanjaAction::FOLDER.'/'.$this->tenant->getKey(),
         ));
-        $this->assertCount(1, Storage::disk('public')->allFiles(
+        $this->assertCount(1, Storage::disk('lampiran')->allFiles(
             SimpanBuktiBelanjaAction::FOLDER.'/'.$lain->getKey(),
         ));
 
         // Nomor nota merchant lain juga tidak boleh terbaca di daftar layar ini.
         $this->assertStringNotContainsString($notaLain->nomor_po,
             Livewire::actingAs($this->owner)->test(Pembelian::class)->html());
+
+        /*
+         * Dan bagian "tidak bisa DIBUKA" pada nama uji ini — yang sampai gelombang lampiran
+         * ini BELUM PERNAH benar-benar diuji, karena memang tidak mungkin: selama berkasnya
+         * disajikan langsung oleh web server, tidak ada satu pun kode kita yang dilewati saat
+         * seseorang membuka URL-nya. Yang menahannya cuma nama UUID yang tidak bisa ditebak.
+         *
+         * Sekarang ada penjaganya, jadi diuji: owner tenant sendiri (tenant "Toko Bukti
+         * Belanja") membuka URL lampiran nota WARUNG SEBELAH.
+         *
+         * 404, bukan 403. 403 mengatakan "berkasnya ada, tapi bukan milikmu", dan konfirmasi
+         * itu sendiri sudah kebocoran — jumlah nota warung sebelah bisa dihitung hanya dari
+         * beda 403 dan 404. Nomor notanya juga tidak boleh muncul di badan balasan.
+         */
+        $urlLain = route('owner.lampiran.lihat', [
+            'nota' => $notaLain->getKey(),
+            'penanda' => PurchaseOrder::PENANDA_BUKTI,
+        ]);
+
+        $balasan = $this->actingAs($this->owner)->get($urlLain);
+
+        $balasan->assertNotFound();
+        $this->assertStringNotContainsString($notaLain->nomor_po, $balasan->getContent(),
+            'nomor nota merchant lain tidak boleh ikut terbaca lewat halaman galatnya');
+        $this->assertStringNotContainsString('struk milik warung sebelah', $balasan->getContent(),
+            'dan isi berkasnya tentu tidak boleh ikut terkirim');
     }
 
-    /* ── Penjaga sumber kode: asset(), bukan Storage::url() ──────────────── */
+    /* ── Penjaga sumber kode: rute berpenjaga, bukan penyajian statis ────── */
 
     /**
-     * URL buktinya WAJIB dari asset('storage/…'), bukan Storage::url().
+     * URL buktinya mengikuti HOST PERMINTAAN, dan tidak pernah lewat /storage/ lagi.
      *
-     * Cacat nyata yang sudah pernah menggigit di layar produk: Storage::url() selalu
-     * menyusun alamat dari APP_URL, jadi tablet yang membuka aplikasi lewat alamat LAN
-     * (192.168.x.x:8000) mencari gambarnya di host yang tidak melayani apa pun — tanpa satu
-     * pun pesan galat, jadi gejalanya cuma "fotonya tidak muncul" dan tidak ada yang tahu
-     * kenapa.
+     * Bagian PERILAKUNYA dipertahankan apa adanya dari uji sebelumnya, karena cacat yang
+     * melahirkannya masih berlaku sepenuhnya: Storage::url() selalu menyusun alamat dari
+     * APP_URL, jadi tablet yang membuka aplikasi lewat alamat LAN (192.168.x.x:8000) mencari
+     * gambarnya di host yang tidak melayani apa pun — tanpa satu pun pesan galat, jadi
+     * gejalanya cuma "fotonya tidak muncul" dan tidak ada yang tahu kenapa. route() menjawab
+     * itu sama baiknya dengan asset(): keduanya memakai host permintaan.
+     *
+     * Yang DITAMBAHKAN: URL-nya tidak boleh memuat `/storage/` sama sekali. Itulah yang
+     * menutup jalan pulang ke penyajian statis secara diam-diam — berkas di bawah
+     * `public/storage` dibuka siapa pun yang punya URL-nya, tanpa login, tanpa tenant, dan
+     * satu tautan yang tersalin ke WhatsApp membocorkan harga beli beserta nama pemasok
+     * SELAMANYA.
      *
      * Dijaga dua lapis, dan keduanya perlu:
-     *  - perilakunya: URL-nya mengikuti host permintaan;
+     *  - perilakunya: URL-nya mengikuti host permintaan dan menunjuk rute berpenjaga;
      *  - SUMBERNYA (pola PenjagaPerHalamanTest): berkas apa pun yang menyentuh bukti_path
-     *    tidak boleh memakai Storage::url()/->url(). Itu satu-satunya cara menahan layar
-     *    yang BELUM ADA — termasuk Blade yang menampilkan fotonya nanti.
+     *    tidak boleh memakai Storage::url()/->url() — larangan LAMA, tidak dilonggarkan —
+     *    dan sekarang juga tidak boleh menyentuh disk 'public' untuk berkas bukti. Itu
+     *    satu-satunya cara menahan layar yang BELUM ADA.
      */
-    public function test_url_bukti_memakai_asset_storage_bukan_storage_url(): void
+    public function test_url_lampiran_mengikuti_host_permintaan_bukan_app_url(): void
     {
         $nota = $this->notaBerbukti('struk-lan.jpg');
 
@@ -585,16 +625,28 @@ class PembelianBuktiTest extends TestCase
 
         $url = (string) $nota->fresh()->urlBukti();
 
-        $this->assertStringStartsWith('http://192.168.1.7:8000/storage/', $url,
+        $this->assertStringStartsWith('http://192.168.1.7:8000/', $url,
             'URL bukti harus mengikuti host permintaan; Storage::url() tidak pernah bisa '
             .'menghasilkan alamat LAN ini karena ia selalu memakai APP_URL');
         $this->assertStringNotContainsString('localhost', $url);
-        $this->assertStringEndsWith((string) $nota->bukti_path, $url);
+        $this->assertStringNotContainsString('/storage/', $url,
+            'buktinya TIDAK BOLEH lagi disajikan dari folder publik: berkas di bawah '
+            .'public/storage terbuka untuk siapa pun yang punya URL-nya, dan tautan yang '
+            .'sudah tersalin tidak bisa dicabut');
+        $this->assertSame(
+            route('owner.lampiran.lihat', [
+                'nota' => $nota->getKey(),
+                'penanda' => PurchaseOrder::PENANDA_BUKTI,
+            ]),
+            $url,
+            'satu-satunya penyusun URL bukti adalah rute berpenjaga owner.lampiran.lihat',
+        );
 
         URL::forceRootUrl(null);
 
         // Lapis kedua: sumbernya.
-        $pelanggar = [];
+        $pelanggarUrl = [];
+        $pelanggarDisk = [];
 
         foreach ($this->berkasSumber() as $berkas) {
             $isi = (string) file_get_contents($berkas);
@@ -608,19 +660,45 @@ class PembelianBuktiTest extends TestCase
             // dibiarkan, satu-satunya cara menghijaukannya adalah menulis komentar yang tidak
             // menyebut hal yang dilarangnya — dan peringatan yang tidak boleh menyebut namanya
             // sendiri berhenti mengajari siapa pun.
-            if (preg_match('/Storage::url\(|Storage::disk\([^)]*\)->url\(/', $this->tanpaKomentar($berkas, $isi)) === 1) {
-                $pelanggar[] = str_replace(base_path().'/', '', $berkas);
+            $kode = $this->tanpaKomentar($berkas, $isi);
+            $nama = str_replace(base_path().'/', '', $berkas);
+
+            if (preg_match('/Storage::url\(|Storage::disk\([^)]*\)->url\(/', $kode) === 1) {
+                $pelanggarUrl[] = $nama;
+            }
+
+            /*
+             * Perintah pemindahan disk adalah SATU-SATUNYA berkas yang memang harus membaca
+             * disk 'public': tugasnya justru mengosongkannya. Dikecualikan dengan menyebut
+             * namanya, bukan dengan melonggarkan polanya — supaya berkas kedua yang menyentuh
+             * disk publik untuk bukti tetap tertangkap.
+             */
+            if ($nama === 'app/Console/Commands/PindahkanLampiranDisk.php') {
+                continue;
+            }
+
+            if (str_contains($kode, "Storage::disk('public')")) {
+                $pelanggarDisk[] = $nama;
             }
         }
 
-        $this->assertSame([], $pelanggar,
-            "Pakai asset('storage/'.\$path), jangan Storage::url(): ".implode(', ', $pelanggar));
+        $this->assertSame([], $pelanggarUrl,
+            'Jangan Storage::url(): ia selalu memakai APP_URL, jadi tablet di alamat LAN '
+            .'kehilangan gambarnya. '.implode(', ', $pelanggarUrl));
 
-        // Dan modelnya sendiri memang memakai asset().
-        $this->assertStringContainsString("asset('storage/'.\$this->bukti_path)",
-            (string) file_get_contents(app_path('Models/PurchaseOrder.php')),
+        $this->assertSame([], $pelanggarDisk,
+            "Bukti belanja TIDAK boleh menyentuh disk 'public' — berkas di situ disajikan "
+            .'web server tanpa pemeriksaan apa pun. Pakai disk lampiran: '
+            .implode(', ', $pelanggarDisk));
+
+        // Dan modelnya sendiri memang memakai rutenya, bukan asset('storage/…').
+        $sumberModel = (string) file_get_contents(app_path('Models/PurchaseOrder.php'));
+
+        $this->assertStringContainsString("route('owner.lampiran.lihat'", $sumberModel,
             'PurchaseOrder::urlBukti() adalah satu-satunya penyusun URL bukti; kalau ia berhenti '
-            .'memakai asset(), semua layar ikut salah sekaligus');
+            .'memakai rute berpenjaga, semua layar ikut bocor sekaligus');
+        $this->assertStringNotContainsString("asset('storage/'.\$this->bukti_path)", $sumberModel,
+            'bentuk lama (penyajian statis) tidak boleh kembali');
     }
 
     /* ── Bantuan ─────────────────────────────────────────────────────────── */

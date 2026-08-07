@@ -38,6 +38,30 @@ return [
             'report' => false,
         ],
 
+        /*
+         * Lampiran nota: foto kwitansi/struk belanja (dan kelak PDF).
+         *
+         * TANPA 'url', dan itu bukan kelalaian — justru intinya. Berkas di disk ini TIDAK
+         * PERNAH disajikan langsung oleh web server; satu-satunya jalan membukanya adalah
+         * rute berpenjaga owner.lampiran.lihat, yang memeriksa login, peran, tenant, dan
+         * outlet lebih dulu. Sebelum ini buktinya ada di disk 'public' (dus di dalam
+         * public/storage lewat symlink), jadi yang menahannya cuma nama berkas UUID yang
+         * tidak bisa ditebak: satu URL yang tersalin ke WhatsApp bocor selamanya, dan yang
+         * bocor adalah harga beli beserta nama pemasok. Tidak ada satu pun cara untuk
+         * mencabutnya kembali.
+         *
+         * Disk SENDIRI, bukan menumpang 'local', karena dua alasan yang keduanya praktis:
+         * root-nya bisa dipindah kelak (mis. ke S3 privat) tanpa menyentuh disk lain, dan
+         * Storage::fake('lampiran') di uji tidak ikut memalsukan disk tempat Livewire
+         * menaruh unggahan sementaranya.
+         */
+        'lampiran' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

@@ -45,7 +45,22 @@ use Throwable;
 class SimpanBuktiBelanjaAction
 {
     /**
-     * Folder induk, di disk publik.
+     * Disk tujuan: `lampiran` — TIDAK PERNAH `public`.
+     *
+     * Disk `lampiran` tidak punya `url` dan tidak disajikan web server, jadi satu-satunya
+     * jalan membukanya adalah rute berpenjaga (LampiranController). Sebelumnya berkasnya
+     * duduk di disk `public` dan disajikan statis lewat symlink `public/storage`: yang
+     * menahannya cuma nama UUID yang tidak bisa ditebak, dan satu tautan yang tersalin ke
+     * WhatsApp membocorkan harga beli beserta nama pemasok untuk selamanya.
+     *
+     * Namanya konstanta karena dipakai empat tempat (aksi ini, PurchaseOrder, controller
+     * lampiran, perintah pemindahan) — dan yang paling merugikan adalah satu pemanggil yang
+     * ketinggalan lalu menulis ke tempat lama tanpa satu pun galat.
+     */
+    public const DISK = 'lampiran';
+
+    /**
+     * Folder induk, di disk lampiran.
      *
      * Sengaja bukan konstanta bernama 'produk' apa pun: uji folder memeriksa nilai ini,
      * dan menyimpannya di satu tempat membuat pemindahan folder kelak tidak menyisakan
@@ -183,7 +198,7 @@ class SimpanBuktiBelanjaAction
              * sementara berkasnya tidak ada. put() mengembalikan bool, dan bool itulah yang
              * menentukan apakah kolomnya ikut diisi.
              */
-            $berhasil = Storage::disk('public')->put($tujuan, $berkas->get());
+            $berhasil = Storage::disk(self::DISK)->put($tujuan, $berkas->get());
 
             if ($berhasil !== true) {
                 return false;
@@ -246,8 +261,8 @@ class SimpanBuktiBelanjaAction
             return;
         }
 
-        if (Storage::disk('public')->exists($path)) {
-            Storage::disk('public')->delete($path);
+        if (Storage::disk(self::DISK)->exists($path)) {
+            Storage::disk(self::DISK)->delete($path);
         }
     }
 }

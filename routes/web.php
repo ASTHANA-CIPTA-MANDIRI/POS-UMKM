@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\KeluarController;
 use App\Http\Controllers\Kasir\KatalogController;
 use App\Http\Controllers\Kasir\SisaStokController;
 use App\Http\Controllers\OfflineSyncController;
+use App\Http\Controllers\Owner\LampiranController;
 use App\Livewire\Pages\Admin\Dasbor as DasborAdmin;
 use App\Livewire\Pages\Auth\Masuk;
 use App\Livewire\Pages\Auth\MasukKasir;
@@ -114,6 +115,35 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
              */
             Route::get('/pembelian', PembelianOwner::class)->name('pembelian');
             Route::get('/pembelian/baru', PembelianBaruOwner::class)->name('pembelian.baru');
+
+            /*
+             * Lampiran nota (foto kwitansi/struk) — SATU-SATUNYA jalan membukanya.
+             *
+             * Sebelum ini berkasnya disajikan statis oleh web server dari
+             * `storage/app/public/bukti-belanja/` lewat symlink `public/storage`: tanpa
+             * login, tanpa tenant, tanpa outlet. Yang menahannya cuma nama berkas UUID yang
+             * tidak bisa ditebak — dan satu tautan yang tersalin ke WhatsApp membocorkan
+             * harga beli beserta nama pemasok SELAMANYA, tanpa cara mencabutnya.
+             *
+             * Sengaja di dalam grup yang sama dengan layar Pembelian, jadi ia mewarisi
+             * seluruh gerbangnya: auth, peran back office (kasir TIDAK boleh — harga beli
+             * bukan wewenang orang yang memegang uang laci), dan tenant-aktif. Sisa
+             * penjagaannya — tenant lewat route-model binding, outlet lewat
+             * canAccessOutlet() — ada di LampiranController, dan semuanya menjawab 404.
+             *
+             * BENTUK RUTENYA: /kelola/lampiran/pembelian/{nota}/{penanda}
+             *  - `pembelian` menamai jenis dokumen induknya, jadi lampiran dokumen lain
+             *    (mis. pengeluaran kas) bisa menyusul tanpa mengganti bentuk yang ini;
+             *  - `{nota}` di-bind ke PurchaseOrder supaya TenantScope ikut menahan;
+             *  - `{penanda}` masih bernilai tetap `bukti` di gelombang ini, dan justru itu
+             *    gunanya: gelombang lampiran berikutnya (banyak lembar, PDF) mengisinya
+             *    dengan id lampiran tanpa mengubah bentuk URL-nya lagi, sehingga tautan yang
+             *    sudah tersimpan di riwayat peramban pemilik tetap berlaku.
+             */
+            Route::get('/lampiran/pembelian/{nota}/{penanda}', LampiranController::class)
+                ->whereUuid('nota')
+                ->where('penanda', '[A-Za-z0-9-]+')
+                ->name('lampiran.lihat');
 
             Route::get('/laporan', LaporanOwner::class)->name('laporan');
         });

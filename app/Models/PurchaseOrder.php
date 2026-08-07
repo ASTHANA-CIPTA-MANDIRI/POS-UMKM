@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Purchase\SimpanBuktiBelanjaAction;
 use App\Enums\DocumentStatus;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -76,6 +77,16 @@ class PurchaseOrder extends Model
     /* ── Bukti belanja (foto kwitansi/struk) ─────────────────────────────── */
 
     /**
+     * Penanda lampiran "foto bukti nota" di URL.
+     *
+     * Satu nota masih punya SATU foto di gelombang ini, jadi penandanya tetap. Tempatnya di
+     * URL sudah disediakan sekarang supaya gelombang lampiran berikutnya (banyak lembar,
+     * PDF) cukup mengisi penanda dengan id lampiran — bentuk rutenya tidak berubah lagi, dan
+     * URL yang sudah tersimpan di riwayat peramban pemilik tetap berlaku.
+     */
+    public const PENANDA_BUKTI = 'bukti';
+
+    /**
      * Apakah foto buktinya benar-benar ada di disk.
      *
      * Path di database bisa menggantung: berkasnya terhapus di luar aplikasi, disk dipindah,
@@ -87,17 +98,24 @@ class PurchaseOrder extends Model
     {
         $path = (string) $this->bukti_path;
 
-        return $path !== '' && Storage::disk('public')->exists($path);
+        return $path !== '' && Storage::disk(SimpanBuktiBelanjaAction::DISK)->exists($path);
     }
 
     /**
      * URL foto bukti; null kalau tidak ada buktinya atau berkasnya hilang.
      *
-     * asset(), dan itu BUKAN pilihan gaya: pembangun URL milik Storage selalu menyusun
-     * alamat dari APP_URL, jadi tablet yang membuka aplikasi lewat alamat LAN
-     * (192.168.x.x:8000) akan mencari gambarnya di host yang tidak melayani apa pun —
-     * tanpa satu pun pesan galat, jadi gejalanya cuma "fotonya tidak muncul".
-     * PembelianBuktiTest menjaga ini dari sisi sumber kode.
+     * RUTE BERPENJAGA, bukan `asset('storage/…')` lagi. Selama berkasnya disajikan statis
+     * dari folder publik, satu-satunya yang menahannya adalah nama berkas UUID yang tidak
+     * bisa ditebak — dan tautan yang tersalin sekali ke WhatsApp membocorkan harga beli
+     * beserta nama pemasok untuk selamanya, tanpa cara mencabutnya. Penjaganya sekarang di
+     * LampiranController: login, peran, tenant, outlet.
+     *
+     * route(), dan itu tetap menjawab alasan asli larangan Storage::url(): sama seperti
+     * asset(), ia menyusun alamat dari host PERMINTAAN — jadi tablet yang membuka aplikasi
+     * lewat alamat LAN (192.168.x.x:8000) tetap mendapat gambarnya. Storage::url() yang
+     * selalu memakai APP_URL adalah hal yang masih dilarang, dan PembelianBuktiTest menjaga
+     * larangan itu dari sisi sumber kode — sekarang termasuk larangan menulis buktinya
+     * kembali ke disk 'public'.
      */
     public function urlBukti(): ?string
     {
@@ -105,7 +123,10 @@ class PurchaseOrder extends Model
             return null;
         }
 
-        return asset('storage/'.$this->bukti_path);
+        return route('owner.lampiran.lihat', [
+            'nota' => $this->getKey(),
+            'penanda' => self::PENANDA_BUKTI,
+        ]);
     }
 
     /**
