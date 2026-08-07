@@ -252,6 +252,12 @@ class Bahan extends Component
     /**
      * Nomor nota belanja yang masih menunggu bahan ini datang.
      *
+     * DIPAKAI DUA GERBANG: aturanSatuanTerkunci() (satuan tidak boleh berubah) dan hapus()
+     * (bahannya tidak boleh dihapus). Sengaja satu kueri, bukan dua yang mirip: keduanya
+     * menjawab pertanyaan yang sama persis — "apakah masih ada angka nota yang bisa masuk
+     * kartu stok bahan ini nanti" — dan dua kueri yang menjawab satu pertanyaan cepat atau
+     * lambat menjawabnya berbeda, sehingga satu layar menahan dan layar lain meloloskan.
+     *
      * PENANDANYA STATUS NOTA, BUKAN `qty_diterima`, dan bedanya menentukan apakah gerbangnya
      * benar atau cuma galak. `qty_diterima` baris nota tetap 0 selamanya untuk nota yang
      * DIBATALKAN sebelum sempat datang — BatalkanPembelianAction tidak pernah menyentuhnya —
@@ -267,7 +273,7 @@ class Bahan extends Component
      * mentahnya ke kartu stok dengan satuan bahan yang berlaku SAAT ITU.
      *
      * Nomornya disebut SEMUA, bukan yang pertama saja: pemilik harus menyelesaikan
-     * (menerima atau membatalkan) semuanya sebelum satuannya terbuka, dan pesan yang cuma
+     * (menerima atau membatalkan) semuanya sebelum gerbangnya terbuka, dan pesan yang cuma
      * menyebut satu membuatnya membetulkan satu lalu tertahan lagi tanpa tahu berapa sisanya.
      *
      * @return array<int, string>
@@ -333,6 +339,33 @@ class Bahan extends Component
      * Dialog SweetAlert di Blade BUKAN pengamannya. Muatan Livewire bisa dikirim tanpa
      * pernah melewati dialog apa pun, jadi gerbangnya ada di sini — dan ujinya memanggil
      * metode ini langsung, tanpa dialog.
+     *
+     * GERBANG KEDUA (nota belanja yang masih bisa diterima) ditambahkan sesudah lubang
+     * KEMBAR-nya terbukti: rantai kerusakan yang sama persis di atas juga bisa dimasuki
+     * lewat pintu nota, tanpa satu pun resep terlibat. Bahan yang punya nota belum-datang
+     * tapi tidak dipakai resep dulu LOLOS gerbang pertama; notanya lalu ditandai datang,
+     * `SiapkanBarisStokAction` tetap membuat baris `stocks` tanpa memeriksa `deleted_at`,
+     * dan `SusunBarisStokAction` menyembunyikan baris itu lewat SoftDeletingScope. Hasilnya
+     * lebih buruk daripada versi resep: barang yang benar-benar dibeli DAN dibayar masuk ke
+     * baris yang tidak muncul di layar mana pun, jadi uang yang sudah keluar tidak punya
+     * wujud di aplikasi.
+     *
+     * Penandanya STATUS NOTA (Draft + Dikirim) lewat notaBelumDatang() — penolong yang sama
+     * dengan aturanSatuanTerkunci(), sengaja dipakai ulang supaya kedua gerbang tidak pernah
+     * berbeda pendapat tentang nota mana yang menggantung. Alasan penandanya bukan
+     * `qty_diterima` ditulis lengkap di docblock penolong itu.
+     *
+     * Nota berstatus Diterima TIDAK menahan penghapusan, dan itu keputusan sadar: sesudah
+     * diterima tidak ada lagi angka yang bisa MASUK, jadi tidak ada baris tersembunyi yang
+     * bisa lahir sesudah bahannya dihapus. Menahannya juga tidak punya pintu keluar — nota
+     * yang sudah diterima tidak pernah kembali menggantung, jadi setiap bahan yang pernah
+     * dibelanjakan akan jadi tidak-bisa-dihapus selamanya, dan itu hampir semua bahan.
+     *
+     * Pesannya menyebutkan JALAN KELUARNYA (tandai datang, atau batalkan notanya). Beda
+     * dengan gerbang satuan yang penolakannya permanen — di situ satu-satunya jalan adalah
+     * bahan baru — penolakan di sini sementara dan bisa diselesaikan pemilik sendiri di layar
+     * Nota belanja. Penolakan tanpa langkah berikutnya membuat orang menekan tombol yang sama
+     * sekali lagi, lalu menyimpulkan tombolnya rusak.
      */
     public function hapus(string $id): void
     {
@@ -343,6 +376,18 @@ class Bahan extends Component
         if ($menu !== []) {
             $this->toast(
                 $nama.' masih dipakai resep: '.implode(', ', $menu).'. Keluarkan dulu dari resepnya.',
+                'galat',
+            );
+
+            return;
+        }
+
+        $notaMenunggu = $this->notaBelumDatang($bahan);
+
+        if ($notaMenunggu !== []) {
+            $this->toast(
+                $nama.' masih ditunggu di nota belanja yang barangnya belum datang: '
+                .implode(', ', $notaMenunggu).'. Tandai barangnya datang dulu, atau batalkan notanya.',
                 'galat',
             );
 

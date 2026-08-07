@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Purchase\BatalkanPembelianAction;
 use App\Actions\Purchase\TerimaPembelianAction;
+use App\Actions\Stock\SusunBarisStokAction;
 use App\Enums\Satuan;
 use App\Enums\UserRole;
 use App\Livewire\Pages\Owner\Bahan as LayarBahan;
@@ -270,6 +271,203 @@ class QaStokBahanTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertSame('gram', $cabai->fresh()->satuan->value);
+    }
+
+    /* ── hapus(): lubang KEMBAR lewat pintu nota belanja ────────────────── */
+
+    /**
+     * CACAT (sudah ditutup): bahan yang punya nota belum-datang tapi TIDAK dipakai resep
+     * boleh dihapus — dan itu lubang KEMBAR dari cacat yang sudah ditulis panjang di docblock
+     * Bahan::hapus(), cuma lewat pintu lain.
+     *
+     * Gerbang lama hanya melihat resep. Bahan yang baru dibelanjakan dan belum pernah masuk
+     * resep karena itu lolos: notanya lalu ditandai datang, `SiapkanBarisStokAction` tetap
+     * membuat baris `stocks` tanpa memeriksa `deleted_at` bahannya, dan `SusunBarisStokAction`
+     * menyembunyikan baris itu lewat SoftDeletingScope. Uang yang sudah benar-benar keluar
+     * masuk ke baris yang tidak muncul di layar mana pun — akibatnya dibuktikan utuh oleh
+     * test_bahan_terhapus_lalu_notanya_diterima… di bawah.
+     *
+     * Penandanya STATUS NOTA (Draft/Dikirim) lewat penolong yang SAMA dengan gerbang satuan
+     * (notaBelumDatang()), bukan kueri kedua dan bukan `qty_diterima`.
+     */
+    public function test_hapus_bahan_ditolak_saat_ada_nota_belanja_yang_barangnya_belum_datang(): void
+    {
+        $santan = $this->buatBahan('Santan Kelapa', ['satuan' => Satuan::Liter]);
+
+        $nota = $this->catatNotaBelumDatang($this->outlet, $this->owner, [
+            'baris' => [$this->baris($santan, qtyBeli: 4, harga: 9000)],
+        ]);
+
+        // Pramis yang membuat lubangnya ada: gerbang LAMA (resep) diam total di sini, dan
+        // belum ada satu pun baris `stocks` yang bisa jadi tanda lain.
+        $this->assertFalse($santan->recipeItems()->exists());
+        $this->assertNull(
+            Stock::withoutGlobalScopes()->where('raw_material_id', $santan->getKey())->first(),
+            'nota belum datang tidak boleh membuat baris stok — pramis uji ini'
+        );
+
+        $layar = Livewire::actingAs($this->owner)->test(LayarBahan::class)
+            ->call('hapus', $santan->getKey());
+
+        // Kerugiannya diperiksa DULU, sebelum bunyi pesannya: kalau gerbangnya hilang, baris
+        // merah pertama yang dibaca orang berikutnya harus menyebut barangnya terhapus —
+        // bukan "event toast tidak terkirim", yang terbaca seperti soal tampilan.
+        $this->assertNull($santan->fresh()->deleted_at, 'bahannya tidak boleh terhapus');
+
+        $layar
+            ->assertDispatched('toast', function (string $nama, array $muatan) use ($nota): bool {
+                return $muatan['jenis'] === 'galat'
+                    && str_contains($muatan['pesan'], 'Santan Kelapa masih ditunggu di nota belanja')
+                    // NOMOR NOTANYA disebut. Tanpa nomor, pemilik tahu ia ditahan tapi tidak
+                    // tahu oleh nota yang mana — dan nota belum-datang justru yang paling
+                    // mudah lupa pernah dicatat.
+                    && str_contains($muatan['pesan'], $nota->nomor_po)
+                    // JALAN KELUARNYA disebut, dan keduanya. Beda dengan gerbang satuan yang
+                    // penolakannya permanen, penolakan ini sementara dan bisa diselesaikan
+                    // pemilik sendiri di layar Nota belanja. Penolakan tanpa langkah
+                    // berikutnya membuat orang menekan tombol yang sama sekali lagi.
+                    && str_contains($muatan['pesan'], 'Tandai barangnya datang dulu')
+                    && str_contains($muatan['pesan'], 'batalkan notanya');
+            });
+    }
+
+    /**
+     * Arah sebaliknya: nota yang DIBATALKAN tidak menahan penghapusan — gerbangnya tidak
+     * boleh jadi galak, persis seperti pada gerbang satuan.
+     *
+     * Inilah yang menentukan penandanya status nota, bukan `qty_diterima`.
+     * BatalkanPembelianAction tidak pernah menyentuh `qty_diterima`, jadi nota belum-datang
+     * yang dibatalkan meninggalkan barisnya 0 SELAMANYA dan tidak ada satu pun layar yang
+     * bisa menaikkannya lagi. Gerbang berbasis kolom itu karena itu akan membuat bahan ini
+     * tidak bisa dihapus sampai kapan pun, gara-gara nota yang sudah dinyatakan tidak pernah
+     * terjadi — dan pemiliknya tidak punya satu pun cara keluar.
+     */
+    public function test_hapus_bahan_boleh_saat_notanya_sudah_dibatalkan(): void
+    {
+        $tepung = $this->buatBahan('Tepung Bumbu', ['satuan' => Satuan::Kg]);
+
+        $nota = $this->catatNotaBelumDatang($this->outlet, $this->owner, [
+            'baris' => [$this->baris($tepung, qtyBeli: 2, harga: 8000)],
+        ]);
+
+        $this->assertTrue(app(BatalkanPembelianAction::class)->execute($nota->fresh(), $this->owner));
+
+        // Pramis: `qty_diterima` barisnya masih 0 sesudah pembatalan — kolom itu tidak bisa
+        // membedakan "belum datang" dari "tidak akan pernah datang".
+        $this->assertEqualsWithDelta(
+            0.0,
+            (float) $nota->fresh()->items()->sole()->qty_diterima,
+            0.001,
+            'qty_diterima tetap 0 sesudah pembatalan — inilah kenapa ia bukan penanda yang benar'
+        );
+
+        Livewire::actingAs($this->owner)->test(LayarBahan::class)
+            ->call('hapus', $tepung->getKey())
+            ->assertDispatched('toast', function (string $nama, array $muatan): bool {
+                return $muatan['jenis'] === 'sukses'
+                    && str_contains($muatan['pesan'], 'Tepung Bumbu');
+            });
+
+        $this->assertNotNull($tepung->fresh()->deleted_at, 'nota batal tidak boleh menahan apa pun');
+    }
+
+    /**
+     * KEPUTUSAN: bahan yang notanya SUDAH ditandai datang tetap BOLEH dihapus.
+     *
+     * Petunjuknya menduga ia mungkin sudah tertahan sebab lain (barisnya `stocks` sudah ada);
+     * pramisnya dibuktikan di bawah dengan assertNotNull dan dugaan itu TERNYATA TIDAK
+     * BENAR — hapus() tidak punya gerbang "sudah punya catatan stok" sama sekali (yang punya
+     * gerbang itu aturanSatuanTerkunci()). Jadi keadaan ini memang lolos, dan itu disengaja:
+     *
+     *   1. yang berbahaya adalah angka nota yang MASIH BISA masuk sesudah bahannya hilang
+     *      dari layar. Nota yang sudah diterima tidak akan pernah masuk lagi —
+     *      TerimaPembelianAction idempoten dan berhenti di status Diterima — jadi tidak ada
+     *      baris tersembunyi baru yang bisa lahir;
+     *   2. menahannya tidak punya pintu keluar. Nota Diterima tidak pernah kembali
+     *      menggantung, jadi setiap bahan yang pernah sekali saja dibelanjakan akan menjadi
+     *      tidak-bisa-dihapus selamanya — dan itu hampir semua bahan, yang berarti tombol
+     *      hapusnya berhenti berarti.
+     *
+     * Yang TERSISA dan dilaporkan, bukan dijaga di sini: barisnya masih memegang sisa 10 kg,
+     * dan sesudah bahannya dihapus sisa itu lenyap dari layar Stok. Itu sifat soft delete
+     * bahan secara umum — sama saja kalau sisanya datang dari Hitung stok — jadi kalaupun
+     * perlu gerbang "masih ada sisa", tempatnya bukan di sini dan bentuknya bukan gerbang
+     * nota. Uji ini merekam kenyataannya apa adanya supaya perubahan kebijakan nanti terbaca.
+     */
+    public function test_hapus_bahan_boleh_saat_notanya_sudah_ditandai_datang(): void
+    {
+        $terigu = $this->buatBahan('Terigu Cakra', ['satuan' => Satuan::Kg]);
+
+        $nota = $this->catatNotaBelumDatang($this->outlet, $this->owner, [
+            'baris' => [$this->baris($terigu, qtyBeli: 10, harga: 12000)],
+        ]);
+
+        $this->assertTrue(app(TerimaPembelianAction::class)->execute($nota->fresh(), $this->owner));
+
+        // Pramisnya dibuktikan, tidak dikira: penerimaan memang meninggalkan baris `stocks`.
+        $baris = Stock::withoutGlobalScopes()->where('raw_material_id', $terigu->getKey())->first();
+        $this->assertNotNull($baris, 'nota yang diterima harus meninggalkan baris stok — pramis uji ini');
+        $this->assertEqualsWithDelta(10.0, (float) $baris->jumlah_saat_ini, 0.001);
+
+        Livewire::actingAs($this->owner)->test(LayarBahan::class)
+            ->call('hapus', $terigu->getKey())
+            ->assertDispatched('toast', function (string $nama, array $muatan): bool {
+                return $muatan['jenis'] === 'sukses';
+            });
+
+        $this->assertNotNull($terigu->fresh()->deleted_at);
+    }
+
+    /**
+     * AKIBATNYA kalau gerbang nota di hapus() suatu hari hilang — dan semuanya SENYAP.
+     *
+     * Uji ini SENGAJA melewati komponen dan menghapus bahannya langsung di model, mengikuti
+     * pola test_menjual_menu_ber_bahan_terhapus… di OwnerBahanTest. Bedanya: di sana yang
+     * memasukkan angka ke baris tersembunyi adalah PENJUALAN (stok minus), di sini
+     * PEMBELIAN — dan versi ini lebih mahal, karena barangnya benar-benar dibeli dan
+     * dibayar. Rantainya:
+     *
+     *   1. `TerimaPembelianAction` menerima notanya seperti biasa — ia tidak memeriksa
+     *      `deleted_at` bahan, dan tidak seharusnya: notanya sah, uangnya sudah keluar;
+     *   2. `SiapkanBarisStokAction` MEMBUAT baris `stocks`-nya tanpa memeriksa apa pun;
+     *   3. `SusunBarisStokAction` menyembunyikan barisnya lewat SoftDeletingScope.
+     *
+     * Hasilnya: 6 kg gula yang sudah dibayar duduk di baris yang tidak muncul di layar Stok
+     * maupun lembar Hitung stok, dan tidak ada satu pun tanda di aplikasi yang bisa dipakai
+     * menemukannya. Karena itu gerbang di Bahan::hapus() adalah satu-satunya penahan.
+     */
+    public function test_bahan_terhapus_lalu_notanya_diterima_menaruh_barang_di_baris_yang_tidak_muncul_di_layar_mana_pun(): void
+    {
+        $gula = $this->buatBahan('Gula Merah', ['satuan' => Satuan::Kg]);
+
+        $nota = $this->catatNotaBelumDatang($this->outlet, $this->owner, [
+            'baris' => [$this->baris($gula, qtyBeli: 6, harga: 18000)],
+        ]);
+
+        // Gerbang komponen DILEWATI dengan sengaja: inilah keadaan yang mau dibuktikan.
+        $gula->delete();
+
+        $this->assertTrue(app(TerimaPembelianAction::class)->execute($nota->fresh(), $this->owner));
+
+        // withoutGlobalScopes() WAJIB: ia melepas TenantScope DAN SoftDeletingScope sekaligus
+        // (aturan 2 CLAUDE.md), dan tanpa itu barisnya memang tidak akan terlihat di sini —
+        // persis seperti tidak terlihatnya di layar.
+        $baris = Stock::withoutGlobalScopes()
+            ->where('raw_material_id', $gula->getKey())
+            ->sole();
+
+        $this->assertEqualsWithDelta(6.0, (float) $baris->jumlah_saat_ini, 0.001,
+            'barangnya benar-benar masuk — dibeli, dibayar, dan tercatat');
+
+        // Dan barisnya TIDAK muncul di penyusun daftar Stok. Ini bagian yang membuat cacatnya
+        // senyap: angkanya ada di basis data, tapi tidak di satu layar pun.
+        $namaDiLayar = app(SusunBarisStokAction::class)
+            ->execute($this->outlet->getKey())
+            ->pluck('nama');
+
+        $this->assertFalse($namaDiLayar->contains('Gula Merah'),
+            'baris itu tersembunyi SoftDeletingScope — pemilik tidak punya cara menemukan barang '
+            .'yang sudah dibayarnya, jadi gerbang di Bahan::hapus() adalah satu-satunya penahan');
     }
 
     /* ── $bahanId: penentu tujuan penyimpanan ───────────────────────────── */

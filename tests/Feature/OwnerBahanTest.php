@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Stock\ApplySaleToStockAction;
 use App\Enums\BusinessType;
+use App\Enums\DocumentStatus;
 use App\Enums\Satuan;
 use App\Enums\TransactionMode;
 use App\Enums\UserRole;
@@ -403,12 +404,18 @@ class OwnerBahanTest extends TestCase
     {
         $bahan = $this->buatBahan('Lele Segar', harga: 58000);
 
+        // Status DITERIMA dinyatakan eksplisit, dan itu bukan hiasan: bawaan kolomnya
+        // 'draft', dan sejak gerbang kedua di hapus() ada, nota Draft/Dikirim MENAHAN
+        // penghapusan (QaStokBahanTest). Yang dimaksud uji ini adalah nota belanja LAMA yang
+        // barangnya sudah datang — barang yang sudah masuk rak tidak bisa masuk dua kali,
+        // jadi tidak ada angka tersembunyi yang bisa lahir sesudah bahannya dihapus.
         $nota = PurchaseOrder::create([
             'outlet_id' => $this->outlet->getKey(),
             'dibuat_oleh' => $this->owner->getKey(),
             'nomor_po' => 'NB-BAHAN-001',
             'tanggal' => today(),
             'total' => 58000,
+            'status' => DocumentStatus::Diterima->value,
         ]);
 
         $baris = PurchaseOrderItem::create([
