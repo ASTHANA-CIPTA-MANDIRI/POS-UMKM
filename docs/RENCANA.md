@@ -58,6 +58,19 @@ tidak sesuai** — sekarang masih perkiraan.
 - [ ] Tutup kasir (layar owner) | | owner | 4j
 - [ ] Service worker: layar kasir tetap terbuka saat dimuat ulang tanpa jaringan | | kasir | 5j
 - [ ] Kontras lencana merah: 21 pemakaian masih 4,15:1 (butuh 4,5:1) | | owner | 1j
+- [ ] Bahan berstok dihapus: sisanya lenyap dari layar | | analis | 1j
+      Menghapus bahan yang masih punya sisa 10 kg membuat sisa itu hilang dari
+      layar Stok (SoftDeletingScope), padahal barangnya masih ada di dapur.
+      Ini sifat soft delete bahan SECARA UMUM — sama saja kalau sisanya datang
+      dari Hitung stok, bukan dari nota — jadi tempatnya bukan di gerbang nota
+      dan sengaja TIDAK ditambal diam-diam di sana. Yang perlu diputuskan
+      pemilik: apakah bahan yang masih bersisa boleh dihapus sama sekali, dan
+      kalau tidak, apa jalan keluarnya (hitung stok jadi nol dulu?).
+- [ ] Bahan: tandai di daftar kalau ada nota belum datang | | owner | 1j
+      Kolom "Dipakai di" sudah memberi tahu sebelum orang menekan Hapus; tanda
+      serupa "ada nota belum datang (NB-…)" menghemat satu penolakan. Butuh data
+      tambahan di kueriBahan() + perubahan Blade. Bukan pemblokir: gerbangnya
+      sudah menahan di server dan pesannya menyebut jalan keluarnya.
 - [ ] Sidebar: butir terakhir tertutup kartu pengguna | | owner | 1j
       Kartu pengguna menempel di dasar sidebar yang bisa digulir, TANPA ruang bawah
       sebesar kartunya, jadi butir paling bawah tidak pernah bisa terlihat penuh.
