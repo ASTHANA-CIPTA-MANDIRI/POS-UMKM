@@ -112,6 +112,12 @@ teksnya, warnanya, dan urutan tombolnya akan bercabang).
   barang yang salah.
 - **Tombol pembenar berwarna bahaya** dan menyebut tindakannya ("Ya, hapus"), bukan "OK".
   Tombol batal yang mendapat fokus awal — bukan tombol hapusnya.
+  Aturan ini TIDAK menentukan tombol pembenar ada di kiri atau di kanan, dan pertanyaan itu
+  sudah pernah diajukan sekali: yang dilarang adalah tiap layar MEMILIH SENDIRI. Pembungkus
+  bersamanya menetapkan satu urutan untuk seluruh aplikasi, dan urutan itu sama dengan panel
+  dua langkah yang sudah ada sebelumnya ("Ya, …" lebih dulu). Yang menahan salah-tekan di
+  sini bukan sisi tombolnya, melainkan fokus awal yang jatuh ke batal — sisi tombol yang
+  seragam cuma membuatnya bisa dipelajari.
 - **Sebutkan akibatnya kalau tidak bisa dibatalkan**, dan sebutkan pula kalau bisa: nota yang
   dibatalkan tetap tersimpan, produk memakai soft delete. Peringatan yang lebih menakutkan
   daripada kenyataannya membuat orang berhenti memercayai peringatan berikutnya.
