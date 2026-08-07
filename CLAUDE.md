@@ -57,12 +57,68 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
 
 ## Susunan kode
 
-- `app/Livewire/Pages/{Owner,Kasir,Admin}/*.php` — halaman penuh, bukan controller.
-  Layout: `layouts.aplikasi` (owner/admin), `layouts.kasir`.
-- `app/Actions/**` — satu aksi satu berkas untuk logika yang menyentuh uang/stok/kas
+### WAJIB: satu folder per fitur, di setiap lapisan
+
+Permintaan tegas pemilik proyek. Tiap fitur punya foldernya sendiri di SEMUA lapisan, dan
+folder perannya (`Owner`, `Kasir`, `Admin`, `Auth`) TETAP — folder fitur ada di dalamnya:
+
+```
+app/Livewire/Pages/Owner/Pembelian/{Pembelian,PembelianBaru}.php
+resources/views/livewire/pages/owner/pembelian/{pembelian,pembelian-baru}.blade.php
+app/Models/Pembelian/{PurchaseOrder,PurchaseOrderItem,Supplier}.php
+app/Actions/Pembelian/*.php
+```
+
+Folder fiturnya bernama **Indonesia** dan sama di semua lapisan — `Pembelian`, bukan
+`Purchase`; `Stok`, bukan `Stock`. Nama KELAS-nya boleh tetap Inggris (`PurchaseOrder`);
+yang diseragamkan foldernya, karena folder itulah yang dibaca orang saat mencari sesuatu.
+
+Fitur yang layarnya lebih dari satu tetap SATU folder: `Stok/` memuat Stok + Opname (rutenya
+`owner.stok.opname`, dan sidebar menyebutnya satu butir), `Pembelian/` memuat nota + nota
+baru, `Masuk/` memuat masuk owner + masuk kasir. Memecahnya per berkas membuat struktur
+berkas menceritakan hal yang berbeda dari yang dilihat pemilik.
+
+**Kalau menambah fitur baru, buat foldernya sejak berkas pertama.** Menambahkan berkas ke
+akar "sementara" berarti pemindahan berikutnya menyentuh puluhan `use` lagi.
+
+### Empat jebakan yang SUDAH menggigit saat pengelompokan ini dikerjakan
+
+Semuanya akan menggigit lagi pada pemindahan berikutnya:
+
+1. **Model yang saling menyebut TANPA `use`.** Dulu semua model satu namespace, jadi
+   `hasMany(RecipeItem::class)` di dalam `Product` cukup. Sesudah dipecah, penyebutan itu
+   resolve ke namespace berkasnya sendiri — `App\Models\Produk\RecipeItem`, kelas yang tidak
+   pernah ada. Gejalanya PALING JAHAT di relasi Eloquent karena `hasMany()` menerima STRING:
+   galatnya baru muncul saat relasinya benar-benar DIPANGGIL, jadi bisa lolos dari uji yang
+   tidak menyentuh relasi itu. Hal yang sama berlaku untuk `extends Controller` tanpa `use`.
+   Setelah memindah kelas, jalankan `ModelRelationsSmokeTest` — itu penangkapnya.
+2. **Namespace jangan DIKETIK, TURUNKAN dari letak berkasnya**, dan lakukan itu SESUDAH
+   penggantian penyebutan — bukan sebelum. `Tenant` adalah nama folder SEKALIGUS nama kelas,
+   jadi baris `namespace App\Models\Tenant;` ikut tercocok oleh penggantian dan jadi
+   `App\Models\Tenant\Tenant`. Gejalanya "Cannot redeclare class".
+3. **Pola penggantian berbeda untuk dua pekerjaan yang mirip.** Memindah KELAS butuh
+   lookahead `(?![\w\\])` supaya hasil yang sudah benar tidak dicocokkan dua kali. Me-RENAME
+   FOLDER justru rusak olehnya — `use App\Actions\Purchase\NamaAction;` ditolak karena
+   diikuti backslash. Untuk rename folder: tukar apa adanya.
+4. **`composer dump-autoload` butuh `--no-scripts`** selama pemindahan: skrip pasca-nya
+   memuat rute yang butuh kelas yang belum ada di peta autoload. Ayam dan telur.
+
+Dan satu aturan untuk UJI: jangan menuliskan jalur berkas (`app_path('Models/Foo.php')`).
+Turunkan dari kelasnya lewat `ReflectionClass::getFileName()`, dan pemindai direktori jangan
+memakai `->depth(0)`. Uji yang merah hanya karena berkas berpindah mengajari orang untuk
+TIDAK merapikan struktur — dan setiap pemindai wajib menegaskan ia menemukan sesuatu
+(`assertNotEmpty` + jumlah minimal), kalau tidak ia lolos hampa sambil tetap hijau.
+
+- `app/Livewire/Pages/{Owner,Kasir,Admin,Auth}/<Fitur>/*.php` — halaman penuh, bukan
+  controller. Layout: `layouts.aplikasi` (owner/admin), `layouts.kasir`.
+- `app/Actions/<Fitur>/**` — satu aksi satu berkas untuk logika yang menyentuh uang/stok/kas
   (`ApplySaleToStockAction`, `AdjustStockAction`, `SyncOfflineTransactionsAction`, …).
   Logika seperti ini TIDAK ditulis di komponen Livewire.
-- `resources/views/livewire/pages/**` — Blade sepadan dengan komponennya.
+- `app/Models/<Fitur>/**` — `Concerns/` dan `Scopes/` bukan fitur dan tidak ikut dipindah.
+  `Sistem/` (AuditLog, SyncLog) dinamai apa adanya supaya tidak menyaru sebagai fitur.
+- `resources/views/livewire/pages/<peran>/<fitur>/**` — Blade sepadan dengan komponennya.
+  Tiap komponen menyebut view-nya EKSPLISIT lewat `view('livewire.pages…')`; itu yang membuat
+  pemindahan Blade cuma mengubah satu string per komponen.
 - `resources/views/components/**` — komponen bersama: `x-kartu-alat` (kepala + saringan),
   `x-kosong`, `x-lencana` (status berdenyut), `x-aksi` (tombol ikon 36/40px seragam),
   `x-panel-pindai` (panel kamera barcode).
