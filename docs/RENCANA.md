@@ -58,6 +58,39 @@ tidak sesuai** — sekarang masih perkiraan.
 - [ ] Tutup kasir (layar owner) | | owner | 4j
 - [ ] Service worker: layar kasir tetap terbuka saat dimuat ulang tanpa jaringan | | kasir | 5j
 - [ ] Kontras lencana merah: 21 pemakaian masih 4,15:1 (butuh 4,5:1) | | owner | 1j
+- [ ] Lampiran G1: keluar dari folder publik ke rute berpenjaga | | backend | 3j
+      Dikerjakan LEBIH DULU, bukan terakhir, dan alasannya kesempatan: sekarang
+      cuma 3 berkas yang perlu dipindah karena belum dirilis. Tiap gelombang yang
+      menunda ini menambah berkas yang dipindah, dan menambah PDF — yang isinya
+      DAFTAR harga, bukan satu harga. Sesudah rilis, pemindahannya tidak pernah
+      murah lagi.
+- [ ] Lampiran G2: banyak lampiran + PDF, batas 10 | | backend | 6j
+      PEMILIK MEMUTUSKAN 2026-08-07: batasnya 10, bukan 5 — ada nota grosir yang
+      lembarnya banyak, dan tiap lembar mau difoto terpisah supaya terbaca.
+      Akibatnya galerinya TIDAK muat sebaris di 1280px, jadi perlu berhalaman
+      atau digulir mendatar; spesifikasi asli mengandaikan 5 dan bentuk galerinya
+      harus disesuaikan. Batas 10 juga menaikkan risiko batas PHP terlampaui,
+      jadi saringan sisi klien (saringPilihan) makin wajib, bukan opsional.
+- [ ] Lampiran G3: kamera dekstop | | owner | 3j
+      Panel kamera sendiri, campuran kode bersama diekstrak dari pemindai.js.
+      JANGAN jadi cabang di dalam pemindaiBarcode. tests/js/pemindai.test.mjs
+      wajib hijau TANPA disunting — kalau perlu disunting, ekstraksinya salah.
+- [ ] Lampiran: tautan berumur yang bisa dibagikan | | backend | 2j
+      PEMILIK MEMUTUSKAN 2026-08-07: "belum tahu, jangan dikunci dulu". Jadi G1
+      jalan apa adanya sekarang; ini ditambahkan HANYA kalau ternyata pemilik
+      perlu mengirim tautan struk ke grosir. Menambahkannya kemudian tidak
+      membongkar G1 — tautan bagi berdiri di atas rute berpenjaga, bukan
+      menggantikannya. Jangan dibangun spekulatif: tiap jalur tanpa login
+      menghidupkan lagi kebocoran yang G1 baru saja tutup.
+- [ ] Pesan galat kamera barcode kemungkinan tidak pernah terlihat | | kasir | 1j
+      `panel-pindai.blade.php:105` menaruh teks galat DI DALAM panel
+      (`x-show="terbuka"`), sementara `pemindai.js:212` memanggil `tutup()`
+      sesudah menyetel `galat` — dan cabang konteks-tidak-aman (`:184-186`) tidak
+      pernah membuka panelnya. Jadi kasir yang izin kameranya ditolak menekan
+      tombol, panelnya menutup, dan penjelasannya berada di tempat yang tidak
+      dirender. BELUM dibuktikan di peramban hidup — buktikan dulu sebelum
+      memperbaiki. Ditemukan analis saat merancang panel kamera bukti, dan itu
+      sebabnya panel kamera yang baru menaruh teks galatnya di LUAR panel.
 - [ ] Bahan berstok dihapus: sisanya lenyap dari layar | | analis | 1j
       Menghapus bahan yang masih punya sisa 10 kg membuat sisa itu hilang dari
       layar Stok (SoftDeletingScope), padahal barangnya masih ada di dapur.
