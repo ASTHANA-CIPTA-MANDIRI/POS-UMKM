@@ -534,7 +534,14 @@
 
                 <div class="mt-4 border-t border-line-soft pt-4">
                     <div class="flex flex-col gap-3.5 sm:flex-row sm:items-start">
-                        <div class="shrink-0">
+                        {{-- x-data DI SINI, bukan di dalam cabang @if di bawahnya: pemicunya
+                             (foto kecil) dan popup-nya harus berada di SATU komponen Alpine
+                             supaya keduanya melihat keadaan `terbuka` yang sama, dan Esc
+                             didengarkan di tingkat jendela dari elemen ini. Seluruh keadaan
+                             popup hidup di Alpine dan tidak pernah menyentuh server — itulah
+                             yang membuat panel rincian nota TETAP TERBUKA sesudah popup
+                             ditutup. --}}
+                        <div class="shrink-0" x-data="lihatBukti" x-on:keydown.escape.window="tutup()">
                             {{-- Yang dipratinjau adalah berkas yang BARU DIPILIH kalau ada —
                                  itulah yang akan tersimpan kalau tombolnya ditekan. Kalau tidak
                                  ada, foto yang sudah terpasang. isPreviewable() diperiksa lebih
@@ -548,18 +555,157 @@
                                     Bukan foto
                                 </span>
                             @elseif ($urlBukti !== null)
-                                {{-- Tautan, bukan dialog gambar: struk difoto dengan kamera ponsel
-                                     dan tulisannya kecil, jadi yang dibutuhkan pemilik adalah
-                                     gambar UKURAN ASLI yang bisa diperbesar dengan cubitan
-                                     peramban — bukan gambar yang dipaskan ke dalam kotak dialog
-                                     lalu tetap tidak terbaca. Tab baru juga berarti panel
-                                     rinciannya tidak tertutup. --}}
-                                <a href="{{ $urlBukti }}" target="_blank" rel="noopener"
-                                   aria-label="Buka foto struk nota {{ $notaRincian->nomor_po }} ukuran penuh"
-                                   class="block rounded-xl border border-line transition-colors hover:border-terracotta">
+                                {{-- ── Pemicu popup foto struk ────────────────────────────
+                                     Sebelum ini sebuah <a target="_blank">, dan alasannya masih
+                                     berlaku sepenuhnya: struk difoto dengan kamera ponsel,
+                                     tulisannya kecil, dan gambar yang dipaskan ke dalam kotak
+                                     dialog malah MENGECIL sehingga tetap tidak terbaca. Pemilik
+                                     proyek memutuskan mau popup, jadi popup-nya dibangun —
+                                     tetapi dengan syarat yang menjawab persis alasan lama itu:
+                                     "pas layar" berarti pas LEBARNYA lalu digulir ke bawah,
+                                     ketukan berpindah ke UKURAN ASLI, cubit-perbesar peramban
+                                     tidak diganggu, dan tautan "buka di tab baru" tetap ada di
+                                     dalam popup-nya. Kemampuan yang sudah ada tidak dihapus,
+                                     hanya dipindahkan.
+
+                                     Tombol, bukan tautan: yang terjadi adalah perubahan di
+                                     halaman ini, bukan perpindahan halaman. aria-haspopup
+                                     mengatakannya lebih dulu kepada pembaca layar. --}}
+                                <button type="button" x-ref="pemicu" x-on:click="buka()"
+                                        aria-haspopup="dialog"
+                                        aria-label="Lihat foto struk nota {{ $notaRincian->nomor_po }} lebih besar"
+                                        class="block cursor-zoom-in rounded-xl border border-line transition-colors hover:border-terracotta">
                                     <img src="{{ $urlBukti }}" alt="Foto kwitansi nota {{ $notaRincian->nomor_po }}"
                                          class="size-20 rounded-[11px] object-cover">
-                                </a>
+                                </button>
+
+                                {{-- ── Popup foto struk ───────────────────────────────────
+                                     <template x-if>, bukan x-show: elemennya baru ada di DOM
+                                     saat dibuka, jadi tidak ada x-cloak yang bisa tertinggal
+                                     tersembunyi selamanya kalau Alpine mati.
+
+                                     Bentuknya MENYALIN pola `fixed inset-0` + kepala berjudul +
+                                     tombol tutup di layar Produk, supaya layar owner tidak
+                                     melahirkan gaya popup ketiga. Bedanya cuma yang dituntut
+                                     isinya: di sini gambarnya BOLEH lebih besar daripada
+                                     kotaknya, dan itu justru maksudnya.
+
+                                     Tiga jalan keluar, dan ketiganya wajib: tombol X, tombol
+                                     Esc (didengarkan di tingkat jendela pada induk x-data), dan
+                                     ketukan pada latar gelapnya (`click.self` — hanya kalau yang
+                                     diketuk latar itu sendiri, bukan kartunya).
+
+                                     x-trap.inert menahan fokus papan ketik di dalam popup dan
+                                     menyembunyikan isi halaman di belakangnya dari pembaca layar;
+                                     fokus dikembalikan ke foto kecil yang tadi diketuk oleh
+                                     tutup(). --}}
+                                <template x-if="terbuka">
+                                    <div class="fixed inset-0 z-50 flex items-stretch justify-center bg-navy-900/80 p-3 backdrop-blur-sm sm:p-6"
+                                         x-trap.inert="terbuka"
+                                         x-on:click.self="tutup()"
+                                         role="dialog" aria-modal="true"
+                                         aria-label="Foto struk nota {{ $notaRincian->nomor_po }}">
+                                        <div class="flex w-full min-w-0 flex-col overflow-hidden rounded-[20px] bg-white shadow-2xl sm:max-w-3xl">
+                                            {{-- Kepala popup TIDAK ikut menggulir: kalau tombol
+                                                 tutup dan tautan tab baru hanyut bersama
+                                                 gambarnya, struk yang panjang menyembunyikan
+                                                 jalan keluarnya sendiri. --}}
+                                            <div class="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2.5 sm:px-4">
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="truncate text-[0.875rem] font-bold text-ink">
+                                                        Struk nota {{ $notaRincian->nomor_po }}
+                                                    </p>
+                                                    {{-- Keadaan zoom-nya dibacakan, bukan ditebak
+                                                         dari gambarnya: "kok fotonya besar sekali"
+                                                         adalah pertanyaan yang tidak perlu ada. --}}
+                                                    <p class="truncate text-[0.6875rem] text-umber-soft"
+                                                       x-text="asli
+                                                           ? 'Ukuran asli — geser untuk pindah bagian'
+                                                           : 'Pas lebar layar — ketuk fotonya untuk ukuran asli'"></p>
+                                                </div>
+
+                                                {{-- Jalan keluar yang tidak boleh hilang: zoom
+                                                     bawaan peramban selalu lebih baik daripada
+                                                     zoom yang kita tulis sendiri, dan kalau ada
+                                                     yang tetap tidak terbaca, orang harus punya
+                                                     cara lain. Teksnya disembunyikan di bawah
+                                                     640px (ikonnya bertahan) supaya judul notanya
+                                                     tidak tinggal 90px; aria-label MEMUAT teks
+                                                     yang terlihat, bukan menggantinya. --}}
+                                                <a href="{{ $urlBukti }}" target="_blank" rel="noopener"
+                                                   aria-label="Buka di tab baru — foto struk nota {{ $notaRincian->nomor_po }}"
+                                                   class="tombol-kedua h-10 shrink-0 px-2.5 text-[0.8125rem] sm:px-3">
+                                                    <span class="tombol-ikon">
+                                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                            <path d="M11.5 4.5H15v3.5M15 5l-5.5 5.5M13 12v2.5A1.5 1.5 0 0 1 11.5 16h-6A1.5 1.5 0 0 1 4 14.5v-6A1.5 1.5 0 0 1 5.5 7H8"
+                                                                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                                                        </svg>
+                                                    </span>
+                                                    <span class="hidden sm:inline">Buka di tab baru</span>
+                                                </a>
+
+                                                <button type="button" x-on:click="tutup()"
+                                                        aria-label="Tutup foto struk nota {{ $notaRincian->nomor_po }}"
+                                                        class="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-line text-umber transition-colors hover:bg-cream hover:text-ink">
+                                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                        <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+
+                                            {{-- ── Jalur gambar ───────────────────────────
+                                                 Ia MEMANG menggulir, dan itu bukan cacat panel:
+                                                 struk kelontong bisa 3× lebih tinggi daripada
+                                                 lebar, jadi "pas layar" yang berarti pas
+                                                 seluruhnya akan memperkecil hurufnya sampai
+                                                 setitik. Yang tidak boleh ikut hanyut adalah
+                                                 tombolnya, dan tombolnya ada di kepala popup.
+
+                                                 `overscroll-contain` menahan gulirnya supaya
+                                                 tidak berlanjut ke halaman di belakang; TIDAK
+                                                 ada `touch-action` di sini, karena satu baris
+                                                 itu saja sudah cukup untuk mematikan
+                                                 cubit-perbesar peramban di HP.
+
+                                                 `m-auto` pada gambarnya, BUKAN `justify-center`
+                                                 pada jalurnya: isi yang dipusatkan dengan
+                                                 justify-center terpotong di sisi kiri begitu ia
+                                                 lebih lebar daripada wadahnya, dan bagian yang
+                                                 terpotong itu tidak bisa dicapai dengan
+                                                 menggulir. --}}
+                                            <div x-ref="jalur"
+                                                 class="flex min-h-0 flex-1 overflow-auto overscroll-contain bg-cream p-3"
+                                                 x-on:pointerdown="mulaiSeret($event)"
+                                                 x-on:pointermove="lanjutSeret($event)"
+                                                 x-on:pointerup="akhiriSeret()"
+                                                 x-on:pointercancel="akhiriSeret()"
+                                                 x-on:pointerleave="akhiriSeret()">
+                                                <img x-ref="gambar" src="{{ $urlBukti }}"
+                                                     alt="Foto kwitansi nota {{ $notaRincian->nomor_po }}"
+                                                     x-on:click="ketukGambar($event)"
+                                                     x-on:dragstart.prevent
+                                                     :class="asli
+                                                         ? 'w-auto max-w-none cursor-zoom-out'
+                                                         : 'w-full cursor-zoom-in'"
+                                                     {{-- `shrink-0` WAJIB: anak flex menyusut
+                                                          sendiri kalau lebih besar daripada
+                                                          wadahnya, jadi tanpa ini "ukuran asli"
+                                                          diperkecil lagi menjadi pas lebar dan
+                                                          tombolnya terasa tidak melakukan apa-apa. --}}
+                                                     class="m-auto block h-auto shrink-0 rounded-lg bg-white">
+                                            </div>
+
+                                            {{-- Keterangan cara memakainya, dan ia tetap terlihat
+                                                 karena di sinilah satu-satunya tempat cubitan
+                                                 disebut. Kata orang warung: "cubit", bukan
+                                                 "pinch-zoom". --}}
+                                            <p class="shrink-0 border-t border-line-soft px-3 py-2 text-[0.6875rem] leading-snug text-umber-soft sm:px-4">
+                                                Ketuk fotonya untuk ukuran asli, lalu geser untuk pindah bagian.
+                                                Di HP bisa dicubit untuk memperbesar lagi.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </template>
                             @else
                                 <span class="grid size-20 place-items-center rounded-xl bg-cream text-umber-soft" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" class="size-7" fill="none">
@@ -574,9 +720,15 @@
                             <p class="text-[0.8125rem] font-semibold text-ink">Foto kwitansi atau struk</p>
 
                             @if ($urlBukti !== null)
+                                {{-- Kalimatnya menyebut apa yang TERJADI saat diketuk, dan itu
+                                     berubah: dulu fotonya pindah ke tab baru, sekarang terbuka di
+                                     halaman ini. Keterangan yang menjanjikan hal lain daripada
+                                     yang dilakukan tombolnya membuat orang menekan dua kali lalu
+                                     mencari tab yang tidak pernah terbuka. --}}
                                 <p class="mt-0.5 text-[0.75rem] text-umber">
-                                    Fotonya tersimpan di nota ini. Ketuk fotonya untuk melihat ukuran
-                                    penuh — tulisan di struk biasanya kecil.
+                                    Fotonya tersimpan di nota ini. Ketuk fotonya untuk membukanya besar
+                                    di halaman ini — bisa diperbesar sampai ukuran asli, karena tulisan
+                                    di struk biasanya kecil.
                                 </p>
                             @elseif ($buktiDikunci)
                                 <p class="mt-0.5 text-[0.75rem] text-umber">

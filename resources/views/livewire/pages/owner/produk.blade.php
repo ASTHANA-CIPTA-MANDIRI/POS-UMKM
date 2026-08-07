@@ -1,3 +1,21 @@
+@php
+    /*
+     * Kalimat dialog hapus diketik SEKALI di sini, bukan dua kali.
+     *
+     * Barisnya digambar dua bentuk (kartu di ponsel, tabel di layar lebar), jadi teks yang
+     * ditulis di masing-masing tempat pasti bercabang begitu salah satunya diperbaiki — dan
+     * yang bercabang adalah peringatan tentang berkas yang tidak bisa dikembalikan.
+     *
+     * Isinya menyebut APA yang hilang dan apa yang TIDAK hilang. Keduanya perlu: fotonya
+     * memang tidak bisa dipulihkan, tapi catatan penjualannya utuh (soft delete) — dan
+     * peringatan yang lebih menakutkan daripada kenyataannya membuat orang berhenti
+     * memercayai peringatan berikutnya.
+     */
+    $pesanHapusProduk = 'Barangnya hilang dari layar kasir, dan fotonya ikut dibuang dari '
+        .'penyimpanan — foto itu tidak bisa dikembalikan. Catatan penjualan yang sudah lewat '
+        .'tetap utuh: omzet bulan lalu tidak berubah.';
+@endphp
+
 {{-- Lingkup zoom gambar dipasang di akar halaman, bukan per baris: satu modal
      dipakai bersama seluruh baris, jadi tidak ada puluhan salinan markup modal
      yang ikut dikirim di setiap muatan halaman. --}}
@@ -174,52 +192,49 @@
                                 </p>
                             @endif
                         </div>
-                        @if ($produkMauDihapus === $produk->id)
-                            <div class="flex gap-2">
-                                <button type="button" wire:click="hapus('{{ $produk->id }}')"
-                                        class="tombol-bahaya h-10 cursor-pointer px-3 text-[0.8125rem]">
-                                    Ya, hapus
-                                </button>
-                                <button type="button" wire:click="batalHapus"
-                                        class="h-10 cursor-pointer rounded-lg border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
-                                    Batal
-                                </button>
-                            </div>
-                        @else
-                            <div class="flex items-center gap-1.5">
-                                <x-aksi warna="utama" label="Ubah {{ $produk->nama_produk }}"
-                                        class="size-10" wire:click="ubah('{{ $produk->id }}')">
-                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                        <path d="M13 3.5 16.5 7 8 15.5H4.5V12L13 3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </x-aksi>
+                        <div class="flex items-center gap-1.5">
+                            <x-aksi warna="utama" label="Ubah {{ $produk->nama_produk }}"
+                                    class="size-10" wire:click="ubah('{{ $produk->id }}')">
+                                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                    <path d="M13 3.5 16.5 7 8 15.5H4.5V12L13 3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </x-aksi>
 
-                                <x-aksi warna="netral" class="size-10"
-                                        label="{{ $produk->is_active ? 'Sembunyikan dari kasir' : 'Tampilkan di kasir' }}"
-                                        wire:click="ubahAktif('{{ $produk->id }}')">
-                                    @if ($produk->is_active)
-                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                            <path d="M3 3l14 14M8.2 8.3a2.5 2.5 0 0 0 3.5 3.5M6.1 6.3C4.4 7.3 3 9 2.5 10c1 2.2 3.9 4.5 7.5 4.5 1.2 0 2.3-.25 3.3-.66m2.2-1.5c.9-.7 1.6-1.5 2-2.34-1-2.2-3.9-4.5-7.5-4.5-.6 0-1.2.06-1.7.18"
-                                                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                        </svg>
-                                    @else
-                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                            <path d="M10 5.5c3.6 0 6.5 2.3 7.5 4.5-1 2.2-3.9 4.5-7.5 4.5S3.5 12.2 2.5 10c1-2.2 3.9-4.5 7.5-4.5Z"
-                                                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                            <circle cx="10" cy="10" r="2.25" stroke="currentColor" stroke-width="1.5" />
-                                        </svg>
-                                    @endif
-                                </x-aksi>
-
-                                <x-aksi warna="bahaya" label="Hapus {{ $produk->nama_produk }}"
-                                        class="size-10" wire:click="tandaiHapus('{{ $produk->id }}')">
+                            <x-aksi warna="netral" class="size-10"
+                                    label="{{ $produk->is_active ? 'Sembunyikan dari kasir' : 'Tampilkan di kasir' }}"
+                                    wire:click="ubahAktif('{{ $produk->id }}')">
+                                @if ($produk->is_active)
                                     <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                        <path d="M4 6h12M8 6V4.5h4V6m-6 0v9.5A1.5 1.5 0 0 0 7.5 17h5a1.5 1.5 0 0 0 1.5-1.5V6M8.5 9v5m3-5v5"
+                                        <path d="M3 3l14 14M8.2 8.3a2.5 2.5 0 0 0 3.5 3.5M6.1 6.3C4.4 7.3 3 9 2.5 10c1 2.2 3.9 4.5 7.5 4.5 1.2 0 2.3-.25 3.3-.66m2.2-1.5c.9-.7 1.6-1.5 2-2.34-1-2.2-3.9-4.5-7.5-4.5-.6 0-1.2.06-1.7.18"
                                               stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                                     </svg>
-                                </x-aksi>
-                            </div>
-                        @endif
+                                @else
+                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                        <path d="M10 5.5c3.6 0 6.5 2.3 7.5 4.5-1 2.2-3.9 4.5-7.5 4.5S3.5 12.2 2.5 10c1-2.2 3.9-4.5 7.5-4.5Z"
+                                              stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                        <circle cx="10" cy="10" r="2.25" stroke="currentColor" stroke-width="1.5" />
+                                    </svg>
+                                @endif
+                            </x-aksi>
+
+                            {{-- Konfirmasinya lewat pembungkus SweetAlert bersama
+                                 (window.konfirmasiNampan, resources/js/toast.js), bukan panel
+                                 dua langkah di dalam barisnya: panel itu menukar isi selnya,
+                                 jadi tombol "Ya, hapus" muncul tepat di bawah jempol yang baru
+                                 menekan ikon hapus. Bukan pula dialog bawaan peramban — teksnya
+                                 tidak bisa menyebut nama barangnya.
+
+                                 Dialog ini BUKAN pengamannya: hapus() di server tetap mencari
+                                 produknya lewat scope tenant, jadi muatan Livewire yang dikirim
+                                 tanpa dialog tetap tertahan. --}}
+                            <x-aksi warna="bahaya" label="Hapus {{ $produk->nama_produk }}" class="size-10"
+                                    x-on:click="window.konfirmasiNampan({ judul: {{ \Illuminate\Support\Js::from('Hapus '.$produk->nama_produk.'?') }}, pesan: {{ \Illuminate\Support\Js::from($pesanHapusProduk) }}, tombolYa: 'Ya, hapus', tombolBatal: 'Tidak jadi' }).then((ya) => ya && $wire.hapus({{ \Illuminate\Support\Js::from($produk->id) }}))">
+                                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                    <path d="M4 6h12M8 6V4.5h4V6m-6 0v9.5A1.5 1.5 0 0 0 7.5 17h5a1.5 1.5 0 0 0 1.5-1.5V6M8.5 9v5m3-5v5"
+                                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </x-aksi>
+                        </div>
                     </div>
                 </div>
             @endforeach
@@ -327,62 +342,54 @@
                                 </x-lencana>
                             </td>
                             <td class="px-5 py-3.5">
-                                @if ($produkMauDihapus === $produk->id)
-                                    {{-- Konfirmasi dua langkah, bukan confirm() bawaan:
-                                         yang hilang di sini adalah produk beserta
-                                         gambarnya, dan dialog sistem mudah tertekan
-                                         tanpa terbaca. --}}
-                                    <div class="flex justify-end gap-2">
-                                        <button type="button" wire:click="hapus('{{ $produk->id }}')"
-                                                class="tombol-bahaya h-9 cursor-pointer px-3 text-[0.8125rem]">
-                                            Ya, hapus
-                                        </button>
-                                        <button type="button" wire:click="batalHapus"
-                                                class="h-9 cursor-pointer rounded-lg border border-line px-3 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream">
-                                            Batal
-                                        </button>
-                                    </div>
-                                @else
-                                    {{--
-                                        Tiga tombol seukuran (36×36) dan sejajar. Bobotnya
-                                        dibedakan lewat garis dan warna sentuh, bukan lewat
-                                        ukuran — ukuran yang berbeda-beda membuat kolomnya
-                                        bergerigi dari baris ke baris.
-                                    --}}
-                                    <div class="flex items-center justify-end gap-1.5">
-                                        <x-aksi warna="utama" label="Ubah {{ $produk->nama_produk }}"
-                                                wire:click="ubah('{{ $produk->id }}')">
-                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                                <path d="M13 3.5 16.5 7 8 15.5H4.5V12L13 3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                            </svg>
-                                        </x-aksi>
+                                {{--
+                                    Tiga tombol seukuran (36×36) dan sejajar. Bobotnya
+                                    dibedakan lewat garis dan warna sentuh, bukan lewat
+                                    ukuran — ukuran yang berbeda-beda membuat kolomnya
+                                    bergerigi dari baris ke baris.
 
-                                        <x-aksi warna="netral"
-                                                label="{{ $produk->is_active ? 'Sembunyikan dari kasir' : 'Tampilkan di kasir' }}"
-                                                wire:click="ubahAktif('{{ $produk->id }}')">
-                                            @if ($produk->is_active)
-                                                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                                    <path d="M3 3l14 14M8.2 8.3a2.5 2.5 0 0 0 3.5 3.5M6.1 6.3C4.4 7.3 3 9 2.5 10c1 2.2 3.9 4.5 7.5 4.5 1.2 0 2.3-.25 3.3-.66m2.2-1.5c.9-.7 1.6-1.5 2-2.34-1-2.2-3.9-4.5-7.5-4.5-.6 0-1.2.06-1.7.18"
-                                                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                                </svg>
-                                            @else
-                                                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                                    <path d="M10 5.5c3.6 0 6.5 2.3 7.5 4.5-1 2.2-3.9 4.5-7.5 4.5S3.5 12.2 2.5 10c1-2.2 3.9-4.5 7.5-4.5Z"
-                                                          stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                                    <circle cx="10" cy="10" r="2.25" stroke="currentColor" stroke-width="1.5" />
-                                                </svg>
-                                            @endif
-                                        </x-aksi>
+                                    Kolom ini TIDAK lagi menukar isinya jadi panel
+                                    "Ya, hapus / Batal": panel itu menggeser ketiga
+                                    tombol setiap kali satu baris ditanyai, jadi baris
+                                    di sekitarnya ikut bergerak dan yang ditekan
+                                    berikutnya bisa bukan yang dimaksud. Pertanyaannya
+                                    sekarang di dialog bersama.
+                                --}}
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <x-aksi warna="utama" label="Ubah {{ $produk->nama_produk }}"
+                                            wire:click="ubah('{{ $produk->id }}')">
+                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                            <path d="M13 3.5 16.5 7 8 15.5H4.5V12L13 3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </x-aksi>
 
-                                        <x-aksi warna="bahaya" label="Hapus {{ $produk->nama_produk }}"
-                                                wire:click="tandaiHapus('{{ $produk->id }}')">
+                                    <x-aksi warna="netral"
+                                            label="{{ $produk->is_active ? 'Sembunyikan dari kasir' : 'Tampilkan di kasir' }}"
+                                            wire:click="ubahAktif('{{ $produk->id }}')">
+                                        @if ($produk->is_active)
                                             <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                                <path d="M4 6h12M8 6V4.5h4V6m-6 0v9.5A1.5 1.5 0 0 0 7.5 17h5a1.5 1.5 0 0 0 1.5-1.5V6M8.5 9v5m3-5v5"
+                                                <path d="M3 3l14 14M8.2 8.3a2.5 2.5 0 0 0 3.5 3.5M6.1 6.3C4.4 7.3 3 9 2.5 10c1 2.2 3.9 4.5 7.5 4.5 1.2 0 2.3-.25 3.3-.66m2.2-1.5c.9-.7 1.6-1.5 2-2.34-1-2.2-3.9-4.5-7.5-4.5-.6 0-1.2.06-1.7.18"
                                                       stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                                             </svg>
-                                        </x-aksi>
-                                    </div>
-                                @endif
+                                        @else
+                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                <path d="M10 5.5c3.6 0 6.5 2.3 7.5 4.5-1 2.2-3.9 4.5-7.5 4.5S3.5 12.2 2.5 10c1-2.2 3.9-4.5 7.5-4.5Z"
+                                                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                                <circle cx="10" cy="10" r="2.25" stroke="currentColor" stroke-width="1.5" />
+                                            </svg>
+                                        @endif
+                                    </x-aksi>
+
+                                    {{-- Sama seperti bentuk kartu: konfirmasinya lewat
+                                         window.konfirmasiNampan (resources/js/toast.js). --}}
+                                    <x-aksi warna="bahaya" label="Hapus {{ $produk->nama_produk }}"
+                                            x-on:click="window.konfirmasiNampan({ judul: {{ \Illuminate\Support\Js::from('Hapus '.$produk->nama_produk.'?') }}, pesan: {{ \Illuminate\Support\Js::from($pesanHapusProduk) }}, tombolYa: 'Ya, hapus', tombolBatal: 'Tidak jadi' }).then((ya) => ya && $wire.hapus({{ \Illuminate\Support\Js::from($produk->id) }}))">
+                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                            <path d="M4 6h12M8 6V4.5h4V6m-6 0v9.5A1.5 1.5 0 0 0 7.5 17h5a1.5 1.5 0 0 0 1.5-1.5V6M8.5 9v5m3-5v5"
+                                                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </x-aksi>
+                                </div>
                             </td>
                         </tr>
                     @endforeach

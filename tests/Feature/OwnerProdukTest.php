@@ -8,6 +8,7 @@ use App\Livewire\Pages\Owner\Produk;
 use App\Models\Product;
 use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -231,15 +232,17 @@ class OwnerProdukTest extends TestCase
         $produk = Product::withoutGlobalScopes()->sole();
         $path = $produk->gambar_path;
 
-        // Langkah pertama hanya menandai; belum ada yang terhapus.
-        $komponen->call('tandaiHapus', $produk->getKey())
-            ->assertSet('produkMauDihapus', $produk->getKey());
+        /*
+         * Membuka layarnya saja tidak menghapus apa pun. Dulu ada langkah tandaiHapus()
+         * di sini — panel dua langkah di dalam baris; sejak konfirmasinya pindah ke dialog
+         * SweetAlert bersama, satu-satunya jalur penghapusan adalah hapus() sendiri.
+         */
+        $komponen->call('$refresh');
 
         $this->assertSame(1, Product::withoutGlobalScopes()->count());
         Storage::disk('public')->assertExists($path);
 
-        $komponen->call('hapus', $produk->getKey())
-            ->assertSet('produkMauDihapus', null);
+        $komponen->call('hapus', $produk->getKey());
 
         /*
          * deleted_at diperiksa langsung. withoutGlobalScopes() melepas SEMUA scope,
@@ -253,7 +256,17 @@ class OwnerProdukTest extends TestCase
         Storage::disk('public')->assertMissing($path);
     }
 
-    public function test_batal_hapus_tidak_menghapus_apa_pun(): void
+    /**
+     * "Tidak jadi" benar-benar tidak menghapus apa pun.
+     *
+     * Bentuk lamanya panel dua langkah di dalam baris (tandaiHapus/batalHapus), jadi
+     * "batal" adalah muatan ke server yang bisa diuji di sini. Sejak konfirmasinya pindah
+     * ke dialog SweetAlert bersama, jawaban "tidak" berhenti di peramban — jalur itu diuji
+     * di tests/js/konfirmasi.test.mjs. Yang tetap harus dijaga di sisi PHP: penghapusan
+     * HANYA terjadi lewat hapus(), dan tidak ada aksi lain di layar ini yang membuang
+     * produk sebagai efek samping.
+     */
+    public function test_aksi_selain_hapus_tidak_membuang_produk(): void
     {
         $produk = $this->konteks()->forTenant($this->tenant->getKey(), fn () => Product::create([
             'nama_produk' => 'Bakso',
@@ -263,11 +276,114 @@ class OwnerProdukTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(Produk::class)
-            ->call('tandaiHapus', $produk->getKey())
-            ->call('batalHapus')
-            ->assertSet('produkMauDihapus', null);
+            ->set('cari', 'Bakso')
+            ->call('ubah', $produk->getKey())
+            ->call('tandaiHapusGambar')
+            ->call('tutupPanel')
+            ->call('ubahAktif', $produk->getKey())
+            ->assertOk();
 
-        $this->assertSame(1, Product::withoutGlobalScopes()->count());
+        $this->assertSame(1, Product::withoutGlobalScopes()->whereNull('deleted_at')->count(),
+            'tidak ada aksi selain hapus() yang boleh membuang produk');
+    }
+
+    /**
+     * Ikon hapus MEMICU dialog bersama; ia tidak lagi menukar isi selnya jadi dua tombol.
+     *
+     * Panel dua langkah sebaris menaruh tombol "Ya, hapus" tepat di bawah jempol yang baru
+     * menekan ikon hapus, dan menggeser tombol baris lain saat muncul. Yang dipakai sekarang
+     * window.konfirmasiNampan (resources/js/toast.js) — satu pembungkus untuk semua layar,
+     * supaya teks, warna, dan urutan tombolnya tidak bercabang.
+     */
+    public function test_tombol_hapus_memicu_dialog_bersama_yang_menyebut_barangnya(): void
+    {
+        $this->konteks()->forTenant($this->tenant->getKey(), fn () => Product::create([
+            'nama_produk' => 'Bakso Urat',
+            'harga_default' => 12000,
+            'satuan' => 'porsi',
+        ]));
+
+        $html = Livewire::actingAs($this->owner)->test(Produk::class)->html();
+
+        preg_match_all('/<button(?:"[^"]*"|\'[^\']*\'|[^>"\'])*aria-label="Hapus Bakso Urat"(?:"[^"]*"|\'[^\']*\'|[^>"\'])*>/', $html, $cocok);
+
+        // Dua bentuk baris yang sama: kartu di ponsel, tabel di layar lebar. Keduanya wajib
+        // lewat dialog — yang paling mudah terlewat adalah bentuk yang tidak sedang dilihat.
+        $this->assertCount(2, $cocok[0],
+            'tombol hapus harus ada di kedua bentuk baris (kartu ponsel + tabel)');
+
+        foreach ($cocok[0] as $tombol) {
+            $this->assertStringContainsString('konfirmasiNampan', $tombol,
+                'pakai pembungkus SweetAlert bersama, bukan Swal.fire mentah dan bukan panel sebaris');
+            $this->assertStringContainsString('$wire.hapus(', $tombol,
+                'dialognya harus benar-benar memanggil hapus() sesudah dijawab ya');
+            $this->assertStringContainsString('Bakso Urat', $tombol,
+                'judul dialog wajib menyebut nama barangnya: tanpa itu orang menekan Ya untuk barang yang salah');
+            $this->assertStringContainsString('Ya, hapus', $tombol,
+                'tombol pembenarnya menyebut tindakannya, bukan "OK"');
+        }
+
+        // Dan panel dua langkahnya benar-benar hilang, bukan hanya tidak terlihat.
+        $this->assertStringNotContainsString('tandaiHapus(', $html);
+        $this->assertStringNotContainsString('batalHapus', $html);
+    }
+
+    /**
+     * Dialog itu BUKAN pengamannya.
+     *
+     * Muatan Livewire bisa dikirim tanpa dialog apa pun pernah muncul — cukup satu POST ke
+     * endpoint update dengan id produk milik merchant lain. Yang menahannya bukan dialognya,
+     * melainkan scope tenant di hapus(): Product::findOrFail() tidak pernah melihat baris
+     * merchant lain, jadi jalur itu berakhir 404 dan produknya tetap ada.
+     */
+    public function test_muatan_hapus_tanpa_dialog_tidak_bisa_menyentuh_produk_merchant_lain(): void
+    {
+        $tenantLain = $this->buatTenant('Warung Sebelah');
+        $outletLain = $this->buatOutlet($tenantLain, 'Outlet Sebelah');
+        $ownerLain = $this->buatUser($tenantLain, UserRole::Owner, [
+            'name' => 'Pemilik Sebelah',
+            'email' => 'sebelah@uji.test',
+            'outlet_id' => $outletLain->getKey(),
+        ]);
+
+        $produkKita = $this->konteks()->forTenant($this->tenant->getKey(), fn () => Product::create([
+            'nama_produk' => 'Nasi Rames',
+            'harga_default' => 10000,
+            'satuan' => 'porsi',
+        ]));
+
+        // findOrFail() melempar ModelNotFoundException, dan di HTTP itu menjadi 404. Yang
+        // diperiksa di sini bukan kode responsnya melainkan akibatnya: tidak ada yang hilang.
+        try {
+            Livewire::actingAs($ownerLain)
+                ->test(Produk::class)
+                ->call('hapus', $produkKita->getKey());
+
+            $this->fail('produk merchant lain seharusnya tidak bisa ditemukan, apalagi dihapus');
+        } catch (ModelNotFoundException) {
+            // Memang ini yang benar: barisnya tidak pernah terlihat oleh kueri owner lain.
+        }
+
+        $this->assertSame(1, Product::withoutGlobalScopes()->whereNull('deleted_at')->count(),
+            'produk merchant lain tidak boleh ikut terhapus');
+    }
+
+    /**
+     * Gerbang peran juga tetap berlaku, dan itu pemeriksaan yang berbeda dari scope tenant:
+     * kasir memang satu tenant dengan owner, jadi scope tenant tidak menahannya sama sekali.
+     * Yang menahan adalah middleware peran di rutenya.
+     */
+    public function test_kasir_tidak_bisa_membuka_layar_produk(): void
+    {
+        $kasir = $this->buatUser($this->tenant, UserRole::Kasir, [
+            'username' => 'kasir-produk',
+            'pin_hash' => '123456',
+            'outlet_id' => $this->tenant->outlets()->first()?->getKey(),
+        ]);
+
+        $this->actingAs($kasir)
+            ->get(route('owner.produk'))
+            ->assertRedirect(route('kasir.beranda'));
     }
 
     /**

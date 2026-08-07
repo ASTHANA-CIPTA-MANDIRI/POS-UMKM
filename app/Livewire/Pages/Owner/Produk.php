@@ -516,21 +516,19 @@ class Produk extends Component
         $stok->save();
     }
 
-    /** Produk yang menunggu konfirmasi hapus; null berarti tidak ada. */
-    public ?string $produkMauDihapus = null;
-
-    public function tandaiHapus(string $id): void
-    {
-        $this->produkMauDihapus = $id;
-    }
-
-    public function batalHapus(): void
-    {
-        $this->produkMauDihapus = null;
-    }
-
     /**
      * Menghapus produk beserta berkas gambarnya.
+     *
+     * Konfirmasinya ADA, tapi tidak di sini: yang menanyakan adalah dialog SweetAlert
+     * bersama di layar (window.konfirmasiNampan). Dulu ada properti $produkMauDihapus
+     * beserta tandaiHapus()/batalHapus() untuk panel dua langkah di dalam baris; keduanya
+     * SENGAJA dibuang begitu dialognya masuk. Properti penanda yang menganggur akan
+     * dibaca orang berikutnya sebagai pengaman yang masih bekerja, padahal ia tidak
+     * menahan apa pun — hapus() bisa dipanggil langsung tanpa pernah melewatinya.
+     *
+     * Yang benar-benar menahan adalah baris pertama metode ini: Product::findOrFail()
+     * berjalan di bawah scope tenant, jadi muatan Livewire berisi id produk merchant lain
+     * berakhir 404 — dengan atau tanpa dialog.
      *
      * Yang dipakai adalah SOFT DELETE, bukan hapus permanen dari database. Baris
      * transaction_items menunjuk product_id, dan menghapus barisnya secara permanen
@@ -550,8 +548,6 @@ class Produk extends Component
         $this->buangBerkas($produk->gambar_path);
         $produk->update(['gambar_path' => null]);
         $produk->delete();
-
-        $this->produkMauDihapus = null;
 
         $this->toast('Produk "'.$nama.'" dihapus. Riwayat penjualannya tetap utuh.');
     }

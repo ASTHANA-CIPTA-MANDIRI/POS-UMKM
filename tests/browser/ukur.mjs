@@ -118,6 +118,24 @@ await new Promise((r) => setTimeout(r, 2500));
 // Skrip/gaya/dokumen yang gagal membuat seluruh pengukuran tidak bisa dipercaya.
 const fatal = gagalMuat.filter((g) => ['Script', 'Stylesheet', 'Document'].includes(g.jenis));
 
+/*
+ * KECUALI yang tidak tertangkap juga membatalkan pengukurannya.
+ *
+ * Ini menutup pintu kedua ke arah salah-lulus yang sama, dan pintu itu sudah dipakai:
+ * berkas bundelnya termuat dengan mulus (jadi penjaga GAGAL MUAT tetap diam), tapi
+ * bundelnya BASI — dibangun sebelum modul Alpine yang baru ada. `x-data="lihatBukti"`
+ * melempar, popup-nya tidak pernah terbentuk, dan ketujuh angka melaporkan NOL karena
+ * tidak ada apa pun untuk diukur. Hasilnya dibaca sebagai "popup rapi" padahal yang
+ * terukur adalah popup yang tidak ada.
+ *
+ * Pelajarannya: angka nol dari halaman yang mati tidak bisa dibedakan dari angka nol
+ * halaman yang rapi — kecuali kalau yang mati menolak melaporkan angka sama sekali.
+ *
+ * Kalau ini menyala, jalankan `npm run build` LALU hasilkan ulang tangkapannya (urutan
+ * itu penting: membangun sesudah tangkapan dibuat menghasilkan 404 atas nama berkas lama).
+ */
+const kecuali = galat.filter((g) => g.startsWith('KECUALI'));
+
 for (const g of gagalMuat) {
     const awalan = fatal.includes(g) ? 'GAGAL MUAT' : 'gagal muat (tidak fatal)';
     console.log(`${awalan}: ${g.jenis} ${g.sebab} — ${g.url}`);
@@ -150,7 +168,8 @@ if (ukur) {
 
     const nilai = balasan.result?.result?.value;
     // Tandanya di DEPAN baris, bukan di belakang: baris hasil sering dipotong `head`.
-    const tanda = (fatal.length > 0 || Number(lebarNyata) !== Number(lebar)) ? 'TIDAK SAH — ' : '';
+    const tanda = (fatal.length > 0 || kecuali.length > 0 || Number(lebarNyata) !== Number(lebar))
+        ? 'TIDAK SAH — ' : '';
     console.log(tanda + `${lebar}px | ` + (typeof nilai === 'string' ? nilai : JSON.stringify(balasan.result).slice(0, 700)));
 }
 
@@ -160,6 +179,14 @@ if (galat.length) {
 
 if (fatal.length > 0) {
     console.log(`TIDAK SAH: ${fatal.length} berkas penting gagal dimuat, jadi Alpine/Livewire mungkin tidak jalan. Angka di atas JANGAN dipakai.`);
+    process.exitCode = 2;
+}
+
+if (kecuali.length > 0) {
+    console.log(`TIDAK SAH: ${kecuali.length} kekecualian tidak tertangkap — bagian yang digerakkan `
+        + 'Alpine mungkin tidak pernah terbentuk, jadi angka nol di atas bisa berarti "tidak ada '
+        + 'apa-apa untuk diukur", bukan "rapi". Kalau ini muncul sesudah menambah modul JS: '
+        + '`npm run build` DULU, baru hasilkan ulang tangkapannya.');
     process.exitCode = 2;
 }
 

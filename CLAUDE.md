@@ -271,10 +271,27 @@ aplikasi kasir. Kalau ia perlu bertanya "itu apa", gantilah.
 Klaim "rapi" dan "responsif" tidak diterima tanpa angka. Alurnya:
 
 ```bash
+npm run build                                            # WAJIB kalau ada JS baru — lihat bawah
 php artisan serve --port=8000 &                          # asetnya dari sini
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu \
+  --no-sandbox --remote-debugging-port=9333 --user-data-dir=/tmp/ukur about:blank &
 PRATINJAU=1 php artisan test --filter=PratinjauTest      # tulis HTML ke storage/pratinjau
 tests/browser/ukur-pratinjau.sh owner-stok owner-opname  # tanpa argumen = semuanya
 ```
+
+**Urutannya bukan selera: `npm run build` DULU, baru hasilkan tangkapannya.** Tangkapan
+memuat nama berkas bundel yang berhak-hash; membangun SESUDAH tangkapan dibuat membuat
+nama itu basi dan halamannya 404 (itu ketahuan, ditandai `TIDAK SAH`). Yang lebih berbahaya
+kebalikannya: bundel lama yang termuat MULUS tapi belum memuat modul Alpine yang baru
+ditambahkan. `x-data` melempar, bagian yang digerakkan Alpine tidak pernah terbentuk, dan
+ketujuh angka melaporkan NOL — bukan karena rapi, tapi karena tidak ada apa pun untuk
+diukur. Itu sudah benar-benar terjadi pada popup foto bukti dan sempat saya laporkan
+sebagai "bersih". Sejak itu `ukur.mjs` menandai kekecualian tak tertangkap sebagai
+`TIDAK SAH` juga, jadi pintu itu tertutup — tapi urutannya tetap harus benar.
+
+`ukur-pratinjau.sh` TIDAK menyalakan Chrome; nyalakan sendiri di porta 9333. Sesudah
+putaran mutasi, tab Chrome bisa masih memegang bundel yang rusak, sehingga halaman
+PERTAMA pada putaran berikutnya ikut tertandai — ulangi sekali sebelum menyimpulkan.
 
 **Jangan menyusun langkah itu sendiri, pakai skripnya.** `@vite` dan Livewire menulis URL
 absolut dari APP_URL (`http://localhost`, tanpa porta), jadi tangkapannya harus ditulis

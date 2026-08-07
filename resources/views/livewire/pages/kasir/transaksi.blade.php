@@ -228,7 +228,7 @@
                     {{-- Bill yang sedang dilayani ditulis di tombolnya sendiri, supaya
                          kasir tidak perlu membuka dialog hanya untuk memastikan. --}}
                     <button type="button" x-show="pakaiBill" x-cloak
-                            @click="billMauDibatalkan = null; $refs.panelBill.showModal()"
+                            @click="$refs.panelBill.showModal()"
                             class="ml-auto flex h-11 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink transition hover:border-terracotta">
                         <svg viewBox="0 0 24 24" class="size-4 text-umber-soft" fill="none" aria-hidden="true">
                             <path d="M7 4h10v16l-3-2-2 2-2-2-3 2V4Zm3 5h4m-4 4h4" stroke="currentColor"
@@ -525,7 +525,7 @@
                                      membuka dialog bill, jadi kasir yang tiba-tiba dapat
                                      pesanan meja lain tidak perlu mencari tombol lain. --}}
                                 <button type="button" x-show="pakaiBill && billTerpilih" x-cloak
-                                        @click="billMauDibatalkan = null; $refs.panelBill.showModal()"
+                                        @click="$refs.panelBill.showModal()"
                                         class="flex max-w-full items-center gap-1.5 text-left">
                                     <span class="truncate text-sm font-bold text-ink" x-text="billTerpilih?.label"></span>
                                     <svg viewBox="0 0 20 20" class="size-3.5 shrink-0 text-umber-soft" fill="none" aria-hidden="true">
@@ -628,7 +628,7 @@
                             <div class="py-6 text-center">
                                 <p class="text-sm text-umber-soft"
                                    x-text="mode === 'open_bill' ? 'Belum ada bill yang dilayani.' : 'Belum ada titipan yang dilayani.'"></p>
-                                <button type="button" @click="billMauDibatalkan = null; $refs.panelBill.showModal()"
+                                <button type="button" @click="$refs.panelBill.showModal()"
                                         class="mt-3 h-11 rounded-xl bg-terracotta px-5 text-sm font-bold text-white transition hover:bg-terracotta-deep">
                                     Buka atau pilih bill
                                 </button>
@@ -951,27 +951,26 @@
                                             Majukan status
                                         </button>
 
-                                        {{-- Dua langkah, bukan confirm() bawaan peramban:
-                                             di layar sentuh dialog sistem sering tertekan
-                                             tanpa terbaca, dan yang hilang di sini adalah
-                                             pesanan yang sudah dicatat. --}}
-                                        <button type="button" x-show="billMauDibatalkan !== b.id" x-cloak
-                                                @click="billMauDibatalkan = b.id"
-                                                class="h-10 flex-1 rounded-lg border border-merah/35 text-sm font-semibold text-merah-tua transition hover:bg-merah/10">
+                                        {{-- PEMICU konfirmasi, bukan tindakan merusaknya:
+                                             tint `bg-merah/10` + `text-merah-tua`, merah sejak
+                                             istirahat — di tablet tidak ada hover, jadi merah
+                                             yang menunggu disorot tidak pernah muncul.
+
+                                             Dialognya lewat pembungkus SweetAlert BERSAMA
+                                             (window.konfirmasiNampan di resources/js/toast.js),
+                                             dipanggil dari mintaBatalkanBill() di kasir.js —
+                                             bukan panel dua langkah sebaris, dan bukan
+                                             confirm() bawaan peramban yang di layar sentuh
+                                             sering tertekan tanpa terbaca. JUMLAH pesanan yang
+                                             akan hilang tetap disebut di dalam dialognya; itu
+                                             satu-satunya pembeda antara bill kosong dan tujuh
+                                             pesanan yang sudah dimasak. Dialognya bukan
+                                             pengaman — endpoint sinkronisasi tetap memeriksa
+                                             tenant, outlet, dan sesinya. --}}
+                                        <button type="button" @click="mintaBatalkanBill(b)"
+                                                class="h-10 flex-1 cursor-pointer rounded-lg border border-merah/35 bg-merah/10 text-sm font-semibold text-merah-tua transition hover:border-merah/45 hover:bg-merah/15">
                                             Batalkan bill
                                         </button>
-
-                                        <template x-if="billMauDibatalkan === b.id">
-                                            <div class="flex flex-1 gap-2">
-                                                <button type="button" @click="batalkanBill(b.id)"
-                                                        class="tombol-bahaya h-10 flex-1 cursor-pointer text-sm"
-                                                        x-text="b.pesanan.length > 0 ? 'Ya, buang ' + b.pesanan.length + ' pesanan' : 'Ya, batalkan'"></button>
-                                                <button type="button" @click="billMauDibatalkan = null"
-                                                        class="h-10 rounded-lg border border-line px-3 text-sm font-semibold text-ink transition hover:bg-cream">
-                                                    Tidak
-                                                </button>
-                                            </div>
-                                        </template>
                                     </div>
                                 </div>
                             </template>

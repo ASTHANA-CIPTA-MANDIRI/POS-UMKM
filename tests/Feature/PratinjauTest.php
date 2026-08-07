@@ -617,6 +617,22 @@ class PratinjauTest extends TestCase
         );
 
         /*
+         * Halaman yang SAMA, tapi dengan popup foto struknya TERBUKA.
+         *
+         * Keadaan bawaan popup adalah tertutup, dan popup yang tidak pernah terpotret tidak
+         * pernah terukur sama sekali: ketujuh angka kerapian akan keluar nol untuk markup
+         * yang memang tidak sedang tampil, lalu lolos sebagai bersih (CLAUDE.md). Justru
+         * popup inilah yang paling mungkin melebihi layar — di dalamnya ada foto struk yang
+         * lebih tinggi daripada lebarnya tiga kali.
+         */
+        file_put_contents(
+            "{$tujuan}/owner-pembelian-rincian-bukti.html",
+            $this->suntikPopupBukti(
+                $this->suntik($this->ambil('owner.pembelian', $owner), $fragmenRincian),
+            ),
+        );
+
+        /*
          * Blok "foto kwitansi/struk" punya TIGA keadaan yang bunyinya berbeda, dan yang
          * tidak terpotret tidak pernah terukur — angka nol untuk markup yang tidak ada di
          * halamannya lolos sebagai bersih (CLAUDE.md).
@@ -889,6 +905,28 @@ class PratinjauTest extends TestCase
      * pratinjaunya memperlihatkan halaman yang mati. (Mengganti wire:id saja tidak cukup:
      * snapshotnya bersegel checksum.)
      */
+    /**
+     * Membuka popup foto struk pada tangkapan, lewat KETUKAN sungguhan pada pemicunya.
+     *
+     * Bukan dengan menyetel keadaan Alpine dari luar, dan itu penting: yang harus diukur
+     * adalah popup yang lahir dari jalur kode yang benar-benar dipakai pemilik (termasuk
+     * kunci gulir latar dan x-trap), bukan sebuah <div> yang dipaksa tampil. Pemicunya
+     * dikenali dari `aria-haspopup="dialog"` — penanda yang memang wajib ada di markupnya,
+     * jadi tidak ada atribut yang ditambahkan ke aplikasi hanya demi pengukuran.
+     *
+     * Yang diketuk pemicu TERAKHIR: fragmen panel rincian disuntikkan di ujung <body>,
+     * sesudah halaman aslinya.
+     */
+    private function suntikPopupBukti(string $halaman): string
+    {
+        $skrip = '<script>document.addEventListener("alpine:initialized",function(){'
+            .'var pemicu=document.querySelectorAll("[aria-haspopup=\'dialog\']");'
+            .'if(pemicu.length>0){pemicu[pemicu.length-1].click();}'
+            .'},{once:true});</script>';
+
+        return str_replace('</head>', $skrip.'</head>', $halaman);
+    }
+
     private function suntik(string $halaman, string $fragmen): string
     {
         $fragmen = preg_replace('/\s(wire:id|wire:snapshot|wire:effects)="[^"]*"/', '', $fragmen);

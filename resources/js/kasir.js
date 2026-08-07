@@ -132,7 +132,6 @@ export function pasangKasir() {
             pelangganId: '',
             jatuhTempo: '',
             labelBaru: '',
-            billMauDibatalkan: null,
             estimasiBaru: '',
 
             /*
@@ -607,13 +606,72 @@ export function pasangKasir() {
             },
 
             /**
+             * Meminta konfirmasi lebih dulu, baru membatalkan bill.
+             *
+             * Inilah yang dipanggil layar; `batalkanBill()` di bawah tidak bertanya
+             * apa-apa. Dialognya memakai pembungkus BERSAMA `window.konfirmasiNampan`
+             * (resources/js/toast.js), bukan `Swal.fire` mentah di Blade — supaya teks,
+             * warna, dan urutan tombolnya tidak bercabang antar-layar. SweetAlert-nya
+             * ikut dibundel di app.js bersama berkas ini, jadi dialognya tetap muncul
+             * saat jaringan mati; layar kasir tidak boleh menunggu apa pun dari internet.
+             *
+             * JUMLAH pesanan disebut di dalam dialognya, dan itu bukan hiasan: angka itu
+             * satu-satunya hal yang membedakan "membatalkan bill kosong" dari "membuang
+             * 7 pesanan yang sudah dimasak". Tanpa itu orang menekan Ya tanpa tahu
+             * bedanya — sebelumnya angka itu ada di teks tombol, jadi ia tidak boleh
+             * hilang saat konfirmasinya pindah ke dialog.
+             *
+             * Dialognya BUKAN pengaman: ia hanya mencegah salah-tekan. Bill di server
+             * tetap diperiksa (tenant, outlet, sesi) di endpoint sinkronisasi.
+             *
+             * @returns {Promise<boolean>} true hanya kalau billnya benar-benar dibatalkan.
+             */
+            async mintaBatalkanBill(bill) {
+                if (! bill) {
+                    return false;
+                }
+
+                const jumlah = (bill.pesanan ?? []).length;
+
+                /*
+                 * Tanpa pembungkusnya, tindakan merusak TIDAK dijalankan. Membiarkannya
+                 * lewat sebagai "anggap saja Ya" berarti satu ketukan membuang pesanan
+                 * tanpa pernah bertanya — justru di keadaan yang tidak bisa dilihat
+                 * kasir. Praktisnya ini tidak pernah terjadi di aplikasi: toast.js dan
+                 * berkas ini dibundel bersama di app.js, jadi kalau komponen Alpine ini
+                 * hidup, pembungkusnya juga hidup.
+                 */
+                if (typeof window.konfirmasiNampan !== 'function') {
+                    this.beriPesan('Dialog konfirmasi belum siap. Muat ulang halaman.', 'galat');
+
+                    return false;
+                }
+
+                const setuju = await window.konfirmasiNampan({
+                    judul: 'Batalkan bill "' + bill.label + '"?',
+                    pesan: jumlah > 0
+                        ? jumlah + ' pesanan yang sudah dicatat di bill ini ikut hilang dan tidak bisa '
+                            + 'dikembalikan. Kalau pesanannya sudah dimasak, tetap ada yang harus membayarnya.'
+                        : 'Bill ini masih kosong, jadi tidak ada pesanan yang hilang.',
+                    tombolYa: jumlah > 0 ? 'Ya, buang ' + jumlah + ' pesanan' : 'Ya, batalkan',
+                    tombolBatal: 'Tidak',
+                });
+
+                if (! setuju) {
+                    return false;
+                }
+
+                return this.batalkanBill(bill.id);
+            },
+
+            /**
              * Menghapus bill beserta pesanannya dari perangkat ini.
              *
              * Dipakai untuk bill yang salah dibuka. Tidak ada stok yang perlu
              * dikembalikan: stok baru bergerak ketika transaksi lunas disinkronkan,
              * dan bill yang belum dibayar belum pernah menyentuhnya.
              *
-             * Layar WAJIB meminta konfirmasi dulu untuk bill yang sudah berisi —
+             * Layar WAJIB meminta konfirmasi dulu lewat `mintaBatalkanBill()` —
              * fungsi ini tidak bertanya, ia hanya menjalankan.
              */
             batalkanBill(id) {
@@ -644,7 +702,6 @@ export function pasangKasir() {
                     this.resetPembayaran();
                 }
 
-                this.billMauDibatalkan = null;
                 this.beriPesan('Bill "' + bill.label + '" dibatalkan.', 'info');
 
                 return true;

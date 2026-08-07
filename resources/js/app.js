@@ -1,3 +1,4 @@
+import { pasangBukti } from './bukti';
 import { pasangBunyi } from './bunyi';
 import { pasangKasir } from './kasir';
 import { pasangToast } from './toast';
@@ -12,6 +13,7 @@ import { pasangTerminal3D } from './terminal3d';
 pasangKasir();
 pasangPemindai();
 pasangOpname();
+pasangBukti();
 
 // Dipasang di luar mulai(): toast bisa dikirim Livewire sebelum DOMContentLoaded,
 // dan pendengarnya harus sudah ada saat event pertama tiba.

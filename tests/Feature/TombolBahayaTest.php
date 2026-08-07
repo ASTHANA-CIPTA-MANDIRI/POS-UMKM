@@ -64,16 +64,74 @@ class TombolBahayaTest extends TestCase
      */
     public function test_tombol_hapus_tidak_memakai_merah_berkontras_rendah(): void
     {
-        $html = $this->halamanProduk();
+        $tombol = $this->tombolHapus($this->halamanProduk());
 
-        preg_match_all('/<button[^>]*aria-label="Hapus[^>]*>/', $html, $cocok);
+        $this->assertNotEmpty($tombol, 'tidak ada tombol hapus yang ditemukan');
 
-        $this->assertNotEmpty($cocok[0], 'tidak ada tombol hapus yang ditemukan');
+        // Layar ini merender DUA pemicu hapus per barang — satu untuk kartu di HP, satu untuk
+        // tabel di dekstop — jadi jumlahnya ditegaskan. Kalau salah satu hilang dari hasil
+        // pindaian, penjaganya berhenti memeriksa separuh layar dan tetap hijau.
+        $this->assertGreaterThanOrEqual(2, count($tombol),
+            'kartu HP dan tabel dekstop masing-masing punya pemicu hapus; yang terbaca cuma '
+            .count($tombol));
 
-        foreach ($cocok[0] as $tombol) {
-            $this->assertStringNotContainsString('text-umber-soft', $tombol,
-                'tombol hapus tidak boleh kelabu di keadaan istirahat');
+        foreach ($tombol as $nomor => ['label' => $label, 'kelas' => $kelas]) {
+            $this->assertStringNotContainsString('text-umber-soft', $kelas,
+                "pemicu hapus ke-{$nomor} (\"{$label}\") tidak boleh kelabu di keadaan istirahat");
         }
+    }
+
+    /**
+     * Tombol hapus beserta kelasnya, dibaca dengan pengurai HTML dan BUKAN regex.
+     *
+     * Bentuk lamanya `preg_match_all('/<button[^>]*aria-label="Hapus[^>]*>/')`, dan itu
+     * sudah benar-benar gagal: sejak pemicu hapus memanggil dialog konfirmasi, atributnya
+     * memuat fungsi panah `.then((ya) => ya && $wire.hapus(...))`. Tanda `>` di dalam `=>`
+     * memutus `[^>]*`, jadi regexnya tidak pernah sampai ke `aria-label` — dan penjaganya
+     * melaporkan "tidak ada tombol hapus yang ditemukan" untuk tombol yang ada dan sudah
+     * benar merah.
+     *
+     * Yang menyelamatkan keadaan itu bukan regexnya, melainkan `assertNotEmpty` di
+     * pemanggilnya: tanpa baris itu, `foreach` atas larik kosong membuat ujinya HIJAU tanpa
+     * memeriksa apa pun. Setiap penjaga yang memindai harus menegaskan bahwa ia menemukan
+     * sesuatu — kalau tidak, hari ketika ia berhenti menemukan apa pun adalah hari ia
+     * berhenti menjaga, dan tidak ada yang tahu.
+     *
+     * Elemennya tidak dibatasi <button>: <x-aksi> boleh merender <a> maupun <button>, dan
+     * penjaga yang mensyaratkan tag tertentu akan buta begitu komponennya berubah.
+     *
+     * DAFTAR, bukan peta berkunci label. Versi pertama memakai aria-label sebagai kunci, dan
+     * uji mutasi langsung membuktikannya buta: layar ini merender dua pemicu hapus dengan
+     * label yang SAMA — satu di kartu HP, satu di tabel dekstop — jadi yang satu menimpa yang
+     * lain dan hanya separuh layar yang pernah diperiksa. Tombol yang dibuat kelabu sengaja
+     * di kartu HP lolos hijau.
+     *
+     * @return list<array{label: string, kelas: string}>
+     */
+    private function tombolHapus(string $html): array
+    {
+        $dokumen = new \DOMDocument;
+
+        // Atribut Alpine memuat `&&` yang bukan entitas HTML sah, jadi libxml mengeluh.
+        // Keluhannya tidak relevan di sini: yang dibaca cuma atribut, dan pohonnya tetap
+        // tersusun. Dibungkam LOKAL supaya galat libxml di uji lain tetap terlihat.
+        $sebelumnya = libxml_use_internal_errors(true);
+        $dokumen->loadHTML('<?xml encoding="UTF-8"><div>'.$html.'</div>',
+            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($sebelumnya);
+
+        $hasil = [];
+
+        foreach ((new \DOMXPath($dokumen))->query('//*[starts-with(@aria-label, "Hapus")]') as $elemen) {
+            /** @var \DOMElement $elemen */
+            $hasil[] = [
+                'label' => $elemen->getAttribute('aria-label'),
+                'kelas' => $elemen->getAttribute('class'),
+            ];
+        }
+
+        return $hasil;
     }
 
     /**

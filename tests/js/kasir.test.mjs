@@ -831,6 +831,143 @@ describe('lepas & batalkan bill', () => {
     });
 });
 
+/**
+ * Konfirmasi "Batalkan bill" lewat pembungkus SweetAlert bersama.
+ *
+ * Dulu konfirmasinya berupa panel dua langkah di dalam Blade: tombolnya berganti jadi
+ * "Ya, buang N pesanan" + "Tidak" lewat state Alpine `billMauDibatalkan`. Sekarang
+ * pertanyaannya diajukan `window.konfirmasiNampan`, dan yang harus dijaga bukan hanya
+ * jalur "Ya" — uji yang cuma memeriksa jalur "Ya" tetap hijau walaupun jawaban "Tidak"
+ * ikut membatalkan billnya, dan yang hilang di situ adalah pesanan yang sudah dicatat.
+ *
+ * `mintaBatalkanBill()` hidup di kasir.js, bukan sebagai ekspresi `@click` di Blade,
+ * supaya percabangan ya/tidak ini benar-benar bisa diuji.
+ */
+describe('konfirmasi batalkan bill', () => {
+    /** Memasang pembungkus konfirmasi palsu; mencatat opsi yang dikirim pemanggilnya. */
+    function pasangDialog(jawaban) {
+        const dicatat = [];
+
+        window.konfirmasiNampan = (opsi) => {
+            dicatat.push(opsi);
+
+            return Promise.resolve(jawaban);
+        };
+
+        return dicatat;
+    }
+
+    /** Satu bill berisi dua pesanan, sedang dilayani. */
+    function billDuaPesanan() {
+        const k = pasang();
+        k.gantiMode('open_bill');
+        k.labelBaru = 'Meja 4';
+        k.bukaBill();
+        k.tambah(k.katalog[0]);
+        k.tambah(k.katalog[1]);
+        k.tambahKeBill();
+
+        return k;
+    }
+
+    beforeEach(() => {
+        delete window.konfirmasiNampan;
+    });
+
+    it('membatalkan billnya hanya kalau dialognya dijawab Ya', async () => {
+        pasangDialog(true);
+        const k = billDuaPesanan();
+
+        assert.equal(await k.mintaBatalkanBill(k.billTerpilih), true);
+
+        assert.equal(k.billLokal.length, 0);
+        assert.equal(k.billAktif, null);
+        assert.equal(JSON.parse(simpanan.get('nampan.bill')).length, 0);
+    });
+
+    it('TIDAK membatalkan apa pun kalau dialognya dijawab Tidak', async () => {
+        pasangDialog(false);
+        const k = billDuaPesanan();
+        const id = k.billAktif;
+
+        assert.equal(await k.mintaBatalkanBill(k.billTerpilih), false);
+
+        // Bill, pesanannya, dan pilihannya harus utuh — persis seperti sebelum ditekan.
+        assert.equal(k.billLokal.length, 1);
+        assert.equal(k.billLokal[0].pesanan.length, 2);
+        assert.equal(k.billAktif, id);
+        assert.equal(JSON.parse(simpanan.get('nampan.bill'))[0].pesanan.length, 2);
+    });
+
+    it('Esc dan klik latar diperlakukan sama dengan Tidak', async () => {
+        // konfirmasiNampan sudah memetakan Esc/klik latar menjadi false (lihat
+        // konfirmasi.test.mjs); yang dijaga di sini adalah pemanggilnya tidak
+        // menganggap "bukan true" sebagai persetujuan.
+        for (const jawaban of [undefined, null, 0, '']) {
+            // Bill tersimpan di localStorage dan dibaca ulang oleh init(); tanpa
+            // dibersihkan, bill dari putaran sebelumnya ikut terhitung.
+            simpanan.clear();
+            pasangDialog(jawaban);
+            const k = billDuaPesanan();
+
+            assert.equal(await k.mintaBatalkanBill(k.billTerpilih), false);
+            assert.equal(k.billLokal.length, 1, 'jawaban ' + JSON.stringify(jawaban) + ' bukan persetujuan');
+        }
+    });
+
+    it('menyebut JUMLAH pesanan yang akan hilang, bukan hanya "yakin?"', async () => {
+        const dicatat = pasangDialog(false);
+        const k = billDuaPesanan();
+
+        await k.mintaBatalkanBill(k.billTerpilih);
+
+        const opsi = dicatat[0];
+
+        // Angka inilah satu-satunya pembeda antara membatalkan bill kosong dan membuang
+        // pesanan yang sudah dimasak. Dulu ia ada di teks tombol; ia tidak boleh hilang
+        // hanya karena pertanyaannya pindah ke dialog.
+        assert.equal(opsi.tombolYa, 'Ya, buang 2 pesanan');
+        assert.match(opsi.pesan, /\b2 pesanan\b/);
+        // Judulnya menyebut bill YANG MANA — di panel ada beberapa meja berderet.
+        assert.match(opsi.judul, /Meja 4/);
+        assert.equal(opsi.tombolBatal, 'Tidak');
+    });
+
+    it('tidak mengaku ada pesanan yang hilang kalau billnya masih kosong', async () => {
+        const dicatat = pasangDialog(false);
+        const k = pasang();
+        k.gantiMode('open_bill');
+        k.labelBaru = 'Meja 9';
+        k.bukaBill();
+
+        await k.mintaBatalkanBill(k.billTerpilih);
+
+        // Peringatan yang lebih menakutkan daripada kenyataannya membuat orang berhenti
+        // memercayai peringatan berikutnya.
+        assert.equal(dicatat[0].tombolYa, 'Ya, batalkan');
+        assert.match(dicatat[0].pesan, /kosong/i);
+    });
+
+    it('tidak membatalkan apa pun kalau pembungkus dialognya tidak ada', async () => {
+        const k = billDuaPesanan();
+
+        // Gagal ke arah AMAN: tanpa dialog, satu ketukan tidak boleh membuang pesanan
+        // tanpa pernah bertanya. Praktisnya toast.js dan kasir.js dibundel bersama di
+        // app.js, jadi keadaan ini tidak terjadi di aplikasi.
+        assert.equal(await k.mintaBatalkanBill(k.billTerpilih), false);
+        assert.equal(k.billLokal.length, 1);
+        assert.equal(k.jenisPesan, 'galat');
+    });
+
+    it('tidak menyimpan lagi state dua langkah yang sudah tidak dipakai', () => {
+        const k = pasang();
+
+        // State menganggur akan disalahpahami sebagai pengaman yang masih bekerja —
+        // layar berikutnya menyetelnya dan menyangka konfirmasinya sudah terpasang.
+        assert.equal('billMauDibatalkan' in k, false);
+    });
+});
+
 describe('mode pesan_antar', () => {
     it('mencatat estimasi selesai dan memajukan status satu langkah', () => {
         const k = pasang();
