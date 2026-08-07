@@ -143,7 +143,12 @@ class PembelianBuktiTampilanTest extends TestCase
 
         $this->assertStringNotContainsString('hal harus dibetulkan dulu', $html,
             'galat foto tidak boleh muncul sebagai penahan simpan — ia tidak menahan apa pun');
-        $this->assertStringContainsString('Bukti belanja harus berupa foto', $html,
+
+        // Kalimat pertama pesannya berlaku untuk SEMUA berkas yang bukan foto, termasuk PDF ini.
+        // Bagian iPhone/HEIC-nya bersyarat ("kalau ini foto dari iPhone…") dengan sengaja: satu
+        // pesan yang berlaku di dua keadaan lebih baik daripada dua pesan yang mirip, dan
+        // MessageBag membuang duplikat kalau aturan `image` dan `mimes` gagal bersamaan.
+        $this->assertStringContainsString('yang bisa cuma JPG, PNG, atau WEBP', $html,
             'pesannya tetap harus terbaca, menempel di kotak fotonya');
 
         // Dan jalan keluarnya ada: pilihannya bisa dibuang tanpa menyentuh isian nota.
@@ -152,6 +157,111 @@ class PembelianBuktiTampilanTest extends TestCase
         $komponen->call('buangBuktiPilihan')
             ->assertHasNoErrors()
             ->assertSet('bukti', null);
+    }
+
+    /**
+     * CACAT NYATA yang dilaporkan pemilik: kamera HP/tablet TIDAK muncul saat memilih foto
+     * struk — yang keluar cuma galeri dan berkas.
+     *
+     * Sebabnya `accept="image/jpeg,image/png,image/webp"`. Banyak peramban Android tidak
+     * menawarkan kamera kalau accept tidak memuat `image/*`, karena aplikasi kameranya
+     * mendaftarkan diri sebagai penghasil `image/*` dan tersaring keluar oleh daftar jenis yang
+     * spesifik; di iOS pilihan "Ambil Foto" ikut hilang. Struk difoto di tempat — kamera yang
+     * tidak muncul berarti fiturnya tidak ada, dan pemiliknya menyimpulkan aplikasinya rusak.
+     *
+     * `capture` DILARANG di sini, dan itu bukan kerapian: `capture="environment"` memang
+     * memaksa kamera muncul, tapi ia MENGHAPUS pilihan galeri di banyak peramban Android —
+     * struk yang sudah difoto kemarin jadi tidak bisa dipilih lagi, dan orangnya dipaksa
+     * memfoto ulang struk yang sudah kusut. Yang dibutuhkan dua-duanya, jadi "perbaikan" yang
+     * menambahkan capture adalah pertukaran satu cacat dengan cacat lain.
+     *
+     * Dibaca dari HTML yang BENAR-BENAR dirender kedua layar, dan diurai DOMDocument — bukan
+     * regex atas berkas Blade. Dua alasan: nilai atribut Livewire memuat `>` (mis. panah objek
+     * di dalam wire:key), dan penjaga yang membaca sumber tidak tahu apakah kotaknya memang
+     * ikut dirender. `assertNotEmpty` + jumlah yang ditegaskan wajib ada: penjaga pemindai di
+     * repo ini sudah tiga kali berbohong dengan cara yang sama — pola yang tidak cocok dengan
+     * apa pun melaporkan "tidak ada pelanggar" dan lulus hijau tanpa memeriksa apa pun.
+     */
+    public function test_kotak_unggah_bukti_menawarkan_kamera_tanpa_menghilangkan_galeri(): void
+    {
+        $nota = $this->catatNota($this->outlet, $this->owner, [
+            'baris' => [$this->baris($this->buatProduk('Teh Celup'), 4, 6500)],
+        ]);
+
+        $halaman = [
+            'formulir nota baru' => Livewire::actingAs($this->owner)
+                ->test(PembelianBaru::class)->html(),
+            'panel rincian nota' => Livewire::actingAs($this->owner)
+                ->test(Pembelian::class)->call('bukaRincian', $nota->getKey())->html(),
+        ];
+
+        $diperiksa = 0;
+
+        foreach ($halaman as $nama => $html) {
+            $kotak = $this->kotakUnggahBukti($html);
+
+            $this->assertNotEmpty($kotak,
+                "kotak unggah foto bukti tidak ditemukan di {$nama} — penjaga ini buta, bukan "
+                .'layarnya yang bersih');
+            $this->assertCount(1, $kotak,
+                "{$nama} punya tepat satu kotak unggah bukti; jumlah yang berubah berarti penjaga "
+                .'ini hanya memeriksa sebagian');
+
+            foreach ($kotak as $atribut) {
+                $this->assertStringContainsString('image/*', $atribut['accept'],
+                    "accept di {$nama} wajib memuat image/* — tanpa itu peramban Android tidak "
+                    .'menawarkan kamera sama sekali (accept sekarang: "'.$atribut['accept'].'")');
+
+                $this->assertFalse($atribut['ada_capture'],
+                    "jangan pasang capture di {$nama}: ia memaksa kamera TAPI menghapus pilihan "
+                    .'galeri, sehingga struk yang sudah difoto kemarin tidak bisa dipilih lagi');
+            }
+
+            $diperiksa += count($kotak);
+        }
+
+        $this->assertSame(2, $diperiksa,
+            'kedua layar owner yang mengunggah bukti harus ikut terperiksa: formulir nota baru '
+            .'DAN panel rincian nota. Yang ketinggalan akan diperbaiki belakangan sendirian.');
+    }
+
+    /**
+     * HEIC dari iPhone ditolak — tapi pesannya bisa dikerjakan orangnya.
+     *
+     * Ini harga langsung dari accept="image/*" di atas: kotak yang menerima `image/*` membuat
+     * iPhone bisa mengirim HEIC/HEIF, dan tumpukan ini TIDAK BISA membacanya (GD tanpa libheif;
+     * getimagesize() dan imagecreatefromstring() sama-sama gagal atas berkas HEIC sungguhan,
+     * dan ekstensi Imagick tidak terpasang). Menerimanya berarti menyimpan bukti yang tidak
+     * bisa dipratinjau di formulir dan tidak bisa dibuka di peramban Android maupun dekstop —
+     * persis pada satu-satunya saat bukti itu dibutuhkan, yaitu waktu grosirnya menagih ulang.
+     *
+     * Jadi ditolak, dan yang menanggung penolakan itu pesannya: ia WAJIB menyebut HEIC dan
+     * jalan keluarnya di HP-nya sendiri. "Harus JPG, PNG, atau WEBP" tidak bisa dikerjakan oleh
+     * orang yang tidak tahu fotonya berformat apa — HEIC bawaan iPhone sejak iOS 11, jadi ia
+     * tidak pernah memilihnya dan tidak punya alasan untuk mengenal namanya.
+     *
+     * Berkasnya dipalsukan lewat mime `image/heic`: yang menolak adalah aturan `image` +
+     * `mimes`, dan keduanya membaca jenis berkasnya, bukan namanya.
+     */
+    public function test_foto_heic_iphone_ditolak_dengan_pesan_yang_menyebut_jalan_keluarnya(): void
+    {
+        $komponen = Livewire::actingAs($this->owner)
+            ->test(PembelianBaru::class)
+            ->set('bukti', UploadedFile::fake()->create('IMG_0042.HEIC', 200, 'image/heic'));
+
+        $komponen->assertHasErrors('bukti');
+
+        $html = $komponen->html();
+
+        $this->assertStringContainsString('HEIC', $html,
+            'pesannya harus menyebut HEIC: pemilik iPhone tidak tahu fotonya berformat apa');
+        $this->assertStringContainsString('Paling Kompatibel', $html,
+            'sebut jalan keluarnya persis seperti tertulis di HP-nya — Pengaturan > Kamera > Format');
+        $this->assertStringContainsString('JPG, PNG, atau WEBP', $html,
+            'yang diterima tetap harus tertulis, supaya kalimatnya bisa dikerjakan');
+
+        // Dan notanya tidak ikut tertahan: foto TIDAK PERNAH menahan tombol simpan.
+        $this->assertStringNotContainsString('hal harus dibetulkan dulu', $html);
     }
 
     /* ── Panel rincian: sudah ada fotonya ────────────────────────────────── */
@@ -296,10 +406,17 @@ class PembelianBuktiTampilanTest extends TestCase
     /**
      * Potongan HTML yang berisi HANYA blok foto kwitansi di panel rincian.
      *
-     * Batas atasnya labelnya, batas bawahnya blok tindakan nota (`x-data="{ tanya: null }"`).
+     * Batas atasnya labelnya, batas bawahnya blok tindakan nota (`data-blok="tindakan-nota"`).
      * Batas bawah itu bukan kerapian: tombol "Batalkan nota" di bawahnya MEMANG merah dan
      * memang harus merah, jadi jendela yang kelewat lebar membuat uji "belum ada foto tidak
      * merah" gagal karena warna milik tombol lain. Uji pertama saya begitu.
+     *
+     * Penandanya dulu string Alpine `tanya: null`, dan itu terbukti rapuh: begitu pembatalan
+     * nota pindah ke dialog SweetAlert bersama, keadaan Alpine-nya berubah dan penandanya
+     * lenyap — batas bawahnya jatuh ke panjang tetap 4000 karakter, ikut menelan tombol
+     * "Batalkan nota", dan uji "belum ada foto tidak merah" gagal karena warna milik tombol
+     * lain. `data-blok` ada di Blade khusus sebagai seam uji, jadi ia tidak berubah karena
+     * gaya atau keadaan Alpine berubah.
      */
     private function blokBukti(string $html): string
     {
@@ -307,11 +424,54 @@ class PembelianBuktiTampilanTest extends TestCase
 
         $this->assertNotFalse($awal, 'blok foto kwitansi tidak ada di panel rincian');
 
-        $akhir = strpos($html, 'tanya: null', $awal);
+        $akhir = strpos($html, 'data-blok="tindakan-nota"', $awal);
 
         // Nota yang dibatalkan tidak punya blok tindakan sama sekali (tidak ada yang bisa
         // ditandai datang maupun dibatalkan lagi), jadi batas bawahnya jatuh ke panjang tetap.
         return substr($html, $awal, $akhir === false ? 4000 : $akhir - $awal);
+    }
+
+    /**
+     * Kotak `<input type="file">` yang terikat ke properti `bukti`, beserta atribut yang
+     * menentukan apakah kamera & galeri muncul.
+     *
+     * Diurai DOMDocument, BUKAN regex: nilai atribut di layar ini memuat `>` (panah objek di
+     * dalam wire:key dan panah fungsi di atribut Alpine tetangga), dan pola `<input[^>]*>`
+     * memotong tagnya di tengah — cacat yang sudah pernah membuat penjaga di repo ini buta
+     * sambil melaporkan hijau.
+     *
+     * XPath sengaja hanya menyaring `type="file"`; ikatan `wire:model`-nya dibaca lewat
+     * getAttribute karena XPath memperlakukan titik dua sebagai awalan namespace dan tidak
+     * akan pernah cocok.
+     *
+     * @return list<array{accept: string, ada_capture: bool}>
+     */
+    private function kotakUnggahBukti(string $html): array
+    {
+        $dokumen = new \DOMDocument;
+
+        $sebelumnya = libxml_use_internal_errors(true);
+        $dokumen->loadHTML('<?xml encoding="UTF-8"><div>'.$html.'</div>',
+            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($sebelumnya);
+
+        $hasil = [];
+
+        foreach ((new \DOMXPath($dokumen))->query('//input[@type="file"]') as $elemen) {
+            /** @var \DOMElement $elemen */
+            if ($elemen->getAttribute('wire:model') !== 'bukti') {
+                continue;
+            }
+
+            $hasil[] = [
+                'accept' => $elemen->getAttribute('accept'),
+                // hasAttribute, bukan nilainya: `capture` boleh berdiri tanpa nilai sama sekali.
+                'ada_capture' => $elemen->hasAttribute('capture'),
+            ];
+        }
+
+        return $hasil;
     }
 
     /** Nota yang sudah berfoto, lewat jalur aksinya — bukan kolom yang diisi tangan. */

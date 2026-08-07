@@ -310,6 +310,174 @@ class PembelianBatalTest extends TestCase
             ->assertDispatched('toast', fn (string $nama, array $data): bool => str_contains($data['pesan'], 'Stok dikembalikan'));
     }
 
+    /**
+     * CACAT NYATA yang dilaporkan pemilik: "Batalkan nota" tidak memunculkan popup apa pun.
+     *
+     * Aturan pemilik proyek tegas — "untuk delete gunakan sweet alert, terapkan di semua
+     * fitur" — dan aturan itu SUDAH dipakai tombol "Hapus foto" beberapa baris di atasnya di
+     * berkas Blade yang sama. Yang terlewat justru tombol yang paling merusak di layar ini:
+     * ia memakai panel dua langkah sebaris (`x-data="{ tanya: null }"`,
+     * `x-on:click="tanya = 'batal'"`), jadi tombol pembenarnya muncul persis di bawah jempol
+     * yang baru menekan pemicunya — dan panel yang muncul itu menggeser isi di sekitarnya.
+     *
+     * Diperiksa dari HTML yang BENAR-BENAR dirender, dan diurai dengan DOMDocument, bukan
+     * regex: atribut pemicunya memuat `.then((ya) => ya && $wire.batalkan(…))`, dan tanda `>`
+     * di dalam `=>` memutus pola `[^>]*` — cacat yang sudah pernah membuat penjaga di repo ini
+     * melaporkan "tidak ada tombol yang ditemukan" untuk tombol yang ada dan sudah benar.
+     * Karena itu ada assertNotEmpty + jumlah minimalnya juga: penjaga yang berhenti menemukan
+     * apa pun adalah penjaga yang berhenti menjaga, dan laporannya tetap berbunyi hijau.
+     */
+    public function test_pemicu_batalkan_nota_bertanya_lewat_sweetalert_bersama(): void
+    {
+        $kopi = $this->buatProduk('Kopi Sachet');
+
+        $nota = $this->catatNota($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 5, 1500)]]);
+
+        $html = Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $nota->getKey())
+            ->html();
+
+        $pemicu = $this->elemenBerlabel($html, 'Batalkan nota');
+
+        $this->assertNotEmpty($pemicu, 'pemicu "Batalkan nota" tidak ditemukan di panel rincian');
+        $this->assertCount(1, $pemicu,
+            'panel rincian punya tepat satu pemicu pembatalan; kalau jumlahnya berubah, penjaga '
+            .'ini hanya memeriksa sebagian');
+
+        $atribut = $pemicu[0]['atribut'];
+
+        $this->assertStringContainsString('konfirmasiNampan', $atribut,
+            'pakai pembungkus SweetAlert bersama (resources/js/toast.js), bukan panel dua langkah '
+            .'sebaris dan bukan Swal.fire mentah per layar');
+        $this->assertStringContainsString('$wire.batalkan(', $atribut,
+            'pembatalannya baru jalan SESUDAH dialognya dijawab ya');
+        $this->assertStringContainsString($nota->nomor_po, $atribut,
+            'judul dialognya wajib menyebut nomor notanya: dialog yang tidak menyebut apa yang '
+            .'dibatalkan membuat orang menekan "Ya" untuk nota yang salah');
+
+        // Merahnya tetap ada TANPA hover — di tablet & HP hover tidak ada sama sekali.
+        $this->assertStringContainsString('text-merah-tua', $pemicu[0]['kelas']);
+        $this->assertStringContainsString('bg-merah/10', $pemicu[0]['kelas']);
+
+        // Dan bentuk lamanya benar-benar hilang, bukan cuma tertutup: tombol pembenar
+        // "Ya, batalkan nota" tidak lagi digambar di halaman (ia teks `tombolYa` di dalam
+        // dialognya), dan keadaan Alpine `tanya = 'batal'` tidak tersisa sebagai jalur kedua.
+        $this->assertEmpty($this->elemenBerlabel($html, 'Ya, batalkan nota'),
+            'tombol pembenar pembatalan hidup di dalam dialognya, bukan sebagai tombol halaman');
+
+        $blade = (string) file_get_contents(
+            resource_path('views/livewire/pages/owner/pembelian.blade.php')
+        );
+
+        $this->assertStringNotContainsString("tanya = 'batal'", $this->bladeTanpaKomentar($blade),
+            'keadaan Alpine untuk cabang pembatalan wajib ikut dibuang — keadaan menganggur '
+            .'terbaca seperti pengaman yang masih bekerja');
+    }
+
+    /**
+     * Kalimat DI DALAM dialog ikut membedakan nota yang barangnya belum datang.
+     *
+     * Sepasang dengan uji pesan toast di atas, dan alasannya sama persis — kecuali satu hal
+     * yang membuatnya lebih penting: toast dibaca SESUDAH keputusannya diambil, dialog dibaca
+     * SEBELUM. Kalimat "stok yang masuk dari nota ini dikeluarkan kembali" pada nota yang
+     * barangnya belum pernah datang membuat pemilik menahan diri membatalkan nota salah ketik
+     * karena takut stoknya ikut kacau — padahal tidak ada satu angka pun yang akan bergerak.
+     *
+     * BatalkanPembelianAction sendiri yang menuliskan aturannya: stok & harga hanya disentuh
+     * kalau status->movesStock(), dan "pemanggilnya WAJIB membedakan pesannya".
+     */
+    public function test_dialog_pembatalan_membedakan_nota_yang_barangnya_belum_datang(): void
+    {
+        $kopi = $this->buatProduk('Kopi Sachet');
+
+        $sudah = $this->catatNota($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 5, 1500)]]);
+        $belum = $this->catatNotaBelumDatang($this->outlet, $this->owner, ['baris' => [$this->baris($kopi, 5, 1500)]]);
+
+        $komponen = Livewire::actingAs($this->owner)->test(Pembelian::class);
+
+        $pesan = function (PurchaseOrder $nota) use ($komponen): string {
+            $pemicu = $this->elemenBerlabel(
+                $komponen->call('bukaRincian', $nota->getKey())->html(),
+                'Batalkan nota',
+            );
+
+            $this->assertNotEmpty($pemicu, 'pemicu pembatalan tidak ditemukan');
+
+            return $pemicu[0]['atribut'];
+        };
+
+        $kalimatSudah = $pesan($sudah);
+
+        $this->assertStringContainsString('dikeluarkan kembali', $kalimatSudah);
+        $this->assertStringContainsString($this->outlet->outlet_name, $kalimatSudah,
+            'sebut cabang mana stoknya yang berubah: pemilik dua cabang tidak bisa menebaknya');
+
+        $kalimatBelum = $pesan($belum);
+
+        $this->assertStringContainsString('belum datang', $kalimatBelum);
+        $this->assertStringNotContainsString('dikeluarkan kembali', $kalimatBelum,
+            'nota yang barangnya belum datang tidak menggerakkan stok apa pun — mengaku sebaliknya '
+            .'membuat pemilik mencari barang yang tidak pernah ada di catatannya');
+
+        // Yang TIDAK hilang wajib disebut juga, di kedua keadaan. Peringatan yang lebih
+        // menakutkan daripada kenyataannya membuat peringatan berikutnya tidak dipercaya.
+        foreach (['sudah datang' => $kalimatSudah, 'belum datang' => $kalimatBelum] as $keadaan => $kalimat) {
+            $this->assertStringContainsString('tetap tersimpan', $kalimat,
+                "dialog nota {$keadaan} harus menyebut bahwa notanya TIDAK hilang");
+            $this->assertStringContainsString('tidak bisa dibalik', $kalimat,
+                "dialog nota {$keadaan} harus menyebut bahwa pembatalannya permanen");
+        }
+    }
+
+    /**
+     * Elemen yang teksnya (sesudah ikon dibuang) sama dengan label yang dicari.
+     *
+     * DOMDocument, BUKAN regex: atribut Alpine pemicunya memuat `=>` dan `&&`, jadi pola
+     * `<button[^>]*>` memotong tagnya di tengah panah dan sisanya terbaca sebagai teks. Itu
+     * sudah benar-benar terjadi di TombolBahayaTest dan menghasilkan tuduhan palsu.
+     *
+     * @return list<array{atribut: string, kelas: string}>
+     */
+    private function elemenBerlabel(string $html, string $label): array
+    {
+        $dokumen = new \DOMDocument;
+
+        // `&&` di atribut Alpine bukan entitas HTML yang sah, jadi libxml mengeluh. Keluhannya
+        // tidak relevan (pohonnya tetap tersusun) dan dibungkam LOKAL supaya galat libxml di
+        // uji lain tetap terlihat.
+        $sebelumnya = libxml_use_internal_errors(true);
+        $dokumen->loadHTML('<?xml encoding="UTF-8"><div>'.$html.'</div>',
+            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($sebelumnya);
+
+        $hasil = [];
+
+        foreach ((new \DOMXPath($dokumen))->query('//button | //a') as $elemen) {
+            /** @var \DOMElement $elemen */
+            if (trim((string) preg_replace('/\s+/', ' ', $elemen->textContent)) !== $label) {
+                continue;
+            }
+
+            $atribut = '';
+
+            foreach ($elemen->attributes as $satu) {
+                $atribut .= ' '.$satu->nodeName.'="'.$satu->nodeValue.'"';
+            }
+
+            $hasil[] = ['atribut' => $atribut, 'kelas' => $elemen->getAttribute('class')];
+        }
+
+        return $hasil;
+    }
+
+    /** Blade tanpa komentar, supaya penjaga di atas membaca KODE dan bukan prosa. */
+    private function bladeTanpaKomentar(string $isi): string
+    {
+        return (string) preg_replace('/\{\{--.*?--\}\}/s', '', $isi);
+    }
+
     /** Saringan status memisahkan yang dibatalkan, tanpa menyembunyikannya dari "semua". */
     public function test_saringan_status_memisahkan_nota_dibatalkan(): void
     {

@@ -94,9 +94,10 @@ class KonfirmasiHapusTest extends TestCase
 
         foreach ($this->halamanBlade() as $jalur => $isi) {
             foreach ($this->elemen($isi) as [$atribut, $label]) {
-                // "Ya, hapus", "Ya, buang 12 pesanan". Yang berupa pertanyaan ("Hapus foto")
-                // adalah PEMICU dan memang tetap ada di halaman.
-                if (preg_match('/^ya[,\s].*\b(hapus|buang|void)\b/i', $label) !== 1) {
+                // "Ya, hapus", "Ya, buang 12 pesanan", "Ya, batalkan nota". Yang berupa
+                // pertanyaan ("Hapus foto", "Batalkan nota") adalah PEMICU dan memang tetap ada
+                // di halaman.
+                if (preg_match('/^ya[,\s].*\b(hapus|buang|void|batalkan)\b/i', $label) !== 1) {
                     continue;
                 }
 
@@ -128,10 +129,16 @@ class KonfirmasiHapusTest extends TestCase
      *  - tombol "Hapus" pada gambar produk memanggil `tandaiHapusGambar` — ia menandai di
      *    formulir, berkasnya baru benar-benar dibuang saat Simpan dan Batal memulihkannya.
      *
-     * "Batalkan" (nota pembelian) dan "Buang N baris" (pindah cabang di lembar hitung stok)
-     * BELUM dijaga di sini: keduanya bukan hapus, dan yang kedua membuang isian yang belum
-     * tersimpan — bukan data. Kalau aturannya nanti diperluas ke pembatalan, tambahkan kata
-     * kerjanya di kedua tempat: daftar label DAN daftar nama metode.
+     * "Batalkan" (nota pembelian) IKUT DIJAGA sejak pemilik melaporkan cacatnya: tombol
+     * "Batalkan nota" di layar Pembelian tidak memunculkan popup apa pun, ia memakai panel dua
+     * langkah sebaris — padahal tombol "Hapus foto" di berkas Blade yang SAMA sudah lewat
+     * dialog bersama. Pembatalan nota mengeluarkan kembali stok yang sudah masuk dan memulihkan
+     * harga beli; kalau itu bukan tindakan yang perlu dikonfirmasi, tidak ada yang perlu.
+     * Perluasannya dikerjakan di dua tempat sekaligus, seperti dicatat di sini sebelumnya:
+     * daftar label DAN daftar nama metode (memanggilPenghapusServer).
+     *
+     * "Buang N baris" (pindah cabang di lembar hitung stok) tetap TIDAK dijaga: yang dibuang
+     * adalah isian yang belum tersimpan, bukan data.
      */
     public function test_setiap_pemicu_hapus_lewat_konfirmasi_nampan(): void
     {
@@ -139,7 +146,7 @@ class KonfirmasiHapusTest extends TestCase
 
         foreach ($this->halamanBlade() as $jalur => $isi) {
             foreach ($this->elemen($isi) as [$atribut, $label]) {
-                if (preg_match('/\b(hapus|void)\b/i', $label) !== 1) {
+                if (preg_match('/\b(hapus|void|batalkan)\b/i', $label) !== 1) {
                     continue;
                 }
 
@@ -191,6 +198,28 @@ class KonfirmasiHapusTest extends TestCase
             'penjaga harus melihat kedua tombol hapus produk (kartu ponsel + tabel)');
         $this->assertGreaterThanOrEqual(1, $terlihat['resources/views/livewire/pages/owner/pembelian.blade.php'] ?? 0,
             'penjaga harus melihat tombol "Hapus foto" di layar pembelian');
+
+        /*
+         * Dan perluasan ke PEMBATALAN benar-benar terlihat juga.
+         *
+         * Tanpa pembanding ini, menambahkan kata "batalkan" ke kedua regex di atas bisa saja
+         * tidak cocok dengan apa pun — dan uji pelanggarnya tetap hijau sebagai "tidak ada
+         * pelanggar". Itu bentuk kebutaan yang sama yang sudah tiga kali terjadi di repo ini,
+         * hanya dengan kata kunci yang lebih baru.
+         */
+        $pemicuBatal = 0;
+
+        foreach ($this->halamanBlade() as $isi) {
+            foreach ($this->elemen($isi) as [$atribut, $label]) {
+                if (preg_match('/\bbatalkan\b/i', $label) === 1 && $this->memanggilPenghapusServer($atribut)) {
+                    $pemicuBatal++;
+                }
+            }
+        }
+
+        $this->assertGreaterThanOrEqual(1, $pemicuBatal,
+            'penjaga harus melihat pemicu "Batalkan nota" di layar pembelian; kalau tidak, kata '
+            .'"batalkan" di regexnya tidak menjaga apa pun');
     }
 
     /* ── Bantuan ─────────────────────────────────────────────────────────── */
@@ -324,23 +353,28 @@ class KonfirmasiHapusTest extends TestCase
     /**
      * Apakah klik elemen ini benar-benar memanggil penghapus di SERVER.
      *
-     * Yang dicari nama metode Livewire yang diawali hapus/buang/void — lewat `wire:click`
-     * maupun `$wire.` di dalam Alpine. Fungsi Alpine lokal dengan nama serupa (mis.
+     * Yang dicari nama metode Livewire yang diawali hapus/buang/void/batalkan — lewat
+     * `wire:click` maupun `$wire.` di dalam Alpine. Fungsi Alpine lokal dengan nama serupa (mis.
      * `hapusPembayaran(i)` yang membuang baris yang baru diketik) SENGAJA tidak dihitung:
      * yang belum tersimpan bukan data yang hilang.
+     *
+     * `[^"]*` pada nilai atributnya sengaja dipertahankan walaupun penangan Alpine memuat `>`
+     * di dalam `=>`: yang dibatasi di sini adalah tanda petik, bukan tanda lebih-besar, jadi
+     * panah fungsi lewat utuh. Yang memutus tag adalah pola `[^>]*` di elemen(), dan di situ
+     * sudah ditangani dengan melewati nilai ber-petik lebih dulu.
      */
     private function memanggilPenghapusServer(string $atribut): bool
     {
-        preg_match_all('/(?:wire:click|x-on:click|@click)[.\w]*="([^"]*)"/', $atribut, $cocok);
+        preg_match_all('/(?:wire:click|x-on:click|@click)[.\w]*="([^"]*)"/s', $atribut, $cocok);
 
         foreach ($cocok[1] ?? [] as $penangan) {
-            // `$wire.hapusBukti()` / `$wire.hapus('…')`
-            if (preg_match('/\$wire\.(hapus|buang|void)[A-Za-z]*\s*\(/', $penangan) === 1) {
+            // `$wire.hapusBukti()` / `$wire.hapus('…')` / `$wire.batalkan('…')`
+            if (preg_match('/\$wire\.(hapus|buang|void|batalkan)[A-Za-z]*\s*\(/', $penangan) === 1) {
                 return true;
             }
 
             // `wire:click="hapus('…')"` atau `wire:click="hapusBukti"` (tanpa tanda kurung).
-            if (preg_match('/^\s*(hapus|buang|void)[A-Za-z]*\s*(\(|$)/', $penangan) === 1) {
+            if (preg_match('/^\s*(hapus|buang|void|batalkan)[A-Za-z]*\s*(\(|$)/', $penangan) === 1) {
                 return true;
             }
         }

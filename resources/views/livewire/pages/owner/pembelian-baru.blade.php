@@ -452,8 +452,29 @@
                                 {{ $bukti ? 'Pilih foto lain' : 'Pilih foto struk' }}
                             </label>
 
+                            {{-- `accept="image/*"`, BUKAN daftar jenis yang spesifik. Cacat nyata yang
+                                 dilaporkan pemilik: dengan `image/jpeg,image/png,image/webp` banyak
+                                 peramban Android TIDAK menawarkan kamera sama sekali — aplikasi
+                                 kameranya mendaftar sebagai penghasil `image/*` dan tersaring keluar
+                                 oleh daftar yang spesifik. Di iOS pilihan "Ambil Foto" ikut hilang.
+                                 Struk difoto di tempat, jadi kamera yang tidak muncul berarti fiturnya
+                                 tidak ada.
+
+                                 `capture="environment"` SENGAJA TIDAK dipakai walaupun ia memaksa
+                                 kamera muncul: atribut itu MENGHAPUS pilihan galeri di banyak peramban
+                                 Android, sehingga struk yang sudah difoto kemarin tidak bisa dipilih
+                                 lagi dan orangnya dipaksa memfoto ulang struk yang sudah kusut. Yang
+                                 dibutuhkan dua-duanya, bukan salah satu.
+
+                                 Harganya: melonggarkan accept membuat iPhone bisa mengirim HEIC, dan
+                                 tumpukan ini tidak bisa membacanya (GD tanpa libheif, Imagick tidak
+                                 ada) — jadi HEIC tetap DITOLAK, dan yang menanggungnya adalah pesan
+                                 galat di SimpanBuktiBelanjaAction::pesan() yang menyebut jalan
+                                 keluarnya. Jangan mengembalikan daftar jenis ke sini sebagai
+                                 "penjagaan": penjagaannya di server, dan yang hilang di sini adalah
+                                 kameranya. --}}
                             <input id="bukti" type="file" wire:model="bukti"
-                                   accept="image/jpeg,image/png,image/webp" class="sr-only">
+                                   accept="image/*" class="sr-only">
 
                             {{-- Membatalkan PILIHAN, bukan menghapus apa pun yang tersimpan:
                                  belum ada nota, belum ada berkas di disk. Karena itu tombolnya

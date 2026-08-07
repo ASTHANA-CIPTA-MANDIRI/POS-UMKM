@@ -772,10 +772,27 @@
                                     {{-- wire:key MEMUAT id notanya: tanpa itu morph Livewire memakai
                                          ulang kotak berkas yang sama saat panel nota lain dibuka, dan
                                          berkas yang masih menempel di elemen lama bisa terpasang ke
-                                         nota yang TIDAK sedang dilihat pemiliknya. --}}
+                                         nota yang TIDAK sedang dilihat pemiliknya.
+
+                                         `accept="image/*"`, BUKAN daftar jenis yang spesifik. Cacat
+                                         nyata yang dilaporkan pemilik: dengan
+                                         `image/jpeg,image/png,image/webp` banyak peramban Android tidak
+                                         menawarkan kamera sama sekali — aplikasi kameranya mendaftar
+                                         sebagai penghasil `image/*` dan tersaring keluar oleh daftar
+                                         yang spesifik; di iOS pilihan "Ambil Foto" ikut hilang.
+
+                                         `capture="environment"` SENGAJA TIDAK dipakai: ia memaksa
+                                         kamera muncul, tapi MENGHAPUS pilihan galeri di banyak peramban
+                                         Android — struk yang sudah difoto kemarin jadi tidak bisa
+                                         dipilih lagi. Yang dibutuhkan dua-duanya.
+
+                                         HEIC dari iPhone tetap DITOLAK (tumpukan ini tidak bisa
+                                         membacanya — GD tanpa libheif, Imagick tidak ada), dan yang
+                                         menanggungnya pesan galat di SimpanBuktiBelanjaAction::pesan()
+                                         yang menyebut jalan keluarnya. --}}
                                     <input id="bukti-nota" type="file" wire:model="bukti"
                                            wire:key="bukti-{{ $notaRincian->getKey() }}"
-                                           accept="image/jpeg,image/png,image/webp" class="sr-only">
+                                           accept="image/*" class="sr-only">
 
                                     @if ($bukti)
                                         {{-- Pasang dulu, baru tersimpan: memilih berkas TIDAK langsung
@@ -851,6 +868,37 @@
                 @php
                     $bolehTandaiDatang = $bisaDitandaiDatang($notaRincian->status);
                     $bolehBatalkan = $notaRincian->status !== \App\Enums\DocumentStatus::Dibatalkan;
+
+                    /*
+                     * Kalimat dialog pembatalan, disusun di sini supaya isinya bisa BERBEDA
+                     * menurut keadaan notanya.
+                     *
+                     * Bentuk lamanya satu kalimat tetap: "Stok yang masuk dari nota ini
+                     * dikembalikan seperti sebelum dicatat." Untuk nota yang barangnya BELUM
+                     * DATANG itu tidak benar — BatalkanPembelianAction hanya menyentuh stok
+                     * dan harga kalau notanya pernah menggerakkannya (status->movesStock()),
+                     * dan aksinya sendiri menuliskan peringatan itu: mengaku "stok
+                     * dikembalikan" untuk nota seperti ini membuat pemilik mencari barang yang
+                     * tidak pernah ada di catatannya. Toast sesudahnya sudah membedakan
+                     * keduanya; kalimat SEBELUM ditekan harus ikut membedakan, karena itulah
+                     * yang dipakai untuk memutuskan.
+                     *
+                     * Yang WAJIB ada, sesuai CLAUDE.md: apa yang hilang, apa yang TIDAK
+                     * hilang, dan apakah bisa dibalik. Peringatan yang lebih menakutkan
+                     * daripada kenyataannya membuat peringatan berikutnya tidak dipercaya —
+                     * jadi "notanya tetap tersimpan" disebut sejelas "tidak bisa dibalik".
+                     *
+                     * Tanpa petik satu pun di dalam kalimatnya bukan kebetulan, walaupun
+                     * Js::from() sudah menanganinya: yang lolos dari penyaringan atribut
+                     * biasanya justru apostrof.
+                     */
+                    $pesanBatal = ($notaRincian->status->movesStock()
+                        ? 'Stok '.($notaRincian->outlet?->outlet_name ?? 'outlet nota ini')
+                            .' yang masuk dari nota ini dikeluarkan kembali, dan harga belinya kembali ke harga nota sebelumnya. '
+                        : 'Barangnya belum datang, jadi tidak ada stok maupun harga yang berubah. ')
+                        .'Notanya sendiri tetap tersimpan berlencana Dibatalkan — riwayat barangnya tidak hilang, '
+                        .'dan foto struknya masih bisa dilihat walau tidak bisa diganti lagi. '
+                        .'Pembatalan tidak bisa dibalik: kalau barangnya ternyata tetap datang, catat nota baru.';
                 @endphp
 
                 {{-- ── Pemicu tindakan nota: SATU baris, terbaca sebagai sepasang ──────
@@ -862,23 +910,32 @@
                      silhouette-nya SAMA (tinggi 44px, ikon berwadah, sudut & tepi sejajar);
                      yang membedakan hanya WARNA, sesuai perannya.
 
-                     Satu `x-data` untuk keduanya (`tanya`: null | 'datang' | 'batal'), jadi
-                     membuka satu pertanyaan menutup yang lain — dua pertanyaan terbuka
-                     sekaligus di kaki panel yang sama membuat orang menjawab yang salah.
-                     `x-cloak` menutup kedipan sebelum Alpine hidup, dan tombol "Ya" ikut
-                     menutup pertanyaannya supaya panel yang dirender ulang tidak tertinggal
-                     dalam keadaan bertanya. --}}
+                     `data-blok="tindakan-nota"` adalah SEAM UJI, bukan hiasan: uji tampilan
+                     memotong "blok foto kwitansi" tepat sebelum baris ini, karena tombol
+                     "Batalkan nota" di sini memang merah dan jendela yang kelewat lebar
+                     membuat uji "belum ada foto tidak merah" gagal karena warna milik tombol
+                     lain. Dulu batasnya string `tanya: null`; itu ikut hilang saat pembatalan
+                     pindah ke dialog, dan penanda yang bisa hilang tanpa disadari adalah
+                     penjaga yang berhenti menjaga.
+
+                     Keadaan Alpine tinggal SATU cabang (`tanyaDatang`), dan hanya dirender
+                     kalau "Tandai barang sudah datang" memang ada. Bentuk lamanya
+                     `tanya: null | 'datang' | 'batal'`; cabang 'batal' pindah ke dialog
+                     SweetAlert bersama, jadi menyimpannya berarti meninggalkan keadaan
+                     menganggur yang terbaca seperti pengaman yang masih bekerja. --}}
                 @if ($bolehTandaiDatang || $bolehBatalkan)
-                    <div class="mt-4 border-t border-line-soft pt-4" x-data="{ tanya: null }">
+                    <div class="mt-4 border-t border-line-soft pt-4" data-blok="tindakan-nota"
+                         @if ($bolehTandaiDatang) x-data="{ tanyaDatang: false }" @endif>
                         {{-- Jalur pemicu. Di ponsel bertumpuk lebar penuh; di ≥sm sebaris,
                              seukuran isinya, dengan tinggi yang sama. --}}
-                        <div x-show="tanya === null" class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                        <div @if ($bolehTandaiDatang) x-show="! tanyaDatang" @endif
+                             class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                             {{-- "Tandai barang sudah datang" TETAP tidak merah: bukan tindakan
                                  merusak, tidak ada yang hilang, dan aksinya idempoten. Kalau ia
                                  ikut merah, merah pada "Batalkan nota" di sebelahnya melemah dan
                                  warnanya berhenti jadi aturan (lihat CLAUDE.md). --}}
                             @if ($bolehTandaiDatang)
-                                <button type="button" x-on:click="tanya = 'datang'"
+                                <button type="button" x-on:click="tanyaDatang = true"
                                         class="tombol-kedua h-11 w-full cursor-pointer px-4 text-[0.8125rem] sm:w-auto">
                                     <span class="tombol-ikon">
                                         <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
@@ -895,9 +952,41 @@
                                  owner dipakai di tablet dan HP, dan di sana hover TIDAK ADA, jadi
                                  tanda bahayanya tidak pernah muncul. `merah-tua` (7,14:1 di atas
                                  tint), bukan `merah-deep` (4,15:1). Bukan `.tombol-bahaya` — itu
-                                 untuk tindakan merusaknya sendiri di dalam blok konfirmasi. --}}
+                                 untuk tindakan merusaknya sendiri, yaitu tombol "Ya" di dalam
+                                 dialognya.
+
+                                 Konfirmasinya lewat pembungkus SweetAlert bersama
+                                 (window.konfirmasiNampan, resources/js/toast.js) — aturan pemilik
+                                 proyek: "untuk delete gunakan sweet alert, terapkan di semua fitur".
+                                 Aturan itu sudah dipakai "Hapus foto" di berkas yang SAMA beberapa
+                                 baris di atas, dan tombol ini terlewat: ia masih memakai panel dua
+                                 langkah sebaris, jadi tindakan paling merusak di layar ini justru
+                                 satu-satunya yang tidak memunculkan dialog. Judulnya MENYEBUT nomor
+                                 notanya, dan pesannya (disusun di @php di atas) menyebut apa yang
+                                 hilang, apa yang tetap ada, dan bahwa pembatalan tidak bisa dibalik.
+
+                                 Js::from(), bukan echo Blade biasa: echo mengubah apostrof menjadi
+                                 &#039;, dan peramban mengurai entitas itu KEMBALI menjadi apostrof di
+                                 dalam nilai atribut — memutus string JS-nya dan mematikan tombolnya
+                                 tanpa satu pun galat yang terlihat di layar. Nama outlet diketik
+                                 pemilik, jadi apostrof di situ bukan hal yang mustahil.
+
+                                 Dialognya BUKAN pengaman: batalkan() di server tetap memeriksa tenant
+                                 & outlet, dan BatalkanPembelianAction tetap idempoten — muatan
+                                 Livewire bisa dikirim tanpa pernah melewati dialog apa pun.
+
+                                 Pemicunya hidup DI SINI, di kaki panel rincian, dan bukan sebagai
+                                 ikon di setiap baris daftar: yang dibatalkan adalah seluruh nota
+                                 beserta mutasi stoknya, dan tindakan sebesar itu tidak boleh berjarak
+                                 satu ketukan jempol dari tombol "lihat". --}}
                             @if ($bolehBatalkan)
-                                <button type="button" x-on:click="tanya = 'batal'"
+                                <button type="button" x-data
+                                        x-on:click="window.konfirmasiNampan({
+                                            judul: {{ \Illuminate\Support\Js::from('Batalkan nota '.$notaRincian->nomor_po.'?') }},
+                                            pesan: {{ \Illuminate\Support\Js::from($pesanBatal) }},
+                                            tombolYa: 'Ya, batalkan nota',
+                                            tombolBatal: 'Tidak jadi',
+                                        }).then((ya) => ya && $wire.batalkan({{ \Illuminate\Support\Js::from($notaRincian->getKey()) }}))"
                                         class="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-merah/25 bg-merah/10 px-4 text-[0.8125rem] font-semibold text-merah-tua transition-colors hover:border-merah/45 hover:bg-merah/15 sm:w-auto">
                                     <span class="tombol-ikon bg-merah/15 text-merah-tua">
                                         <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
@@ -909,15 +998,23 @@
                             @endif
                         </div>
 
-                        {{-- Konfirmasi "sudah datang". Dua langkah dengan alasan yang berbeda dari
-                             pembatalan: yang perlu dibaca sebelum ditekan adalah apa yang terjadi
-                             pada barang yang datang TIDAK SESUAI nota. Terima sebagian tidak
-                             dibangun (isi notanya masuk penuh), jadi kalimat
-                             $catatanTerimaSebagian dari komponen WAJIB terpasang di sini — tanpa
-                             itu pemilik yang menerima 8 dari 10 mengarang jalannya sendiri, dan
-                             yang dikarang biasanya "biarkan saja". --}}
+                        {{-- Konfirmasi "sudah datang" — TETAP panel dua langkah, dan itu keputusan
+                             yang disengaja, bukan yang terlewat.
+
+                             "Tandai barang sudah datang" bukan tindakan merusak: tidak ada yang
+                             hilang dan aksinya idempoten. Yang perlu DIBACA sebelum ditekan adalah
+                             apa yang terjadi pada barang yang datang TIDAK SESUAI nota — terima
+                             sebagian tidak dibangun (isi notanya masuk penuh), jadi kalimat
+                             $catatanTerimaSebagian dari komponen WAJIB terpasang di sini. Tanpa itu
+                             pemilik yang menerima 8 dari 10 mengarang jalannya sendiri, dan yang
+                             dikarang biasanya "biarkan saja".
+
+                             Memaksanya ke dialog SweetAlert akan menghilangkan medan catatan
+                             terima-sebagian itu, dan warnanya harus tetap netral supaya merah pada
+                             "Batalkan nota" di sebelahnya tidak melemah. Jangan menyatukan keduanya
+                             "supaya seragam"; yang seragam adalah aturannya, bukan bentuknya. --}}
                         @if ($bolehTandaiDatang)
-                            <div x-cloak x-show="tanya === 'datang'">
+                            <div x-cloak x-show="tanyaDatang">
                                 <p class="text-[0.8125rem] text-ink">
                                     <span class="font-bold">Tandai nota {{ $notaRincian->nomor_po }} sudah datang?</span>
                                     Stok {{ $notaRincian->outlet?->outlet_name ?? 'outlet nota ini' }} langsung bertambah
@@ -926,38 +1023,13 @@
                                 <p class="mt-1.5 text-[0.8125rem] text-umber">{{ $catatanTerimaSebagian }}</p>
                                 <div class="mt-2.5 flex gap-2">
                                     <button type="button" wire:click="tandaiDatang('{{ $notaRincian->getKey() }}')"
-                                            x-on:click="tanya = null" wire:loading.attr="disabled"
+                                            x-on:click="tanyaDatang = false" wire:loading.attr="disabled"
                                             class="tombol-utama h-11 flex-1 cursor-pointer px-4 text-[0.8125rem] sm:flex-none">
                                         Ya, barangnya sudah datang
                                     </button>
-                                    <button type="button" x-on:click="tanya = null"
+                                    <button type="button" x-on:click="tanyaDatang = false"
                                             class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:flex-none">
                                         Belum
-                                    </button>
-                                </div>
-                            </div>
-                        @endif
-
-                        {{-- Konfirmasi pembatalan. Diletakkan DI SINI, bukan sebagai ikon di
-                             setiap baris daftar: yang dibatalkan adalah seluruh nota beserta
-                             mutasi stoknya, dan tindakan sebesar itu tidak boleh berjarak satu
-                             ketukan jempol dari tombol "lihat". --}}
-                        @if ($bolehBatalkan)
-                            <div x-cloak x-show="tanya === 'batal'">
-                                <p class="text-[0.8125rem] text-ink">
-                                    <span class="font-bold">Batalkan nota {{ $notaRincian->nomor_po }}?</span>
-                                    Stok yang masuk dari nota ini dikembalikan seperti sebelum dicatat. Notanya tetap
-                                    tersimpan supaya riwayat barangnya masih bisa dibuka.
-                                </p>
-                                <div class="mt-2.5 flex gap-2">
-                                    <button type="button" wire:click="batalkan('{{ $notaRincian->getKey() }}')"
-                                            x-on:click="tanya = null" wire:loading.attr="disabled"
-                                            class="tombol-bahaya h-11 flex-1 cursor-pointer px-4 text-[0.8125rem] sm:flex-none">
-                                        Ya, batalkan nota
-                                    </button>
-                                    <button type="button" x-on:click="tanya = null"
-                                            class="h-11 flex-1 cursor-pointer rounded-xl border border-line px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:flex-none">
-                                        Tidak jadi
                                     </button>
                                 </div>
                             </div>

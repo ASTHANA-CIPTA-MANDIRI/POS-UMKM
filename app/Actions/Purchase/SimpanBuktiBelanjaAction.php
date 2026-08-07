@@ -76,13 +76,39 @@ class SimpanBuktiBelanjaAction
      * lang/id), jadi tanpa blok ini pemilik warung membaca "The foto bukti must not be
      * greater than 4096 kilobytes." di layarnya sendiri.
      *
+     * KENAPA pesan jenis berkas menyebut iPhone & HEIC. Kotak unggahnya memakai
+     * `accept="image/*"` — wajib, karena daftar jenis yang spesifik membuat banyak peramban
+     * Android tidak menawarkan KAMERA sama sekali (aplikasi kameranya mendaftar sebagai
+     * penghasil `image/*` lalu tersaring keluar). Harga dari kelonggaran itu: iPhone bisa
+     * mengirim HEIC/HEIF, dan HEIC memang ditolak di sini.
+     *
+     * Ditolak, bukan diterima, dan itu keputusan yang diukur — bukan selera: PHP di repo ini
+     * TIDAK BISA membaca HEIC (GD tanpa libheif; `getimagesize()` dan
+     * `imagecreatefromstring()` sama-sama gagal atas berkas HEIC sungguhan, dan ekstensi
+     * Imagick tidak terpasang), jadi menerimanya berarti menyimpan berkas yang tidak bisa
+     * dijadikan pratinjau di formulir dan tidak bisa dibuka di peramban Android maupun
+     * dekstop — persis pada satu-satunya saat bukti itu dibutuhkan. Bukti yang tersimpan tapi
+     * tidak bisa dilihat lebih buruk daripada penolakan yang menyebut jalan keluarnya.
+     *
+     * Karena itu pesannya WAJIB menyebut jalan keluarnya, dan jalan keluarnya harus yang
+     * benar-benar ada di HP-nya: setelan format kamera iOS. Pesan yang hanya berbunyi "harus
+     * JPG, PNG, atau WEBP" tidak bisa dikerjakan oleh orang yang tidak tahu fotonya berformat
+     * apa — dan HEIC adalah bawaan iPhone sejak iOS 11, jadi ia tidak pernah memilihnya.
+     *
+     * `image` dan `mimes` sengaja BERBUNYI SAMA: keduanya gagal bersamaan untuk HEIC, dan
+     * MessageBag membuang duplikat — jadi yang terbaca satu pesan, bukan dua yang mirip.
+     *
      * @return array<string, string>
      */
     public static function pesan(): array
     {
+        $jenis = 'Fotonya belum bisa dibaca di sini — yang bisa cuma JPG, PNG, atau WEBP. '
+            .'Kalau ini foto dari iPhone, biasanya formatnya HEIC: buka Pengaturan > Kamera > Format, '
+            .'pilih Paling Kompatibel, lalu foto struknya sekali lagi.';
+
         return [
-            'image' => 'Bukti belanja harus berupa foto — JPG, PNG, atau WEBP.',
-            'mimes' => 'Bukti belanja harus berupa foto — JPG, PNG, atau WEBP.',
+            'image' => $jenis,
+            'mimes' => $jenis,
             'max' => 'Fotonya kelewat besar. Paling besar '.self::labelBatas()
                 .' — potret ulang dengan ukuran lebih kecil, atau simpan notanya dulu tanpa foto.',
         ];
