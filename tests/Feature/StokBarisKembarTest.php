@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Stock\ApplySaleToStockAction;
-use App\Actions\Stock\SiapkanBarisStokAction;
+use App\Actions\Stok\ApplySaleToStockAction;
+use App\Actions\Stok\SiapkanBarisStokAction;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Enums\TransactionMode;

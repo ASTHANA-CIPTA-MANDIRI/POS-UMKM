@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Owner;
 
-use App\Actions\Purchase\SimpanBuktiBelanjaAction;
+use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Http\Controllers\Controller;
 use App\Models\Pembelian\PurchaseOrder;
 use Illuminate\Http\Request;

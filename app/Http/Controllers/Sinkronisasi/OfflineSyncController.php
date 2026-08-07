@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Sinkronisasi;
 
-use App\Actions\Sync\SyncOfflineTransactionsAction;
-use App\Http\Requests\SyncOfflineTransactionsRequest;
+use App\Actions\Sinkronisasi\SyncOfflineTransactionsAction;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Sinkronisasi\SyncOfflineTransactionsRequest;
 use Illuminate\Http\JsonResponse;
 
 class OfflineSyncController extends Controller

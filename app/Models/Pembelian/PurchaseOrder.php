@@ -2,7 +2,7 @@
 
 namespace App\Models\Pembelian;
 
-use App\Actions\Purchase\SimpanBuktiBelanjaAction;
+use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Enums\DocumentStatus;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Stok\StockMovement;

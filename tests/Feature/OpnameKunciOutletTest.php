@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Stock\AdjustStockAction;
-use App\Actions\Stock\SusunBarisStokAction;
+use App\Actions\Stok\AdjustStockAction;
+use App\Actions\Stok\SusunBarisStokAction;
 use App\Enums\AlasanOpname;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;

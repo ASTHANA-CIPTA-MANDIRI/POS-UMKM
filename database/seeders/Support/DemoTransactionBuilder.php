@@ -2,7 +2,7 @@
 
 namespace Database\Seeders\Support;
 
-use App\Actions\Stock\ApplySaleToStockAction;
+use App\Actions\Stok\ApplySaleToStockAction;
 use App\Enums\CashMovementType;
 use App\Enums\CashSessionStatus;
 use App\Enums\PaymentMethod;

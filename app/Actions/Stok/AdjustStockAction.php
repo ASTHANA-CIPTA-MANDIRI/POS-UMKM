@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Stock;
+namespace App\Actions\Stok;
 
 use App\Enums\AlasanOpname;
 use App\Enums\StockMovementType;

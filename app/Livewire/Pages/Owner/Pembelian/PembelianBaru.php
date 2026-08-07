@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Pages\Owner\Pembelian;
 
-use App\Actions\Purchase\CatatPembelianAction;
-use App\Actions\Purchase\SimpanBuktiBelanjaAction;
-use App\Actions\Stock\SusunBarisStokAction;
+use App\Actions\Pembelian\CatatPembelianAction;
+use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
+use App\Actions\Stok\SusunBarisStokAction;
 use App\Enums\Satuan;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;

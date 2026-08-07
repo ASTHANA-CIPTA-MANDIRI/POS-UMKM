@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Actions\Sync;
+namespace App\Actions\Sinkronisasi;
 
-use App\Actions\Stock\ApplySaleToStockAction;
+use App\Actions\Stok\ApplySaleToStockAction;
 use App\Enums\BillStatus;
 use App\Enums\CashMovementType;
 use App\Enums\PaymentMethod;

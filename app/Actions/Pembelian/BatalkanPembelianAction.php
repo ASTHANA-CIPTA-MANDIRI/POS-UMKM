@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Actions\Purchase;
+namespace App\Actions\Pembelian;
 
-use App\Actions\Stock\AdjustStockAction;
-use App\Actions\Stock\SiapkanBarisStokAction;
+use App\Actions\Stok\AdjustStockAction;
+use App\Actions\Stok\SiapkanBarisStokAction;
 use App\Enums\DocumentStatus;
 use App\Enums\StockMovementType;
 use App\Models\Bahan\RawMaterial;

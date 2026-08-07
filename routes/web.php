@@ -3,8 +3,8 @@
 use App\Http\Controllers\Auth\KeluarController;
 use App\Http\Controllers\Kasir\KatalogController;
 use App\Http\Controllers\Kasir\SisaStokController;
-use App\Http\Controllers\OfflineSyncController;
 use App\Http\Controllers\Owner\LampiranController;
+use App\Http\Controllers\Sinkronisasi\OfflineSyncController;
 use App\Livewire\Pages\Admin\Dasbor\Dasbor as DasborAdmin;
 use App\Livewire\Pages\Auth\Masuk\Masuk;
 use App\Livewire\Pages\Auth\Masuk\MasukKasir;

@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Pages\Owner\Produk;
 
-use App\Actions\Stock\SiapkanBarisStokAction;
+use App\Actions\Stok\SiapkanBarisStokAction;
 use App\Enums\Satuan;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;

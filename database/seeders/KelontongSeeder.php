@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Actions\Purchase\CatatPembelianAction;
+use App\Actions\Pembelian\CatatPembelianAction;
 use App\Enums\BusinessType;
 use App\Enums\DeviceOwnership;
 use App\Enums\DeviceType;

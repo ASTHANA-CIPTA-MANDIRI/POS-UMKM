@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\Purchase\SimpanBuktiBelanjaAction;
+use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Models\Pembelian\PurchaseOrder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Sync\SyncOfflineTransactionsAction;
+use App\Actions\Sinkronisasi\SyncOfflineTransactionsAction;
 use App\Enums\BusinessType;
 use App\Enums\CashMovementType;
 use App\Enums\PaymentMethod;

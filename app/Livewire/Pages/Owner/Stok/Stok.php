@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Pages\Owner\Stok;
 
-use App\Actions\Stock\SiapkanBarisStokAction;
-use App\Actions\Stock\SusunBarisStokAction;
+use App\Actions\Stok\SiapkanBarisStokAction;
+use App\Actions\Stok\SusunBarisStokAction;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;
 use App\Models\Bahan\RawMaterial;

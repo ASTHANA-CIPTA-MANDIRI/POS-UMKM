@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Actions\Sync\SyncOfflineTransactionsAction;
+use App\Actions\Sinkronisasi\SyncOfflineTransactionsAction;
 use App\Enums\CashSessionStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\TransactionMode;

@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Purchase\BatalkanPembelianAction;
-use App\Actions\Purchase\SimpanBuktiBelanjaAction;
+use App\Actions\Pembelian\BatalkanPembelianAction;
+use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Enums\UserRole;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;

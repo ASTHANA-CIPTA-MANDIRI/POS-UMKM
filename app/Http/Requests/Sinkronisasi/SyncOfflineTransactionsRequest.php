@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Sinkronisasi;
 
 use App\Enums\BillStatus;
 use App\Enums\PaymentMethod;

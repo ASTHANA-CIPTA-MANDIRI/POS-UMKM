@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Purchase\BatalkanPembelianAction;
-use App\Actions\Purchase\TerimaPembelianAction;
-use App\Actions\Stock\SusunBarisStokAction;
+use App\Actions\Pembelian\BatalkanPembelianAction;
+use App\Actions\Pembelian\TerimaPembelianAction;
+use App\Actions\Stok\SusunBarisStokAction;
 use App\Enums\Satuan;
 use App\Enums\UserRole;
 use App\Livewire\Pages\Owner\Bahan\Bahan as LayarBahan;

@@ -2,7 +2,7 @@
 
 namespace App\Actions\Kasir;
 
-use App\Actions\Stock\SusunBarisStokAction;
+use App\Actions\Stok\SusunBarisStokAction;
 use App\Models\Produk\Product;
 
 /**

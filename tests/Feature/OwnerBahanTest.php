@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Stock\ApplySaleToStockAction;
+use App\Actions\Stok\ApplySaleToStockAction;
 use App\Enums\BusinessType;
 use App\Enums\DocumentStatus;
 use App\Enums\Satuan;

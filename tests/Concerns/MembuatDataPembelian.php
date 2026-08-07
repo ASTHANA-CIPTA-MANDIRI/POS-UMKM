@@ -2,7 +2,7 @@
 
 namespace Tests\Concerns;
 
-use App\Actions\Purchase\CatatPembelianAction;
+use App\Actions\Pembelian\CatatPembelianAction;
 use App\Enums\Satuan;
 use App\Models\Bahan\RawMaterial;
 use App\Models\Pembelian\PurchaseOrder;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Stock;
+namespace App\Actions\Stok;
 
 use App\Models\Bahan\RawMaterial;
 use App\Models\Produk\Product;

@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Pages\Owner\Stok;
 
-use App\Actions\Stock\CatatOpnameAction;
-use App\Actions\Stock\SusunBarisStokAction;
+use App\Actions\Stok\CatatOpnameAction;
+use App\Actions\Stok\SusunBarisStokAction;
 use App\Enums\AlasanOpname;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;

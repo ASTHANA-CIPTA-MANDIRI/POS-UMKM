@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions\Purchase;
+namespace App\Actions\Pembelian;
 
 use App\Enums\DocumentStatus;
 use App\Models\Pembelian\PurchaseOrder;

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Sync\SyncOfflineTransactionsAction;
+use App\Actions\Sinkronisasi\SyncOfflineTransactionsAction;
 use App\Enums\PaymentMethod;
 use App\Enums\Satuan;
 use App\Enums\TransactionMode;

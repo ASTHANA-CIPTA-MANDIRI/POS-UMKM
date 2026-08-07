@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Kas\BukaSesiKasAction;
 use App\Actions\Kasir\SusunSisaStokAction;
-use App\Actions\Stock\SusunBarisStokAction;
+use App\Actions\Stok\SusunBarisStokAction;
 use App\Enums\Satuan;
 use App\Enums\UserRole;
 use App\Models\Bahan\RawMaterial;

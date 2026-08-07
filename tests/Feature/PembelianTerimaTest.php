@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Purchase\BatalkanPembelianAction;
-use App\Actions\Purchase\TerimaPembelianAction;
+use App\Actions\Pembelian\BatalkanPembelianAction;
+use App\Actions\Pembelian\TerimaPembelianAction;
 use App\Enums\DocumentStatus;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
