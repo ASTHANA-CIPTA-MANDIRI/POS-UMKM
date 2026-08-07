@@ -8,10 +8,10 @@ use App\Enums\DocumentStatus;
 use App\Enums\UserRole;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
-use App\Models\Outlet;
-use App\Models\PurchaseOrder;
-use App\Models\Tenant;
-use App\Models\User;
+use App\Models\Pembelian\PurchaseOrder;
+use App\Models\Tenant\Outlet;
+use App\Models\Tenant\Tenant;
+use App\Models\Tenant\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -692,7 +692,11 @@ class PembelianBuktiTest extends TestCase
             .implode(', ', $pelanggarDisk));
 
         // Dan modelnya sendiri memang memakai rutenya, bukan asset('storage/…').
-        $sumberModel = (string) file_get_contents(app_path('Models/PurchaseOrder.php'));
+        // Jalurnya diturunkan dari kelasnya, bukan dituliskan: `app_path('Models/…')` memerah
+        // begitu modelnya dikelompokkan ke folder fitur, padahal tidak ada perilaku yang
+        // berubah — dan uji yang merah karena berkas berpindah mengajari orang untuk tidak
+        // merapikan struktur.
+        $sumberModel = (string) file_get_contents((new \ReflectionClass(PurchaseOrder::class))->getFileName());
 
         $this->assertStringContainsString("route('owner.lampiran.lihat'", $sumberModel,
             'PurchaseOrder::urlBukti() adalah satu-satunya penyusun URL bukti; kalau ia berhenti '

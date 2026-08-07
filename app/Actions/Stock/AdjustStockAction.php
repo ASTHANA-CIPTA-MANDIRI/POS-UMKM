@@ -4,8 +4,8 @@ namespace App\Actions\Stock;
 
 use App\Enums\AlasanOpname;
 use App\Enums\StockMovementType;
-use App\Models\Stock;
-use App\Models\StockMovement;
+use App\Models\Stok\Stock;
+use App\Models\Stok\StockMovement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 

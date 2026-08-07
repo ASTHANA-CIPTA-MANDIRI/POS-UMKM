@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Pages\Auth\Masuk;
 
-use App\Models\User;
+use App\Models\Tenant\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;

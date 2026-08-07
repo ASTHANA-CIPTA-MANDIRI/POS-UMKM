@@ -3,8 +3,8 @@
 namespace App\Actions\Kas;
 
 use App\Enums\CashSessionStatus;
-use App\Models\CashSession;
-use App\Models\User;
+use App\Models\Kas\CashSession;
+use App\Models\Tenant\User;
 use RuntimeException;
 
 /**

@@ -3,7 +3,7 @@
 namespace App\Models\Concerns;
 
 use App\Models\Scopes\TenantScope;
-use App\Models\Tenant;
+use App\Models\Tenant\Tenant;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

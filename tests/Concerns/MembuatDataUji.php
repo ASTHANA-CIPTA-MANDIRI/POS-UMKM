@@ -7,10 +7,10 @@ use App\Enums\DeviceType;
 use App\Enums\TenantStatus;
 use App\Enums\TransactionMode;
 use App\Enums\UserRole;
-use App\Models\Device;
-use App\Models\Outlet;
-use App\Models\Tenant;
-use App\Models\User;
+use App\Models\Tenant\Device;
+use App\Models\Tenant\Outlet;
+use App\Models\Tenant\Tenant;
+use App\Models\Tenant\User;
 use App\Support\TenantContext;
 
 /**

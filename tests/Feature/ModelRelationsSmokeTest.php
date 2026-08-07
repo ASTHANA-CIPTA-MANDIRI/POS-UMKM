@@ -52,13 +52,31 @@ class ModelRelationsSmokeTest extends TestCase
     }
 
     /** @return array<int, class-string<Model>> */
+    /**
+     * Semua model, MENURUNI folder fitur.
+     *
+     * Bentuk lamanya `->depth(0)` dengan FQCN disusun dari nama berkas saja
+     * (`'App\Models\'.$namaBerkas`). Begitu model dikelompokkan ke folder per fitur, ia
+     * menemukan NOL model — dan yang menyelamatkan keadaan bukan uji relasinya, melainkan
+     * `assertGreaterThanOrEqual(25, …)` di pemanggilnya: tanpa baris itu, `foreach` atas
+     * larik kosong membuat ujinya HIJAU sambil tidak memeriksa satu pun relasi. Penjaga
+     * yang memindai harus menegaskan bahwa ia menemukan sesuatu.
+     *
+     * Namespace-nya DITURUNKAN dari jalur relatifnya, bukan ditebak dari nama berkas, supaya
+     * pengelompokan berikutnya tidak memerahkan uji ini lagi.
+     *
+     * @return list<class-string<Model>>
+     */
     private function modelClasses(): array
     {
         $classes = [];
+        $akar = app_path('Models');
 
-        foreach (Finder::create()->files()->in(app_path('Models'))->name('*.php')->depth(0) as $file) {
+        foreach (Finder::create()->files()->in($akar)->name('*.php') as $file) {
             /** @var SplFileInfo $file */
-            $class = 'App\\Models\\'.Str::before($file->getFilename(), '.php');
+            $relatif = trim(str_replace($akar, '', $file->getPath()), DIRECTORY_SEPARATOR);
+            $ruang = 'App\\Models'.($relatif === '' ? '' : '\\'.str_replace(DIRECTORY_SEPARATOR, '\\', $relatif));
+            $class = $ruang.'\\'.Str::before($file->getFilename(), '.php');
 
             if (is_subclass_of($class, Model::class)) {
                 $classes[] = $class;

@@ -7,7 +7,7 @@ use App\Actions\Stock\SusunBarisStokAction;
 use App\Enums\AlasanOpname;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;
-use App\Models\Outlet;
+use App\Models\Tenant\Outlet;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;

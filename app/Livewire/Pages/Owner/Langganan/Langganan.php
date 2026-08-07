@@ -3,8 +3,8 @@
 namespace App\Livewire\Pages\Owner\Langganan;
 
 use App\Livewire\Concerns\TerikatTenant;
-use App\Models\Invoice;
-use App\Models\Subscription;
+use App\Models\Langganan\Invoice;
+use App\Models\Langganan\Subscription;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 

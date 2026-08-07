@@ -6,7 +6,7 @@ use App\Actions\Kas\BukaSesiKasAction;
 use App\Actions\Kas\TutupSesiKasAction;
 use App\Actions\Kasir\SusunKatalogAction;
 use App\Livewire\Concerns\TerikatTenant;
-use App\Models\CashSession;
+use App\Models\Kas\CashSession;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use RuntimeException;

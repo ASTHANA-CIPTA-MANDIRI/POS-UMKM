@@ -2,9 +2,9 @@
 
 namespace App\Actions\Stock;
 
-use App\Models\Product;
-use App\Models\RawMaterial;
-use App\Models\Stock;
+use App\Models\Bahan\RawMaterial;
+use App\Models\Produk\Product;
+use App\Models\Stok\Stock;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;

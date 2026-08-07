@@ -3,7 +3,7 @@
 namespace App\Actions\Kas;
 
 use App\Enums\CashSessionStatus;
-use App\Models\CashSession;
+use App\Models\Kas\CashSession;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 

@@ -2,9 +2,9 @@
 
 namespace App\Actions\Kasir;
 
-use App\Models\Customer;
-use App\Models\Product;
-use App\Models\User;
+use App\Models\Pelanggan\Customer;
+use App\Models\Produk\Product;
+use App\Models\Tenant\User;
 
 /**
  * Menyusun seluruh bekal yang dibutuhkan layar kasir dalam satu bentuk.

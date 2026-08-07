@@ -3,7 +3,7 @@
 namespace App\Actions\Kasir;
 
 use App\Actions\Stock\SusunBarisStokAction;
-use App\Models\Product;
+use App\Models\Produk\Product;
 
 /**
  * Menyusun kabar sisa stok untuk PETAK PRODUK di layar kasir.

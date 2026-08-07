@@ -6,12 +6,12 @@ use App\Actions\Stock\AdjustStockAction;
 use App\Actions\Stock\SiapkanBarisStokAction;
 use App\Enums\DocumentStatus;
 use App\Enums\StockMovementType;
-use App\Models\Product;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
-use App\Models\RawMaterial;
+use App\Models\Bahan\RawMaterial;
+use App\Models\Pembelian\PurchaseOrder;
+use App\Models\Pembelian\PurchaseOrderItem;
+use App\Models\Produk\Product;
 use App\Models\Scopes\TenantScope;
-use App\Models\User;
+use App\Models\Tenant\User;
 use Illuminate\Support\Facades\DB;
 
 /**

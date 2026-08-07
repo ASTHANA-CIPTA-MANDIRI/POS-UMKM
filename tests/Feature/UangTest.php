@@ -4,11 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\Satuan;
 use App\Enums\UserRole;
-use App\Models\Outlet;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
-use App\Models\Tenant;
-use App\Models\User;
+use App\Models\Pembelian\PurchaseOrder;
+use App\Models\Pembelian\PurchaseOrderItem;
+use App\Models\Tenant\Outlet;
+use App\Models\Tenant\Tenant;
+use App\Models\Tenant\User;
 use App\Support\Uang;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;

@@ -3,10 +3,10 @@
 namespace App\Actions\Stock;
 
 use App\Enums\StockMovementType;
-use App\Models\Product;
-use App\Models\Stock;
-use App\Models\StockMovement;
-use App\Models\Transaction;
+use App\Models\Kasir\Transaction;
+use App\Models\Produk\Product;
+use App\Models\Stok\Stock;
+use App\Models\Stok\StockMovement;
 
 /**
  * Menurunkan stok akibat penjualan.

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Owner;
 
 use App\Actions\Purchase\SimpanBuktiBelanjaAction;
 use App\Http\Controllers\Controller;
-use App\Models\PurchaseOrder;
+use App\Models\Pembelian\PurchaseOrder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;

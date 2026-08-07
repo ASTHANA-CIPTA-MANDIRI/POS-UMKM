@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
-use App\Models\Outlet;
-use App\Models\PurchaseOrder;
-use App\Models\Tenant;
-use App\Models\User;
+use App\Models\Pembelian\PurchaseOrder;
+use App\Models\Tenant\Outlet;
+use App\Models\Tenant\Tenant;
+use App\Models\Tenant\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Concerns\MembuatDataPembelian;

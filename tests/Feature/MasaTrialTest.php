@@ -4,10 +4,10 @@ namespace Tests\Feature;
 
 use App\Enums\SubscriptionStatus;
 use App\Enums\TenantStatus;
-use App\Models\AuditLog;
-use App\Models\Plan;
-use App\Models\Subscription;
-use App\Models\Tenant;
+use App\Models\Langganan\Plan;
+use App\Models\Langganan\Subscription;
+use App\Models\Sistem\AuditLog;
+use App\Models\Tenant\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\MembuatDataUji;
 use Tests\TestCase;

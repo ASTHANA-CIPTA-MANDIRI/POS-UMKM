@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Actions\Purchase\SimpanBuktiBelanjaAction;
-use App\Models\PurchaseOrder;
+use App\Models\Pembelian\PurchaseOrder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 

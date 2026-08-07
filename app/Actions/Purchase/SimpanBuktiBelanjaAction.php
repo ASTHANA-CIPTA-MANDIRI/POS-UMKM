@@ -3,7 +3,7 @@
 namespace App\Actions\Purchase;
 
 use App\Enums\DocumentStatus;
-use App\Models\PurchaseOrder;
+use App\Models\Pembelian\PurchaseOrder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;

@@ -2,9 +2,9 @@
 
 namespace App\Providers;
 
-use App\Models\PurchaseOrder;
-use App\Models\StockTransfer;
-use App\Models\Transaction;
+use App\Models\Kasir\Transaction;
+use App\Models\Pembelian\PurchaseOrder;
+use App\Models\Stok\StockTransfer;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;

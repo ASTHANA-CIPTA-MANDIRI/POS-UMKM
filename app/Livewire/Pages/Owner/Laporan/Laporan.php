@@ -3,10 +3,10 @@
 namespace App\Livewire\Pages\Owner\Laporan;
 
 use App\Livewire\Concerns\TerikatTenant;
-use App\Models\Outlet;
-use App\Models\Transaction;
-use App\Models\TransactionItem;
-use App\Models\TransactionPayment;
+use App\Models\Kasir\Transaction;
+use App\Models\Kasir\TransactionItem;
+use App\Models\Kasir\TransactionPayment;
+use App\Models\Tenant\Outlet;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;

@@ -7,7 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\TransactionMode;
 use App\Enums\TransactionOrigin;
 use App\Enums\TransactionStatus;
-use App\Models\Bill;
+use App\Models\Kasir\Bill;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;

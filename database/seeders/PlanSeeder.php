@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Plan;
+use App\Models\Langganan\Plan;
 use Illuminate\Database\Seeder;
 
 /**

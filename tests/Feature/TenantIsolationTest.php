@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\BusinessType;
 use App\Enums\TenantStatus;
-use App\Models\Product;
-use App\Models\Tenant;
+use App\Models\Produk\Product;
+use App\Models\Tenant\Tenant;
 use App\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;

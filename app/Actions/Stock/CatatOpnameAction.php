@@ -4,9 +4,9 @@ namespace App\Actions\Stock;
 
 use App\Enums\AlasanOpname;
 use App\Enums\StockMovementType;
-use App\Models\Outlet;
-use App\Models\Stock;
-use App\Models\User;
+use App\Models\Stok\Stock;
+use App\Models\Tenant\Outlet;
+use App\Models\Tenant\User;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Throwable;

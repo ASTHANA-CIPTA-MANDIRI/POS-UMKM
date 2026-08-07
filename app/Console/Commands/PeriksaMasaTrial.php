@@ -4,9 +4,9 @@ namespace App\Console\Commands;
 
 use App\Enums\SubscriptionStatus;
 use App\Enums\TenantStatus;
-use App\Models\AuditLog;
-use App\Models\Subscription;
-use App\Models\Tenant;
+use App\Models\Langganan\Subscription;
+use App\Models\Sistem\AuditLog;
+use App\Models\Tenant\Tenant;
 use App\Support\TenantContext;
 use Illuminate\Console\Command;
 

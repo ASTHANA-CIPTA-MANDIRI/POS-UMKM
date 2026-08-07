@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Pages\Auth\Masuk;
 
-use App\Models\Device;
-use App\Models\User;
+use App\Models\Tenant\Device;
+use App\Models\Tenant\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;

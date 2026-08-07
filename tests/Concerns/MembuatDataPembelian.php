@@ -4,12 +4,12 @@ namespace Tests\Concerns;
 
 use App\Actions\Purchase\CatatPembelianAction;
 use App\Enums\Satuan;
-use App\Models\Outlet;
-use App\Models\Product;
-use App\Models\PurchaseOrder;
-use App\Models\RawMaterial;
-use App\Models\Stock;
-use App\Models\User;
+use App\Models\Bahan\RawMaterial;
+use App\Models\Pembelian\PurchaseOrder;
+use App\Models\Produk\Product;
+use App\Models\Stok\Stock;
+use App\Models\Tenant\Outlet;
+use App\Models\Tenant\User;
 
 /**
  * Penyiapan data yang dipakai berulang oleh berkas uji Pembelian.

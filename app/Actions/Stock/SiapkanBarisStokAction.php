@@ -3,7 +3,7 @@
 namespace App\Actions\Stock;
 
 use App\Models\Scopes\TenantScope;
-use App\Models\Stock;
+use App\Models\Stok\Stock;
 use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
