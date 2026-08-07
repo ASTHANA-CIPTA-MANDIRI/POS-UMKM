@@ -11,6 +11,7 @@ use App\Actions\Stock\AdjustStockAction;
 use App\Enums\AlasanOpname;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
+use App\Livewire\Pages\Owner\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Opname;
 use App\Livewire\Pages\Owner\Pembelian;
 use App\Livewire\Pages\Owner\PembelianBaru;
@@ -434,6 +435,37 @@ class PratinjauTest extends TestCase
         file_put_contents(
             "{$tujuan}/owner-laporan.html",
             $this->ambil('owner.laporan', $owner),
+        );
+
+        /*
+         * Layar Bahan baku, dua keadaan.
+         *
+         * Owner-nya WartegSeeder (fnb), karena hanya usaha yang memasak melihat menu ini —
+         * dan seedernya sudah punya enam bahan beserta resepnya, jadi kolom "Dipakai di"
+         * terpotret berisi nama menu, bukan hanya tanda "—".
+         *
+         * Satu bahan sengaja dikosongkan harga belinya supaya keadaan "belum diisi" ikut
+         * terpotret. Tanpa itu pratinjau hanya membuktikan satu dari dua keadaan, dan justru
+         * keadaan kosong itulah yang paling mudah tampil sebagai sel kosong tanpa penanda.
+         */
+        RawMaterial::withoutGlobalScopes()
+            ->orderBy('nama')
+            ->first()
+            ?->forceFill(['harga_beli_terakhir' => null])->save();
+
+        $halamanBahan = $this->ambil('owner.bahan', $owner);
+
+        file_put_contents("{$tujuan}/owner-bahan.html", $halamanBahan);
+
+        // Panel formulirnya hanya ada di DOM saat dibuka, jadi fragmennya disuntikkan ke
+        // halaman yang sama supaya CSS dan fontnya ikut — lihat suntik() untuk alasan
+        // penanda Livewire dilepas.
+        file_put_contents(
+            "{$tujuan}/owner-bahan-form.html",
+            $this->suntik(
+                $halamanBahan,
+                Livewire::actingAs($owner)->test(BahanOwner::class)->call('tambah')->html(),
+            ),
         );
 
         $admin = User::withoutGlobalScopes()->where('role', 'super_admin')->firstOrFail();

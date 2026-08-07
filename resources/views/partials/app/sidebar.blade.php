@@ -25,6 +25,32 @@
     ];
 
     /*
+     * Bahan baku muncul HANYA untuk usaha yang memasak.
+     *
+     * Aturannya sudah ada di BusinessType::supportsRecipe() (fnb & campuran), dan
+     * presedennya BusinessType::pakaiBarcode() yang menentukan kolom barcode di layar
+     * produk. Kelontong, depot air, dan laundry tidak menyusun menu dari bahan: bagi
+     * mereka butir ini hanya memanjangkan daftar dengan halaman yang tidak pernah dibuka,
+     * dan daftar yang isinya sebagian tidak berguna adalah daftar yang berhenti dibaca.
+     *
+     * Yang TIDAK dilakukan: memblokir rutenya. Lihat alasannya di routes/web.php —
+     * menyembunyikan menu adalah soal kerapian, bukan keamanan, jadi ia tidak dijaga
+     * seperti keamanan.
+     */
+    $pakaiResep = $user->tenant?->business_type?->supportsRecipe() ?? false;
+
+    $katalog = [
+        ['Produk', 'owner.produk', 'kotak'],
+    ];
+
+    if ($pakaiResep) {
+        $katalog[] = ['Bahan baku & resep', 'owner.bahan', 'daun'];
+    }
+
+    $katalog[] = ['Stok & hitung stok', 'owner.stok', 'lapis'];
+    $katalog[] = ['Pembelian', 'owner.pembelian', 'truk'];
+
+    /*
      * Struktur navigasi mengikuti pembagian modul di dokumen bisnis. Butir yang
      * belum dibangun sengaja diberi rute NULL dan dirender sebagai teks bertanda
      * "segera" — bukan tautan. Tautan ke route yang belum ada akan melempar error,
@@ -47,12 +73,7 @@
                 ['Bill terbuka', null, 'bill'],
                 ['Tutup kasir', null, 'kalkulator'],
             ],
-            'Katalog & stok' => [
-                ['Produk', 'owner.produk', 'kotak'],
-                ['Bahan baku & resep', null, 'daun'],
-                ['Stok & hitung stok', 'owner.stok', 'lapis'],
-                ['Pembelian', 'owner.pembelian', 'truk'],
-            ],
+            'Katalog & stok' => $katalog,
             'Pelanggan' => [
                 ['Pelanggan', null, 'orang'],
                 ['Kasbon', null, 'buku'],

@@ -9,6 +9,7 @@ use App\Livewire\Pages\Auth\Masuk;
 use App\Livewire\Pages\Auth\MasukKasir;
 use App\Livewire\Pages\Kasir\Beranda as BerandaKasir;
 use App\Livewire\Pages\Kasir\Transaksi as TransaksiKasir;
+use App\Livewire\Pages\Owner\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Dasbor as DasborOwner;
 use App\Livewire\Pages\Owner\Langganan;
 use App\Livewire\Pages\Owner\Laporan as LaporanOwner;
@@ -72,6 +73,24 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
         Route::middleware('tenant-aktif')->group(function () {
             Route::get('/', DasborOwner::class)->name('dasbor');
             Route::get('/produk', ProdukOwner::class)->name('produk');
+
+            /*
+             * Bahan baku sejajar produk, dan SENGAJA tidak diberi middleware jenis usaha.
+             *
+             * Menunya memang hanya muncul untuk usaha yang memasak
+             * (BusinessType::supportsRecipe()), karena kelontong tidak punya resep dan
+             * butir menu yang tidak pernah dipakai hanya memanjangkan daftar. Tapi
+             * MEMBLOKIR rutenya untuk jenis usaha lain berarti satu middleware baru plus
+             * satu uji 403 demi nol manfaat bagi pemilik: yang bisa terjadi paling buruk
+             * adalah pemilik kelontong mengetik URL-nya sendiri lalu melihat layar yang
+             * tidak berguna baginya — bukan data orang lain, bukan uang yang salah.
+             *
+             * Nama rutenya BERSARANG-siap: penanda menu memakai
+             * `routeIs('owner.bahan', 'owner.bahan.*')`, jadi layar Resep yang menyusul
+             * (gelombang 2, `owner.bahan.resep`) akan tetap menyalakan menu induknya tanpa
+             * menyentuh sidebar lagi.
+             */
+            Route::get('/bahan', BahanOwner::class)->name('bahan');
 
             /*
              * Stok & opname sengaja HANYA di grup back office ini.
