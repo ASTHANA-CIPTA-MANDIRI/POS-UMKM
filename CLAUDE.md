@@ -1,7 +1,7 @@
 # CLAUDE.md — Nampan POS (POS-UMKM)
 
 Panduan untuk Claude Code di repo ini. **Baca sebelum menyentuh berkas apa pun.**
-Setiap agen mulai tanpa ingatan; berkas ini yang menggantikannya.
+Setiap sesi mulai tanpa ingatan; berkas ini yang menggantikannya.
 
 ## Apa yang sedang dibangun
 
@@ -46,9 +46,9 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
 6. **Jangan menghapus data permanen.** Produk memakai soft delete supaya laporan lama
    tetap utuh.
 7. **JANGAN `git stash`, `git checkout <berkas>`, atau `git clean` selama ada pekerjaan
-   orang/agen lain yang belum dikomit.** Pohon kerja ini sering dipakai beberapa agen
-   sekaligus, dan ketiga perintah itu menyingkirkan perubahan yang belum tersimpan —
-   milik siapa pun, tanpa bertanya. Sudah hampir terjadi: `git stash -u` dipakai untuk
+   yang belum dikomit.** Ketiga perintah itu menyingkirkan perubahan yang belum tersimpan —
+   milik siapa pun, tanpa bertanya — dan yang belum dikomit TIDAK ADA di reflog maupun di
+   riwayat, jadi tidak ada jalan pulang. Sudah hampir terjadi: `git stash -u` dipakai untuk
    mengukur "patokan bersih", dan ikut mencabut satu layar baru beserta ujinya selama
    ±13 detik. Kali itu `stash pop` berhasil; kalau prosesnya mati di sela itu, pekerjaan
    satu putaran penuh hilang tanpa jejak di mana pun.
@@ -334,8 +334,9 @@ layar tidak menolong kalau sepuluh layar lain kosong.
 - **Satu putaran QA per fitur.** Cacat yang tersisa dicatat di `docs/RENCANA.md` lalu
   LANJUT. Jangan menyelesaikan semuanya sekarang.
 - Perbaiki cacat yang ditemukan; jangan melebar jadi penyempurnaan.
-- Agen kena batas sesi? **Kerjakan sendiri, jangan menunggu reset** — dan sebutkan di
-  laporan bahwa rantainya dipendekkan.
+- **Jangan menunggu apa pun yang bisa dikerjakan sekarang.** Kalau sesuatu di luar kendali
+  menghalangi (batas pemakaian, layanan mati), kerjakan bagian yang tidak bergantung padanya
+  lalu sebutkan mana yang tertunda — jangan diam menunggu reset.
 - Uji mutasi hanya untuk penjaga yang menyentuh uang/stok, bukan setiap uji.
 - Jalankan seluruh berkas uji di AKHIR, bukan berkali-kali di tengah.
 
@@ -343,67 +344,35 @@ Yang TIDAK boleh dipotong, karena masing-masing sudah pernah merugikan: env uji 
 jangan hapus `storage/app/public/produk/`, uang divalidasi ketat, dan klaim "rapi" tetap
 harus diukur.
 
-## WAJIB: setiap permintaan lewat tim agen — tanpa pengecualian
+## Dikerjakan langsung, tapi lewat langkah yang sama
 
-Pemilik proyek meminta ini secara tegas, dan berlaku untuk **apa pun**: cacat, perbaikan
-besar, perbaikan sepele, fitur baru, perubahan tampilan, pertanyaan desain.
+Repo ini dulu memakai tim agen (lead → analis → backend/frontend → QA). **Agennya sudah
+dihapus** atas permintaan pemilik proyek — putarannya terlalu lama, dan menunggu berkali-kali
+lebih merugikan daripada manfaat pembagian perannya.
 
-```
-Permintaan pemilik proyek
-      ▼
-LEAD      pecah pekerjaannya, tentukan urutan, pegang berkas bersama
-      ▼
-ANALIS    spesifikasi: yang sudah ada, kriteria terima, keadaan tepi, yang TIDAK dibangun
-      ▼
-BACKEND   model, migrasi, Action, komponen Livewire, uji PHPUnit
-FRONTEND  Blade, Tailwind, Alpine, JS + BUKTI kerapian berupa angka
-      ▼
-QA        cari cacat & buktikan; sesudah diperbaiki, uji ULANG dengan langkah yang sama
-      ▼
-LEAD      tandai di docs/RENCANA.md + kabari Telegram
-```
+Yang dihapus cuma pembagian perannya. **Langkah-langkahnya tetap**, karena tiap langkah lahir
+dari cacat yang sudah pernah lolos di repo ini — bukan dari formalitas:
 
-Yang TIDAK boleh: mengerjakan permintaan langsung tanpa melewati rantai ini, sekecil apa
-pun perubahannya. Alasannya bukan formalitas — sesi ini sudah membuktikan tiga kali bahwa
-pekerjaan yang dikerjakan langsung menyisakan cacat yang baru ketemu belakangan: nominal
-bayar terpisah yang ditimpa sistem, sepuluh kegagalan uji palsu di salinan bersih, dan
-tombol yang menimpa teks di kolom sempit. Ketiganya lolos dari mata dan dari PHPUnit;
-ketiganya tertangkap oleh peran yang berbeda.
+1. **Tahu dulu apa yang sudah ada** sebelum menulis kode. Setengah pekerjaan yang "perlu
+   dibangun" di proyek ini ternyata sudah ada dan cuma belum tersambung: mesin resep lengkap
+   tanpa layar, `SusunSisaStokAction::menuBerbasisResep()` yang sudah jadi tapi belum bisa
+   dipakai siapa pun, kolom `isi_per_satuan_beli` yang sudah berdiri.
+2. **Sebutkan kriteria terimanya sebagai kalimat** sebelum mulai — termasuk yang SENGAJA
+   tidak dibangun. Yang tidak ditulis akan diperdebatkan ulang setiap putaran.
+3. **Cacat harus DIBUKTIKAN, bukan diduga.** Uji yang benar-benar dijalankan, angka yang
+   benar-benar keluar. Beberapa kali di repo ini dugaan yang masuk akal ternyata salah:
+   `restrictOnDelete` yang tidak pernah menyala karena soft delete, cacat yang disangka
+   kemunduran padahal sudah lama ada, dan alat ukur yang melaporkan "bersih" untuk popup yang
+   tidak pernah terbentuk.
+4. **Cari cacatnya SENDIRI sesudah selesai**, dengan mata yang berbeda dari yang menulis.
+   Yang paling sering ketemu di tahap ini: penjaga yang lolos hampa, uji yang memalsukan disk
+   yang salah lalu menulis berkas sungguhan, dan pesan galat yang benar tapi tidak terbaca.
+5. **Catat sisanya di `docs/RENCANA.md` lalu LANJUT.** Jangan menuntaskan semuanya sekarang.
 
-Untuk perubahan sepele (mis. satu kalimat teks UI), rantainya boleh dipendekkan menjadi
-FRONTEND → QA — tapi **harus dikatakan** bahwa itu yang dilakukan, beserta alasannya.
-Jangan melewatinya diam-diam.
+Kalau salah satu langkah dilewati, katakan bahwa itu dilewati beserta alasannya. Yang
+merugikan bukan melewatinya — melainkan melewatinya diam-diam lalu melapor selesai.
 
-## Alur perbaikan cacat (QA → lead → BE/FE/analis → QA)
-
-Ini alur kerja tim agen di repo ini. Satu putaran, berulang sampai QA menyatakan hijau.
-
-```
-QA temukan cacat
-      │  laporan berformat (lihat di bawah)
-      ▼
-LEAD triase  ──► kabar Telegram: "N cacat baru, ditugaskan ke …"
-      │
-      ├──► BACKEND   (uang, stok, kas, tenant, sinkronisasi)
-      ├──► FRONTEND  (tata letak, Alpine, kerapian, responsif)
-      └──► ANALIS    (kalau cacatnya sebenarnya salah paham kebutuhan)
-      │
-      ▼  selesai dikerjakan
-LEAD  ──► kabar Telegram: "sudah dikerjakan, dikembalikan ke QA"
-      ▼
-QA uji ULANG dengan langkah yang sama
-      │
-      ├─ masih gagal ──► kembali ke LEAD (putaran berikutnya)
-      └─ hijau ────────► LEAD tandai selesai di docs/RENCANA.md
-                         └─► kabar Telegram + laporan lengkap
-```
-
-**Yang benar-benar otomatis** adalah pelaporannya dan urutan langkahnya. Yang TIDAK
-otomatis: agen tidak bisa membangunkan dirinya sendiri — putarannya berjalan selama ada
-sesi Claude Code yang menjalankannya. Jangan menjanjikan "berjalan sendiri 24 jam" ke
-pemilik proyek.
-
-### Format laporan QA (wajib, supaya lead bisa menugaskan tanpa membaca ulang semuanya)
+### Format mencatat cacat (dipakai saat menemukan cacat yang tidak dikerjakan sekarang)
 
 ```
 [BERAT|SEDANG|RINGAN] berkas:baris — satu kalimat cacatnya
@@ -411,13 +380,17 @@ pemilik proyek.
   Terjadi:   apa yang terjadi sekarang
   Seharusnya: apa yang benar
   Rugi:      uang salah? data bocor? cuma kurang rapi?
-  Untuk:     backend | frontend | analis
 ```
 
-Urutan berat: uang & data bocor > data hilang > alur macet > tampilan. QA menambahkan
-uji yang **gagal** di `tests/`, dan tidak menyentuh berkas aplikasi.
+Urutan berat: uang & data bocor > data hilang > alur macet > tampilan.
 
-### Kabar Telegram di setiap tahap
+Cacat yang ditemukan tapi belum dikerjakan sebaiknya **direkam sebagai uji yang LULUS atas
+perilaku yang salah** — bukan cuma dicatat di RENCANA. Ujinya merekam apa yang terjadi
+sekarang, dan begitu diperbaiki ia harus DIBALIK jadi menuntut perilaku yang benar.
+Pembalikan itulah buktinya bahwa perbaikannya mengubah sesuatu, bukan cuma menambah kode
+yang kelihatan meyakinkan. Polanya sudah dipakai: `QaStokBahanTest`.
+
+### Kabar Telegram
 
 ```bash
 php artisan lapor:telegram --kirim --pesan="QA: 3 cacat di layar kasir (2 BERAT). Ditugaskan: BE 2, FE 1."
@@ -428,7 +401,7 @@ php artisan lapor:telegram --kirim          # laporan lengkap di akhir sesi
 
 Kabar singkat tidak menjalankan suite (cepat); laporan lengkap menjalankannya.
 
-### Kerapian yang WAJIB diperiksa frontend sebelum melapor selesai
+### Kerapian yang WAJIB diperiksa sebelum melapor selesai
 
 Bukan pendapat — dijalankan dan angkanya dicantumkan:
 
