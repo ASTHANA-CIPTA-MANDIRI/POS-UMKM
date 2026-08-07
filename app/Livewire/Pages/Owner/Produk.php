@@ -711,7 +711,7 @@ class Produk extends Component
     {
         $outletId = $this->outletStokTerpakai();
 
-        return view('livewire.pages.owner.produk', [
+        return view('livewire.pages.owner.produk.produk', [
             'daftar' => $this->kueriProduk($outletId)
                 ->orderBy('products.nama_produk')
                 ->paginate(config('nampan.per_halaman')),

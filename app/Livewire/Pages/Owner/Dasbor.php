@@ -32,7 +32,7 @@ class Dasbor extends Component
     {
         $outletId = auth()->user()->scopedOutletId();
 
-        return view('livewire.pages.owner.dasbor', [
+        return view('livewire.pages.owner.dasbor.dasbor', [
             'omzetHariIni' => $this->omzetHariIni($outletId),
             'jumlahTransaksi' => $this->jumlahTransaksiHariIni($outletId),
             'billTerbuka' => $this->billTerbuka($outletId),

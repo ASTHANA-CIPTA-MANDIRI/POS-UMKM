@@ -25,7 +25,7 @@ class Dasbor extends Component
 {
     public function render()
     {
-        return view('livewire.pages.admin.dasbor', app(TenantContext::class)->withoutScoping(fn () => [
+        return view('livewire.pages.admin.dasbor.dasbor', app(TenantContext::class)->withoutScoping(fn () => [
             'perStatus' => $this->merchantPerStatus(),
             'totalMerchant' => Tenant::count(),
             'mrr' => $this->pendapatanBulanan(),

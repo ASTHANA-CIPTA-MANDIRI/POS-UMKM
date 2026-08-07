@@ -95,6 +95,6 @@ class Masuk extends Component
 
     public function render()
     {
-        return view('livewire.pages.auth.masuk');
+        return view('livewire.pages.auth.masuk.masuk');
     }
 }

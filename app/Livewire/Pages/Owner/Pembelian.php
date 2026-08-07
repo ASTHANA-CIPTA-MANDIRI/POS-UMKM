@@ -513,7 +513,7 @@ class Pembelian extends Component
     {
         $daftar = $this->kueri()->paginate(config('nampan.per_halaman'), ['*'], self::NAMA_HALAMAN);
 
-        return view('livewire.pages.owner.pembelian', [
+        return view('livewire.pages.owner.pembelian.pembelian', [
             'daftar' => $daftar,
             'notaRincian' => $this->rincianId === null
                 ? null

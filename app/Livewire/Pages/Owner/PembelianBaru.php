@@ -994,7 +994,7 @@ class PembelianBaru extends Component
     {
         $semua = $this->semuaBaris();
 
-        return view('livewire.pages.owner.pembelian-baru', [
+        return view('livewire.pages.owner.pembelian.pembelian-baru', [
             'daftar' => $this->halamankan($this->barisTersaring()),
             'ringkasan' => $this->ringkasan($semua),
             'jumlahTerisi' => $this->jumlahTerisi(),

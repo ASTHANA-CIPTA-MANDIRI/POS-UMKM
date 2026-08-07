@@ -74,7 +74,7 @@ class Laporan extends Component
         $jumlah = (clone $dasar())->count();
         $omzet = (float) (clone $dasar())->sum('total');
 
-        return view('livewire.pages.owner.laporan', [
+        return view('livewire.pages.owner.laporan.laporan', [
             'mulai' => $mulai,
             'selesai' => $selesai,
             'pilihanRentang' => $this->pilihanRentang(),

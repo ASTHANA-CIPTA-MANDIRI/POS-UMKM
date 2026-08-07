@@ -367,7 +367,7 @@ class PembelianBatalTest extends TestCase
             'tombol pembenar pembatalan hidup di dalam dialognya, bukan sebagai tombol halaman');
 
         $blade = (string) file_get_contents(
-            resource_path('views/livewire/pages/owner/pembelian.blade.php')
+            resource_path('views/livewire/pages/owner/pembelian/pembelian.blade.php')
         );
 
         $this->assertStringNotContainsString("tanya = 'batal'", $this->bladeTanpaKomentar($blade),

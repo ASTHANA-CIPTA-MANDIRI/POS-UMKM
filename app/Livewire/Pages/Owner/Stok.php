@@ -471,7 +471,7 @@ class Stok extends Component
         $tersaring = $this->saring($baris);
         $barisKartu = $this->kartuKunci === null ? null : $baris->firstWhere('kunci', $this->kartuKunci);
 
-        return view('livewire.pages.owner.stok', [
+        return view('livewire.pages.owner.stok.stok', [
             'daftar' => $this->halamankan($tersaring),
             'harusBelanja' => $this->harusBelanja($baris),
             // `semua` diambil dari jumlah baris yang sebenarnya, BUKAN dari menjumlahkan

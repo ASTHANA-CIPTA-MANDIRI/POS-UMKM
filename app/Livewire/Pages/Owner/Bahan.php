@@ -442,7 +442,7 @@ class Bahan extends Component
 
     public function render()
     {
-        return view('livewire.pages.owner.bahan', [
+        return view('livewire.pages.owner.bahan.bahan', [
             'daftar' => $this->kueriBahan()
                 ->orderBy('nama')
                 ->paginate(config('nampan.per_halaman')),

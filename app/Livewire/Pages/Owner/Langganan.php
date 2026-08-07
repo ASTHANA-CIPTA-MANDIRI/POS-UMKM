@@ -22,7 +22,7 @@ class Langganan extends Component
 
     public function render()
     {
-        return view('livewire.pages.owner.langganan', [
+        return view('livewire.pages.owner.langganan.langganan', [
             'tenant' => auth()->user()->tenant,
             'langganan' => Subscription::with('plan')->latest('tanggal_mulai')->first(),
             'tagihan' => Invoice::with('payments')->latest('periode_mulai')->limit(12)->get(),

@@ -125,6 +125,6 @@ class StokQaTemuanTest extends TestCase
         $this->assertFalse($baris['punya_baris'], 'pembanding: barang ini memang belum pernah dicatat');
 
         $this->assertNotSame('habis', $baris['status'],
-            'BUG app/Actions/Stock/SusunBarisStokAction.php:154-157 (stokSementara) — barang tanpa baris stocks dipetakan ke jumlah=0 sebelum dikirim ke Stock::statusStok(), jadi statusnya "habis" persis seperti barang confirmed kosong. Badge merah "Habis" tampil di resources/views/livewire/pages/owner/stok.blade.php untuk barang yang belum pernah diopname sama sekali, dan baris itu ikut masuk hitungan ringkasan "Habis".');
+            'BUG app/Actions/Stock/SusunBarisStokAction.php:154-157 (stokSementara) — barang tanpa baris stocks dipetakan ke jumlah=0 sebelum dikirim ke Stock::statusStok(), jadi statusnya "habis" persis seperti barang confirmed kosong. Badge merah "Habis" tampil di resources/views/livewire/pages/owner/stok/stok.blade.php untuk barang yang belum pernah diopname sama sekali, dan baris itu ikut masuk hitungan ringkasan "Habis".');
     }
 }

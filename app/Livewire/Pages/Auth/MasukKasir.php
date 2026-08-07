@@ -130,6 +130,6 @@ class MasukKasir extends Component
 
     public function render()
     {
-        return view('livewire.pages.auth.masuk-kasir');
+        return view('livewire.pages.auth.masuk.masuk-kasir');
     }
 }

@@ -35,7 +35,7 @@ class KonfirmasiHapusTest extends TestCase
     /**
      * Berkas yang SENGAJA belum dijaga, berikut alasannya.
      *
-     * `resources/views/livewire/pages/kasir/transaksi.blade.php` — sedang dikerjakan
+     * `resources/views/livewire/pages/kasir/transaksi/transaksi.blade.php` — sedang dikerjakan
      * gelombang ini oleh agen lain, jadi menyentuhnya berarti dua agen di satu berkas.
      * Diperiksa saat pengecualian ini dibuat (2026-08-06): satu tuduhan tersisa di situ,
      * tombol "Hapus pembayaran" pada bayar terpisah — dan tuduhan itu mungkin memang tidak
@@ -50,7 +50,7 @@ class KonfirmasiHapusTest extends TestCase
      */
     private const DIKERJAKAN_GELOMBANG_INI = [
         // sedang dikerjakan gelombang ini
-        'resources/views/livewire/pages/kasir/transaksi.blade.php',
+        'resources/views/livewire/pages/kasir/transaksi/transaksi.blade.php',
     ];
 
     /**
@@ -194,9 +194,9 @@ class KonfirmasiHapusTest extends TestCase
         // Layar produk (dua bentuk baris: kartu ponsel + tabel) dan tombol hapus foto di
         // layar pembelian. Kalau salah satu hilang dari daftar ini, penjaganya buta — bukan
         // layarnya yang bersih.
-        $this->assertSame(2, $terlihat['resources/views/livewire/pages/owner/produk.blade.php'] ?? 0,
+        $this->assertSame(2, $terlihat['resources/views/livewire/pages/owner/produk/produk.blade.php'] ?? 0,
             'penjaga harus melihat kedua tombol hapus produk (kartu ponsel + tabel)');
-        $this->assertGreaterThanOrEqual(1, $terlihat['resources/views/livewire/pages/owner/pembelian.blade.php'] ?? 0,
+        $this->assertGreaterThanOrEqual(1, $terlihat['resources/views/livewire/pages/owner/pembelian/pembelian.blade.php'] ?? 0,
             'penjaga harus melihat tombol "Hapus foto" di layar pembelian');
 
         /*

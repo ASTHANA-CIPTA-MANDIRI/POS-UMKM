@@ -147,7 +147,7 @@ class Beranda extends Component
 
         $riwayat = $this->riwayat($user->getKey(), $sesi, $rentang);
 
-        return view('livewire.pages.kasir.beranda', [
+        return view('livewire.pages.kasir.beranda.beranda', [
             'sesi' => $sesi,
             'rentangAktif' => $rentang,
             'riwayat' => $riwayat,

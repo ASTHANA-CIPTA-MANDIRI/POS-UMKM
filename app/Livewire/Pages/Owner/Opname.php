@@ -850,7 +850,7 @@ class Opname extends Component
 
         $this->rekamAngkaTerbaca(collect($daftar->items()));
 
-        return view('livewire.pages.owner.opname', [
+        return view('livewire.pages.owner.stok.opname', [
             'daftar' => $daftar,
             'namaPerKunci' => $this->namaPerKunci($daftar->items()),
             'alasanTersedia' => AlasanOpname::pilihan(),

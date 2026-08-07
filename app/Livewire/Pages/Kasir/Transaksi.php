@@ -79,7 +79,7 @@ class Transaksi extends Component
         $user = auth()->user();
         $sesi = $buka->sesiBerjalan($user);
 
-        return view('livewire.pages.kasir.transaksi', [
+        return view('livewire.pages.kasir.transaksi.transaksi', [
             'sesi' => $sesi,
             'kasSistem' => $sesi ? $this->kasSistem($sesi) : 0.0,
             'outletId' => $user->outlet_id,
