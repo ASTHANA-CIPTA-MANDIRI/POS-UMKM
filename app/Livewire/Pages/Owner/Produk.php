@@ -225,6 +225,26 @@ class Produk extends Component
             // Ambang stok, per outlet. Boleh 0 (= tidak dipantau), tidak boleh negatif.
             'stokMinimum' => $this->aturanStokMinimum(),
             'outletStok' => $this->aturanOutletStok(),
+        ], messages: [
+            /*
+             * Pesan sendiri untuk gambar, karena bawaan Laravel cuma menyebutkan jenis yang
+             * boleh — dan itu tidak menolong orang yang sedang ditolak.
+             *
+             * Sejak `accept` dilonggarkan ke `image/*` supaya kamera HP muncul, HEIC dari
+             * iPhone BISA terpilih di pemilih berkas lalu ditolak di sini. Tumpukan ini
+             * memang tidak bisa membacanya (GD tanpa libheif, Imagick tidak ada — terukur),
+             * dan peramban selain Safari juga tidak bisa menampilkannya, jadi menerimanya
+             * berarti menyimpan foto produk yang tidak pernah muncul di layar kasir.
+             *
+             * Bagian iPhone-nya BERSYARAT ("kalau ini…") supaya kalimatnya tetap benar untuk
+             * berkas lain yang jatuh ke aturan yang sama.
+             */
+            'gambar.image' => 'Gambarnya belum bisa dibaca di sini — yang bisa cuma JPG, PNG, atau WEBP. '
+                .'Kalau ini foto dari iPhone, biasanya formatnya HEIC: buka Pengaturan > Kamera > Format, '
+                .'pilih Paling Kompatibel, lalu foto sekali lagi.',
+            'gambar.mimes' => 'Gambarnya belum bisa dibaca di sini — yang bisa cuma JPG, PNG, atau WEBP. '
+                .'Kalau ini foto dari iPhone, biasanya formatnya HEIC: buka Pengaturan > Kamera > Format, '
+                .'pilih Paling Kompatibel, lalu foto sekali lagi.',
         ], attributes: [
             'nama' => 'nama produk',
             'kategoriForm' => 'kategori',

@@ -793,8 +793,28 @@
                                             {{ ($gambarLama && ! $hapusGambar && $this->punyaGambar($gambarLama)) || $gambar ? 'Ganti gambar' : 'Pilih gambar' }}
                                         </label>
 
+                                        {{--
+                                            `image/*`, BUKAN daftar jenis satu per satu.
+
+                                            Daftar spesifik membuat banyak peramban Android tidak
+                                            menawarkan kamera sama sekali: aplikasi kameranya
+                                            mendaftar sebagai penghasil `image/*` dan tersaring
+                                            keluar oleh daftar itu. Pemilik warung memotret
+                                            barangnya langsung di rak, jadi kehilangan kamera di
+                                            sini berarti kehilangan satu-satunya cara ia memasang
+                                            foto produk.
+
+                                            `capture` TETAP tidak dipasang: ia memaksa kamera tapi
+                                            menghapus pilihan galeri, sehingga foto yang sudah
+                                            diambil kemarin tidak bisa dipilih lagi.
+
+                                            Melonggarkan `accept` berarti HEIC dari iPhone bisa
+                                            terpilih; tumpukan ini tidak bisa membacanya (GD tanpa
+                                            libheif, tanpa Imagick — terukur), jadi validatornya
+                                            tetap menolak dan pesannya menyebut jalan keluarnya.
+                                        --}}
                                         <input id="gambar" type="file" wire:model="gambar"
-                                               accept="image/jpeg,image/png,image/webp" class="sr-only">
+                                               accept="image/*" class="sr-only">
 
                                         @if (($gambarLama && ! $hapusGambar && $this->punyaGambar($gambarLama)) || $gambar)
                                             <button type="button" wire:click="tandaiHapusGambar"
