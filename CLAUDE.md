@@ -496,8 +496,34 @@ Estetika yang tidak terukur (irama jarak, keseimbangan kolom, hierarki) tetap di
 mata — tapi hanya SETELAH tujuh angka di atas nol. Rapi yang tidak terukur biasanya
 berarti belum diperiksa.
 
+## WAJIB: setiap pekerjaan selesai langsung didorong need → dev → main
+
+Permintaan tegas pemilik proyek. Begitu satu pekerjaan selesai dan hijau, dorong sampai
+`main` — jangan menunggu diminta, dan jangan menumpuk. Pernah menumpuk 23 komit dalam satu
+sesi; kalau mesinnya mati saat itu, satu hari kerja hanya ada di satu cakram.
+
+```bash
+# Syarat mutlak SEBELUM menyentuh main — bukan formalitas, main yang dipakai:
+vendor/bin/pint --test
+DB_CONNECTION=sqlite DB_DATABASE=:memory: SESSION_DRIVER=array CACHE_STORE=array \
+  QUEUE_CONNECTION=sync MAIL_MAILER=array BROADCAST_CONNECTION=null php artisan test
+npm run uji:js
+
+git push origin need
+git checkout dev  && git merge --ff-only need && git push origin dev
+git checkout main && git merge --ff-only dev  && git push origin main
+git checkout need                              # selalu kembali ke need
+```
+
+- **`--ff-only`, bukan `merge` biasa.** Kalau ia menolak, artinya cabangnya sudah bercabang
+  dan ada pekerjaan lain di sana — berhenti dan periksa, jangan membuat komit gabungan yang
+  menyembunyikan bahwa dua riwayat berbeda baru saja disatukan tanpa dibaca siapa pun.
+- **Merah berarti berhenti di `need`.** Mendorong yang merah ke `main` menghapus arti `main`
+  sebagai "yang boleh dipakai".
+- Kerja selalu di `need`; `dev` dan `main` hanya dilewati, tidak pernah jadi tempat mengetik.
+
 ## Melapor
 
 Sebutkan hasil apa adanya: perintah yang dijalankan, angka yang keluar, dan apa yang
 BELUM dikerjakan. Jangan menyatakan selesai tanpa `pint` + `php artisan test` +
-`npm run uji:js` hijau.
+`npm run uji:js` hijau — dan sebutkan sampai mana sudah terdorong.
