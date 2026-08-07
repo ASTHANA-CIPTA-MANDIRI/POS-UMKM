@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\BusinessType;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Produk;
+use App\Livewire\Pages\Owner\Produk\Produk;
 use App\Models\Product;
 use App\Models\Tenant;
 use App\Models\User;

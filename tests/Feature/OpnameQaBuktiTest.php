@@ -7,7 +7,7 @@ use App\Enums\AlasanOpname;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Opname;
+use App\Livewire\Pages\Owner\Stok\Opname;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\Stock;

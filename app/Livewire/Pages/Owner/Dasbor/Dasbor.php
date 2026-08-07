@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Owner;
+namespace App\Livewire\Pages\Owner\Dasbor;
 
 use App\Enums\CashSessionStatus;
 use App\Enums\CreditStatus;

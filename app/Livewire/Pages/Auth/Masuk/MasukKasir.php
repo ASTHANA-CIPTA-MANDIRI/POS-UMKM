@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Auth;
+namespace App\Livewire\Pages\Auth\Masuk;
 
 use App\Models\Device;
 use App\Models\User;

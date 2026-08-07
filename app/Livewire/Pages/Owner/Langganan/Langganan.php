@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Owner;
+namespace App\Livewire\Pages\Owner\Langganan;
 
 use App\Livewire\Concerns\TerikatTenant;
 use App\Models\Invoice;

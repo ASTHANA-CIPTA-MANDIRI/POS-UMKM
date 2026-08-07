@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Owner;
+namespace App\Livewire\Pages\Owner\Pembelian;
 
 use App\Actions\Purchase\BatalkanPembelianAction;
 use App\Actions\Purchase\SimpanBuktiBelanjaAction;

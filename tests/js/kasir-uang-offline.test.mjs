@@ -28,7 +28,7 @@ const PRODUK = [
     /*
      * Harga ganjil pada satuan pecahan. Bukan data karangan: Owner › Produk
      * memvalidasi harga hanya dengan ['required','numeric','min:0'] dan menyimpannya
-     * ke decimal(15,2) (app/Livewire/Pages/Owner/Produk.php:138), jadi Rp 4.999/kg
+     * ke decimal(15,2) (app/Livewire/Pages/Owner/Produk/Produk.php:138), jadi Rp 4.999/kg
      * memang bisa disimpan owner.
      */
     { id: 'p4', nama: 'Cabai', harga: 4999, kategori: 'Bahan', pecahan: true, barcode: null, sku: 'CBI-1' },

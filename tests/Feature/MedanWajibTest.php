@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\Satuan;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\PembelianBaru;
-use App\Livewire\Pages\Owner\Stok as LayarStok;
+use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
+use App\Livewire\Pages\Owner\Stok\Stok as LayarStok;
 use App\Models\Product;
 use App\Models\Stock;
 use Illuminate\Foundation\Testing\RefreshDatabase;

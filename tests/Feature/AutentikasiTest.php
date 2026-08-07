@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
-use App\Livewire\Pages\Auth\Masuk;
-use App\Livewire\Pages\Auth\MasukKasir;
+use App\Livewire\Pages\Auth\Masuk\Masuk;
+use App\Livewire\Pages\Auth\Masuk\MasukKasir;
 use App\Models\Device;
 use App\Models\Outlet;
 use App\Models\Tenant;

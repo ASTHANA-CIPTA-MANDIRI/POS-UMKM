@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\Satuan;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Produk as LayarProduk;
-use App\Livewire\Pages\Owner\Stok as LayarStok;
+use App\Livewire\Pages\Owner\Produk\Produk as LayarProduk;
+use App\Livewire\Pages\Owner\Stok\Stok as LayarStok;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\Stock;
@@ -59,7 +59,7 @@ class StokQaTemuanTest extends TestCase
     }
 
     /**
-     * CACAT: `Produk::outletStokTerpakai()` (app/Livewire/Pages/Owner/Produk.php) tidak
+     * CACAT: `Produk::outletStokTerpakai()` (app/Livewire/Pages/Owner/Produk/Produk.php) tidak
      * memanggil `canAccessOutlet()` sama sekali — beda dengan `Stok::outletTerpakai()` yang
      * memanggil `abort_unless($user->canAccessOutlet(...), 403)` untuk syarat yang SAMA.
      * Akibatnya Regional Manager yang hanya ditugaskan ke Outlet A bisa menyetel properti
@@ -90,7 +90,7 @@ class StokQaTemuanTest extends TestCase
         $dipakai = $komponen->instance()->outletStokTerpakai();
 
         $this->assertNotSame($outletB->getKey(), $dipakai,
-            'BUG app/Livewire/Pages/Owner/Produk.php outletStokTerpakai() — tidak menggerbang canAccessOutlet() seperti Stok.php::outletTerpakai(), sehingga RM bisa memaksa kolom stok/menipis memakai outlet yang bukan haknya.');
+            'BUG app/Livewire/Pages/Owner/Produk/Produk.php outletStokTerpakai() — tidak menggerbang canAccessOutlet() seperti Stok.php::outletTerpakai(), sehingga RM bisa memaksa kolom stok/menipis memakai outlet yang bukan haknya.');
     }
 
     /**

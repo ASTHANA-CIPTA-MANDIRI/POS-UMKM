@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\PembelianBaru;
+use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\PurchaseOrderItem;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Owner;
+namespace App\Livewire\Pages\Owner\Produk;
 
 use App\Actions\Stock\SiapkanBarisStokAction;
 use App\Enums\Satuan;

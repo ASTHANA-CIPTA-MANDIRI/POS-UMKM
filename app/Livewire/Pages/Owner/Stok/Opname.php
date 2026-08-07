@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Owner;
+namespace App\Livewire\Pages\Owner\Stok;
 
 use App\Actions\Stock\CatatOpnameAction;
 use App\Actions\Stock\SusunBarisStokAction;

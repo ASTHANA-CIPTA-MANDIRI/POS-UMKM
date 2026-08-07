@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Pembelian;
+use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Models\Outlet;
 use App\Models\Supplier;
 use App\Models\Tenant;

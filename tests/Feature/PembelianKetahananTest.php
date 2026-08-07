@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\PembelianBaru;
+use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
 use App\Models\Outlet;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;

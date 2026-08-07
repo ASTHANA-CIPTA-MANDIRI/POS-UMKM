@@ -7,7 +7,7 @@ use App\Actions\Purchase\TerimaPembelianAction;
 use App\Actions\Stock\SusunBarisStokAction;
 use App\Enums\Satuan;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Bahan as LayarBahan;
+use App\Livewire\Pages\Owner\Bahan\Bahan as LayarBahan;
 use App\Models\Outlet;
 use App\Models\RawMaterial;
 use App\Models\Stock;
@@ -22,7 +22,7 @@ use Tests\Concerns\MembuatDataUji;
 use Tests\TestCase;
 
 /**
- * QA — gerbang "satuan terkunci" milik layar Bahan (App\Livewire\Pages\Owner\Bahan).
+ * QA — gerbang "satuan terkunci" milik layar Bahan (App\Livewire\Pages\Owner\Bahan\Bahan).
  *
  * CACAT YANG PERNAH ADA DI SINI, dan berkas ini lahir untuk menutupnya:
  * `aturanSatuanTerkunci()` dulu hanya mengunci satuan kalau bahannya SUDAH punya

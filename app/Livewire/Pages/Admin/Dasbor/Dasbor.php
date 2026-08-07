@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Admin;
+namespace App\Livewire\Pages\Admin\Dasbor;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\SubscriptionStatus;

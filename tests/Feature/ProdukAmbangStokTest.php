@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Enums\Satuan;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Dasbor;
-use App\Livewire\Pages\Owner\Produk;
+use App\Livewire\Pages\Owner\Dasbor\Dasbor;
+use App\Livewire\Pages\Owner\Produk\Produk;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\RawMaterial;

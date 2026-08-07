@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Owner;
+namespace App\Livewire\Pages\Owner\Bahan;
 
 use App\Enums\DocumentStatus;
 use App\Enums\Satuan;

@@ -8,7 +8,7 @@ use App\Enums\DocumentStatus;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Pembelian;
+use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Models\Outlet;
 use App\Models\PurchaseOrder;
 use App\Models\PurchaseOrderItem;

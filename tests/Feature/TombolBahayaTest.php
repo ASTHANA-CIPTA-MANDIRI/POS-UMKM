@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Satuan;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Produk as LayarProduk;
+use App\Livewire\Pages\Owner\Produk\Produk as LayarProduk;
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;

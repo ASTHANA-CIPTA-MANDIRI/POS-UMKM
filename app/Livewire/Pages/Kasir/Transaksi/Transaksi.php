@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Kasir;
+namespace App\Livewire\Pages\Kasir\Transaksi;
 
 use App\Actions\Kas\BukaSesiKasAction;
 use App\Actions\Kas\TutupSesiKasAction;

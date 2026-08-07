@@ -10,7 +10,7 @@ use App\Enums\StockMovementType;
 use App\Enums\TransactionMode;
 use App\Enums\TransactionOrigin;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\Opname;
+use App\Livewire\Pages\Owner\Stok\Opname;
 use App\Models\Outlet;
 use App\Models\Product;
 use App\Models\RawMaterial;

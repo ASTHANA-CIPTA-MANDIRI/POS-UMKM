@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Satuan;
 use App\Enums\UserRole;
-use App\Livewire\Pages\Owner\PembelianBaru;
+use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
 use App\Models\Outlet;
 use App\Models\PurchaseOrder;
 use App\Models\StockMovement;
@@ -553,8 +553,16 @@ class PembelianFormatUangTest extends TestCase
      */
     public function test_properti_nominal_tetap_bertipe_teks(): void
     {
+        /*
+         * Jalur berkasnya DITURUNKAN dari kelasnya, bukan dituliskan.
+         *
+         * Bentuk lamanya `app_path('Livewire/Pages/Owner/PembelianBaru.php')`, dan itu
+         * memerah begitu komponennya dipindah ke folder fitur — padahal tidak ada satu pun
+         * perilaku yang berubah. Uji yang merah karena berkasnya berpindah mengajari orang
+         * untuk tidak merapikan struktur, dan itu harga yang tidak perlu dibayar.
+         */
         $sumber = $this->tanpaKomentar(
-            (string) file_get_contents(app_path('Livewire/Pages/Owner/PembelianBaru.php'))
+            (string) file_get_contents((new \ReflectionClass(PembelianBaru::class))->getFileName())
         );
 
         foreach (['diskon', 'ongkosKirim'] as $properti) {

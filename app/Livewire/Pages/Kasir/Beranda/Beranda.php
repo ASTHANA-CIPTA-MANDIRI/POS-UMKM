@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Livewire\Pages\Kasir;
+namespace App\Livewire\Pages\Kasir\Beranda;
 
 use App\Actions\Kas\BukaSesiKasAction;
 use App\Actions\Kas\KoreksiModalAwalAction;
