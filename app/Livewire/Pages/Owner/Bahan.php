@@ -2,16 +2,19 @@
 
 namespace App\Livewire\Pages\Owner;
 
+use App\Enums\DocumentStatus;
 use App\Enums\Satuan;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;
 use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\RawMaterial;
 use App\Support\Uang;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -54,6 +57,19 @@ class Bahan extends Component
 
     public bool $panel = false;
 
+    /**
+     * Baris mana yang sedang diubah — #[Locked] karena ia penentu TUJUAN penyimpanan.
+     *
+     * Diisi hanya oleh ubah()/tambah() di server. Tanpa #[Locked], muatan Livewire bisa
+     * mengirim id apa pun: `TenantScope` memang tetap menahan tulisannya (findOrFail() di
+     * simpan() melempar 404 untuk bahan tenant lain), tapi ia menahannya di langkah TERAKHIR
+     * dan hanya selama scope-nya aktif — jalur tanpa tenant di TenantContext (perintah
+     * artisan, job) tidak difilter sama sekali. Yang lebih dekat: id milik tenant SENDIRI
+     * yang ditukar diam-diam membuat formulir "Gula Pasir" menimpa baris "Garam" tanpa satu
+     * pun galat, karena semua pemeriksaannya lolos — barisnya memang ada dan memang miliknya.
+     * Pola yang sama dengan Opname::$outletId dan PembelianBaru::$outletId.
+     */
+    #[Locked]
     public ?string $bahanId = null;
 
     public string $nama = '';
@@ -172,14 +188,24 @@ class Bahan extends Component
     }
 
     /**
-     * Satuan TIDAK BOLEH diubah kalau bahannya sudah punya catatan stok atau sudah dipakai
-     * resep.
+     * Satuan TIDAK BOLEH diubah kalau bahannya sudah punya catatan stok, sudah dipakai resep,
+     * atau masih ditunggu di nota belanja yang barangnya belum datang.
      *
      * Ini cacat 1000× lewat pintu lain, dan pintunya tidak berbunyi sama sekali: angka lama
      * TIDAK dikonversi. Mengubah "Lele Segar" dari kg ke gram membuat 60 (kg) di kartu stok
      * terbaca 60 gram — enam puluh gram lele untuk warung yang menyimpan enam puluh kilo —
      * dan resep 0,25 kg per porsi menjadi 0,25 gram. Tidak ada galat, tidak ada uang yang
      * salah hari itu; yang salah adalah setiap keputusan belanja sesudahnya.
+     *
+     * Syarat KETIGA (nota belum datang) ditambahkan sesudah QA membuktikan lubangnya, dan
+     * lubang itu lahir dari keputusan yang benar di tempat lain: nota yang belum ditandai
+     * datang SENGAJA tidak membuat baris `stocks` (TerimaPembelianAction adalah satu-satunya
+     * jalur pembelian menaikkan stok). Jadi bahan yang baru dibelanjakan 5 kg — belum punya
+     * `stocks`, belum dipakai resep — dulu LOLOS kedua syarat pertama. Pemilik boleh
+     * menggantinya ke gram, lalu notanya ditandai datang: `purchase_order_items.qty` bahan
+     * baku tidak pernah dikonversi (CatatPembelianAction: "angkanya memang sudah dalam
+     * satuan pencatatannya sendiri"), jadi angka 5 yang berarti 5 KILOGRAM masuk apa adanya
+     * dan dibaca 5 GRAM di seluruh layar Stok dan riwayat barang.
      *
      * Jalan keluarnya disebutkan di pesannya: buat bahan BARU. Bahan lama tetap memegang
      * riwayatnya dalam satuan yang benar.
@@ -209,8 +235,52 @@ class Bahan extends Component
             if ($bahan->recipeItems()->exists()) {
                 $gagal('Satuan tidak bisa diubah karena '.$bahan->nama.' sudah dipakai resep. '
                     .'Buat bahan baru kalau satuannya mau beda.');
+
+                return;
+            }
+
+            $notaMenunggu = $this->notaBelumDatang($bahan);
+
+            if ($notaMenunggu !== []) {
+                $gagal('Satuan tidak bisa diubah karena '.$bahan->nama.' ada di nota belanja yang '
+                    .'barangnya belum datang ('.implode(', ', $notaMenunggu).'). '
+                    .'Buat bahan baru kalau satuannya mau beda.');
             }
         };
+    }
+
+    /**
+     * Nomor nota belanja yang masih menunggu bahan ini datang.
+     *
+     * PENANDANYA STATUS NOTA, BUKAN `qty_diterima`, dan bedanya menentukan apakah gerbangnya
+     * benar atau cuma galak. `qty_diterima` baris nota tetap 0 selamanya untuk nota yang
+     * DIBATALKAN sebelum sempat datang — BatalkanPembelianAction tidak pernah menyentuhnya —
+     * jadi gerbang yang membaca `qty_diterima = 0` akan mengunci satuan bahan itu untuk
+     * selama-lamanya, karena tidak ada satu pun layar yang bisa membuat angka itu naik lagi.
+     * Nota batal justru tidak menahan apa pun: ia dinyatakan tidak pernah terjadi, tidak
+     * akan pernah menambah stok, dan angkanya tidak akan pernah dibaca dengan satuan baru.
+     *
+     * Dua status yang menahan (Draft dan Dikirim) adalah TEPAT dua status yang masih bisa
+     * dilewati TerimaPembelianAction::execute() — aksi itu berhenti di Diterima dan
+     * Dibatalkan. Disamakan dengan sengaja: yang berbahaya bukan "nota yang belum diterima",
+     * melainkan "nota yang MASIH BISA diterima", karena penerimaanlah yang memasukkan angka
+     * mentahnya ke kartu stok dengan satuan bahan yang berlaku SAAT ITU.
+     *
+     * Nomornya disebut SEMUA, bukan yang pertama saja: pemilik harus menyelesaikan
+     * (menerima atau membatalkan) semuanya sebelum satuannya terbuka, dan pesan yang cuma
+     * menyebut satu membuatnya membetulkan satu lalu tertahan lagi tanpa tahu berapa sisanya.
+     *
+     * @return array<int, string>
+     */
+    private function notaBelumDatang(RawMaterial $bahan): array
+    {
+        return PurchaseOrder::query()
+            ->whereIn('status', [DocumentStatus::Draft->value, DocumentStatus::Dikirim->value])
+            ->whereHas('items', fn ($q) => $q->where('raw_material_id', $bahan->getKey()))
+            ->orderBy('tanggal')
+            ->orderBy('nomor_po')
+            ->pluck('nomor_po')
+            ->all();
     }
 
     /**
