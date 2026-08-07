@@ -8,12 +8,14 @@ import { pasangOpname } from './opname';
 import { pasangPemindai } from './pemindai';
 import { pasangAngkaNaik, pasangScene3D } from './scene3d';
 import { pasangTerminal3D } from './terminal3d';
+import { pasangUang } from './uang';
 
 // Harus didaftarkan SEBELUM Alpine init, karena memakai hook alpine:init.
 pasangKasir();
 pasangPemindai();
 pasangOpname();
 pasangBukti();
+pasangUang();
 
 // Dipasang di luar mulai(): toast bisa dikirim Livewire sebelum DOMContentLoaded,
 // dan pendengarnya harus sudah ada saat event pertama tiba.

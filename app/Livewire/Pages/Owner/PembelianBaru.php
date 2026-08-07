@@ -10,9 +10,12 @@ use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;
 use App\Models\Outlet;
 use App\Models\Supplier;
+use App\Support\Uang;
+use Closure;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -53,6 +56,18 @@ class PembelianBaru extends Component
 
     private const NAMA_HALAMAN = 'page';
 
+    /**
+     * Batas nominal & jumlah per baris — pagar terhadap SALAH KETIK, bukan aturan bisnis.
+     *
+     * Sepuluh digit rupiah (Rp 9.999.999.999) jauh di atas belanja warung mana pun, jadi
+     * angka yang melewatinya hampir selalu tombol yang tertekan dua kali. Yang dijaga bukan
+     * kemewahan: nota Rp 580.000.000 tersimpan tanpa satu pun peringatan akan mengacaukan
+     * seluruh laporan bulan itu, dan pemiliknya baru menemukannya saat menutup buku.
+     */
+    private const MAKS_RUPIAH = 9999999999;
+
+    private const MAKS_JUMLAH = 99999999;
+
     #[Url(as: 'outlet')]
     public ?string $outletId = null;
 
@@ -76,7 +91,12 @@ class PembelianBaru extends Component
      */
     public array $jumlah = [];
 
-    /** @var array<string, mixed> harga per satuan BELI, di-key id barang */
+    /**
+     * @var array<string, mixed> harga per satuan BELI, di-key id barang
+     *
+     * TETAP `mixed`, dan isinya TEKS DIGIT ("58000") yang dikirim kotak uang di layar.
+     * Jangan pernah menjadikannya array<string, float>: lihat peringatan di $diskon.
+     */
     public array $harga = [];
 
     /** Teks bebas dengan saran nama yang sudah pernah dipakai; boleh dikosongkan. */
@@ -84,8 +104,21 @@ class PembelianBaru extends Component
 
     public string $tanggal = '';
 
+    /**
+     * Potongan — WAJIB tetap `?string`. JANGAN pernah dijadikan `?float`.
+     *
+     * Ini bukan selera tipe, dan akibatnya sudah terukur: properti Livewire ber-tipe float
+     * DICOR saat hidrasi, yaitu SEBELUM satu pun aturan validasi berjalan. Muatan "58.000"
+     * menjadi 58.0 di situ, dan seluruh penjagaan uang di bawah — beserta App\Support\Uang
+     * yang ada khusus untuk membedakan titik ribuan dari titik desimal — berubah menjadi kode
+     * mati yang tetap hijau di semua uji. Yang tersimpan Rp 58 dari nota Rp 58.000, tanpa
+     * satu pun galat di layar.
+     *
+     * Dengan `?string`, teks apa adanya sampai ke validator dan Uang::baca() yang memutuskan.
+     */
     public ?string $diskon = null;
 
+    /** Ongkos kirim — WAJIB tetap `?string`, dengan alasan yang sama seperti $diskon. */
     public ?string $ongkosKirim = null;
 
     public string $catatan = '';
@@ -139,6 +172,25 @@ class PembelianBaru extends Component
 
     /** Outlet yang tadi dicoba dipilih saat nota sudah berisi baris; penggerak peringatan. */
     public ?string $outletDiminta = null;
+
+    /**
+     * Nomor urut "nota keberapa yang sedang diketik" — masuk ke wire:key tiap kotak uang.
+     *
+     * Kenapa perlu, dan ini cacat yang tidak terlihat sama sekali di layar: yang tampak di
+     * kotak harga/potongan/ongkir dimiliki Alpine (kotaknya memformat sendiri, tanpa
+     * wire:model). simpan() mengosongkan properti di server, tapi keadaan Alpine di peramban
+     * TIDAK ikut hilang — jadi harga nota yang baru tersimpan masih terpampang di nota
+     * berikutnya, lalu ikut tersimpan sebagai belanja yang tidak pernah terjadi. Belanja di
+     * dua grosir dalam satu hari itu biasa, jadi keadaan ini bukan keadaan tepi.
+     *
+     * Angkanya naik di AKHIR simpan() saja: kuncinya berubah, Livewire membuang kotak lamanya
+     * dan membuat yang baru, dan Alpine lahir ulang dengan nilai awal kosong.
+     *
+     * #[Locked] karena ia cuma penanda tampilan; nilai dari klien tidak boleh bisa menahan
+     * pengosongan itu.
+     */
+    #[Locked]
+    public int $generasiUang = 0;
 
     public function mount(): void
     {
@@ -457,6 +509,18 @@ class PembelianBaru extends Component
         // sudah dibawa pulang, dan pilihan yang MENEMPEL dari nota sebelumnya membuat
         // belanja hari itu diam-diam tidak masuk stok.
         $this->sudahDatang = true;
+        /*
+         * Kotak uang di layar DIBUAT ULANG — dan tanpa baris ini nota berikutnya lahir dengan
+         * harga nota yang baru tersimpan masih terpampang di kotaknya.
+         *
+         * Yang tampak di kotak harga/potongan/ongkir dimiliki Alpine (kotaknya memformat
+         * sendiri, tanpa wire:model), jadi mengosongkan properti di server saja tidak
+         * menghapus apa pun dari peramban. Angka yang masih tertinggal di situ akan ikut
+         * tersimpan sebagai belanja yang tidak pernah terjadi, dan tidak ada satu pun galat
+         * yang menandainya. Kuncinya berubah → Livewire membuang kotak lamanya → Alpine lahir
+         * ulang dengan nilai awal kosong.
+         */
+        $this->generasiUang++;
         $this->resetValidation();
         $this->resetPage();
 
@@ -498,8 +562,10 @@ class PembelianBaru extends Component
     private function periksa(Collection $terisi, Collection $semua): void
     {
         $aturan = [
-            'diskon' => ['nullable', 'numeric', 'min:0', 'max:9999999999'],
-            'ongkosKirim' => ['nullable', 'numeric', 'min:0', 'max:9999999999'],
+            // BUKAN 'numeric' — lihat aturanRupiah(). `numeric` menolak "58.000", bentuk yang
+            // justru paling sering diketik pemilik warung, dan sekaligus MELOLOSKAN "58.5".
+            'diskon' => ['nullable', $this->aturanRupiah('Potongan')],
+            'ongkosKirim' => ['nullable', $this->aturanRupiah('Ongkos kirim')],
             'tanggal' => ['required', 'date'],
             'beliDari' => ['nullable', 'string', 'max:255'],
             'catatan' => ['nullable', 'string', 'max:1000'],
@@ -510,7 +576,9 @@ class PembelianBaru extends Component
         ];
 
         $atribut = [
-            'diskon' => 'diskon',
+            // "potongan", bukan "diskon": nama propertinya tidak pernah dicetak apa adanya
+            // ke layar orang yang tidak pernah menamai apa pun seperti itu.
+            'diskon' => 'potongan',
             'ongkosKirim' => 'ongkos kirim',
             'tanggal' => 'tanggal nota',
             'beliDari' => 'beli dari',
@@ -519,13 +587,14 @@ class PembelianBaru extends Component
         ];
 
         foreach ($terisi->keys() as $kunci) {
-            // gt:0 — jumlah minus adalah salah ketik, dan nol berarti barisnya tidak
-            // dibeli. Keduanya tidak boleh jadi mutasi stok.
-            $aturan['jumlah.'.$kunci] = ['numeric', 'gt:0', 'max:99999999'];
+            // Jumlah: pecahan SAH ("2,5" kg), titik ribuan TIDAK ("1.500" kg beda seribu
+            // kali dari 1,5). Nol & minus ditolak di dalam aturannya dengan pesannya sendiri
+            // — keduanya tidak boleh jadi mutasi stok.
+            $aturan['jumlah.'.$kunci] = [$this->aturanJumlah('Jumlah beli')];
             // Harga WAJIB, dan nol sah: nol adalah pernyataan "bonus", sedangkan kosong
             // berarti belum diisi. Membiarkan kosong lolos sebagai nol menghapus harga
             // beli barangnya di master.
-            $aturan['harga.'.$kunci] = ['required', 'numeric', 'min:0', 'max:9999999999'];
+            $aturan['harga.'.$kunci] = ['required', $this->aturanRupiah('Harga beli')];
             $atribut['jumlah.'.$kunci] = 'jumlah beli';
             $atribut['harga.'.$kunci] = 'harga beli';
         }
@@ -542,10 +611,6 @@ class PembelianBaru extends Component
          */
         $pesan = [
             'required' => ':Attribute wajib diisi.',
-            'numeric' => ':Attribute harus berupa angka.',
-            'gt' => ':Attribute harus lebih dari :value.',
-            'min' => ':Attribute tidak boleh kurang dari :min.',
-            'max.numeric' => ':Attribute kelewat besar — periksa lagi angkanya.',
             'max.string' => ':Attribute paling panjang :max huruf.',
             'date' => ':Attribute harus berupa tanggal yang benar.',
             'string' => ':Attribute harus berupa teks.',
@@ -582,14 +647,25 @@ class PembelianBaru extends Component
                     continue;
                 }
 
-                if (! is_numeric($nilai)) {
+                /*
+                 * Dibaca lewat App\Support\Uang, BUKAN is_numeric() + (float).
+                 *
+                 * Ini setengah dari cacat yang paling mahal di layar ini, dan cacatnya lahir
+                 * dari KOMBINASI, bukan dari kolomnya sendiri: dengan harga "58.000",
+                 * `(float)` membaca 58 dan subtotal 2 dus jadi 116 — lalu potongan Rp 5.000
+                 * yang SAH ditolak keliru sebagai "lebih besar daripada belanjaannya".
+                 * Pemiliknya tidak punya cara menduga bahwa yang salah bukan potongannya.
+                 */
+                $jumlahBaris = $this->kuantitas($nilai);
+
+                if ($jumlahBaris === null) {
                     continue;
                 }
 
-                $harga = $this->harga[$kunci] ?? null;
+                $harga = $this->rupiah($this->harga[$kunci] ?? null);
 
-                if (is_numeric($harga) && (float) $harga >= 0 && (float) $nilai > 0) {
-                    $subtotal += (float) $nilai * (float) $harga;
+                if ($harga !== null && $harga >= 0 && $jumlahBaris > 0) {
+                    $subtotal += $jumlahBaris * $harga;
                 }
 
                 /*
@@ -602,7 +678,7 @@ class PembelianBaru extends Component
                  */
                 $satuan = Satuan::tryFrom((string) ($baris['satuan'] ?? ''));
 
-                if ($satuan !== null && ! $satuan->allowsFraction() && fmod((float) $nilai, 1.0) !== 0.0) {
+                if ($satuan !== null && ! $satuan->allowsFraction() && fmod($jumlahBaris, 1.0) !== 0.0) {
                     $validator->errors()->add(
                         'jumlah.'.$kunci,
                         'Jumlah "'.$baris['nama'].'" harus bilangan bulat karena satuannya '.$satuan->label().'.',
@@ -615,14 +691,152 @@ class PembelianBaru extends Component
              * di kolom diskon, bukan di kolom harga), dan hasilnya total nota NEGATIF —
              * uang masuk menurut catatan, padahal pemiliknya baru saja membayar.
              */
-            if (is_numeric($this->diskon) && (float) $this->diskon > $subtotal + 0.005) {
-                $validator->errors()->add('diskon', 'Diskon tidak boleh lebih besar daripada total belanjaannya.');
+            $diskon = $this->rupiah($this->diskon);
+
+            if ($diskon !== null && $diskon > $subtotal + 0.005) {
+                // Pesannya TIDAK mengulang kata "Potongan" di depan: ringkasan galat di layar
+                // sudah mencetak "Potongan:" sebagai judul barisnya.
+                $validator->errors()->add(
+                    'diskon',
+                    'Potongannya lebih besar daripada belanjaannya — belanja '
+                    .$this->rupiahTeks($subtotal).', potongan '.$this->rupiahTeks($diskon)
+                    .'. Mungkin angka harga masuk ke kolom potongan.',
+                );
             }
         });
 
         // Melempar ValidationException — Livewire menangkapnya dan mengisi kantong galat,
         // dan tidak ada satu baris pun yang tersimpan sebelum ini lolos.
         $validator->validate();
+    }
+
+    /* ── Angka yang diketik orang ────────────────────────────────────────── */
+
+    /**
+     * Aturan untuk kolom UANG: rupiah bulat, titik ribuan diterima, sen ditolak.
+     *
+     * KENAPA BUKAN `numeric`, dan kenapa ini bukan pelonggaran:
+     *
+     * `numeric` salah di KEDUA arah sekaligus di kolom rupiah. Ia MENOLAK "58.000" — bentuk
+     * yang paling sering diketik pemilik warung, sehingga orang yang mengetik seperti
+     * kebiasaannya cuma mendapat "harus berupa angka" tanpa tahu apa yang harus diubah. Dan
+     * ia MELOLOSKAN "58.5" beserta "58.00", dua bentuk yang mustahil dibedakan dari 58.000
+     * yang kehilangan satu nol — beda seribu kali, dan tidak ada jawaban yang benar tanpa
+     * bertanya kepada orangnya. App\Support\Uang yang memutuskan keduanya, dan aturan di sini
+     * memakai penerjemah yang SAMA dengan CatatPembelianAction supaya layar dan aksinya tidak
+     * pernah berbeda pendapat tentang satu angka.
+     *
+     * Kemampuan yang sengaja DIHAPUS, dan harus disebut: `harga = '1500.5'` dulu lolos,
+     * sekarang ditolak. Harga pecahan tetap hidup di tempat yang memang butuh — harga per
+     * satuan dasar (10.000 / 12 = 833,33) DIHITUNG TerimaPembelianAction, bukan diketik.
+     */
+    private function aturanRupiah(string $label): Closure
+    {
+        return function (string $atribut, mixed $nilai, Closure $gagal) use ($label): void {
+            // Minus diperiksa lebih dulu supaya pesannya menyebut sebab yang sebenarnya:
+            // Uang::baca juga menolaknya, tapi dengan pesan "bentuknya tidak terbaca" untuk
+            // angka yang bentuknya justru benar — cuma salah tanda.
+            if (is_numeric($nilai) && (float) $nilai < 0) {
+                $gagal($label.' tidak boleh minus. Kalau barangnya dikembalikan, batalkan notanya.');
+
+                return;
+            }
+
+            if (! Uang::sah($nilai)) {
+                $gagal($label.' ditulis dengan angka rupiah saja — mis. 58000 atau 58.000, tanpa sen. '
+                    .'Yang terbaca: '.$this->mentah($nilai).'.');
+
+                return;
+            }
+
+            if ((Uang::baca($nilai) ?? 0) > self::MAKS_RUPIAH) {
+                $gagal($label.' kelewat besar — periksa lagi angkanya.');
+            }
+        };
+    }
+
+    /**
+     * Aturan untuk kolom JUMLAH — kebalikan dari uang, dan itu disengaja.
+     *
+     * Pecahan SAH ("2,5" kg beras, "1,5" liter minyak) dan koma WAJIB diterima: itu cara
+     * orang di Indonesia menulis desimal, dan menolaknya berarti pemilik warteg tidak bisa
+     * mencatat belanja berasnya sama sekali. Yang justru ditolak titik ribuan ("1.500"),
+     * karena kalau dibaca 1,5 orang yang baru belajar "titik boleh di kolom harga" akan
+     * menerima 1,5 kg tanpa satu pun galat — seribu kali lebih sedikit dari yang ia maksud.
+     */
+    private function aturanJumlah(string $label): Closure
+    {
+        return function (string $atribut, mixed $nilai, Closure $gagal) use ($label): void {
+            $angka = $this->kuantitas($nilai);
+
+            if ($angka === null) {
+                $gagal($label.' ditulis tanpa titik ribuan — mis. 2, atau 2,5 untuk setengah. '
+                    .'Yang terbaca: '.$this->mentah($nilai).'.');
+
+                return;
+            }
+
+            if ($angka <= 0) {
+                // Nol berarti barisnya tidak dibeli, minus adalah salah ketik. Keduanya tidak
+                // boleh menjadi mutasi stok.
+                $gagal($label.' harus lebih dari nol. Baris yang tidak dibeli dikosongkan saja.');
+
+                return;
+            }
+
+            if ($angka > self::MAKS_JUMLAH) {
+                $gagal($label.' kelewat besar — periksa lagi angkanya.');
+            }
+        };
+    }
+
+    /** Rupiah bulat dari isian layar; null kalau kosong ATAU bentuknya tidak terbaca. */
+    private function rupiah(mixed $nilai): ?float
+    {
+        try {
+            $angka = Uang::baca($nilai);
+        } catch (InvalidArgumentException) {
+            // null di sini selalu berarti "jangan hitung nilai ini", dan pemanggilnya
+            // memang melewatinya — bukan menggantinya dengan nol. Nol akan membuat harga
+            // yang tidak terbaca ikut menyusun subtotal sebagai barang gratis.
+            return null;
+        }
+
+        return $angka === null ? null : (float) $angka;
+    }
+
+    /** Kuantitas (boleh pecahan) dari isian layar; null kalau kosong atau tidak terbaca. */
+    private function kuantitas(mixed $nilai): ?float
+    {
+        try {
+            return Uang::bacaJumlah($nilai);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    /** Nominal untuk PESAN GALAT — berformat rupiah, supaya angkanya bisa dibandingkan mata. */
+    private function rupiahTeks(float $nilai): string
+    {
+        return 'Rp '.number_format($nilai, 0, ',', '.');
+    }
+
+    /**
+     * Nilai mentah untuk pesan galat, dikutip supaya titik & spasinya kelihatan.
+     *
+     * Pesan yang tidak menyebut APA yang ditolak membuat orang mengetik ulang hal yang sama.
+     */
+    private function mentah(mixed $nilai): string
+    {
+        if (is_bool($nilai)) {
+            return $nilai ? '"true"' : '"false"';
+        }
+
+        if (is_scalar($nilai)) {
+            return '"'.$nilai.'"';
+        }
+
+        return is_array($nilai) ? 'daftar nilai' : get_debug_type($nilai);
     }
 
     /* ── Daftar barang ───────────────────────────────────────────────────── */
@@ -740,20 +954,32 @@ class PembelianBaru extends Component
         $baris = 0;
 
         foreach ($this->jumlah as $kunci => $nilai) {
-            if (! $this->diisi($nilai) || ! is_numeric($nilai) || ! $indeks->has($kunci)) {
+            /*
+             * Dibaca dengan penerjemah yang SAMA dengan validator dan aksinya.
+             *
+             * Dulu is_numeric() + (float) di sini, dan itu membuat bar bawah memakai SKALA
+             * YANG BERBEDA dari nota yang tersimpan: harga "58.000" terbaca 58, jadi bar
+             * berkata "Rp 116" untuk nota yang akan tersimpan Rp 116.000. Dua angka yang bisa
+             * berbeda untuk satu nominal adalah cara tercepat membuat orang berhenti
+             * memercayai keduanya — dan yang lebih buruk, bar itulah satu-satunya tempat
+             * pemilik memeriksa notanya sebelum menekan Simpan.
+             */
+            $jumlahBaris = $this->kuantitas($nilai);
+
+            if (! $this->diisi($nilai) || $jumlahBaris === null || ! $indeks->has($kunci)) {
                 continue;
             }
 
             $baris++;
-            $harga = $this->harga[$kunci] ?? null;
+            $harga = $this->rupiah($this->harga[$kunci] ?? null);
 
-            if (is_numeric($harga)) {
-                $subtotal += (float) $nilai * (float) $harga;
+            if ($harga !== null) {
+                $subtotal += $jumlahBaris * $harga;
             }
         }
 
-        $diskon = is_numeric($this->diskon) ? (float) $this->diskon : 0.0;
-        $ongkir = is_numeric($this->ongkosKirim) ? (float) $this->ongkosKirim : 0.0;
+        $diskon = $this->rupiah($this->diskon) ?? 0.0;
+        $ongkir = $this->rupiah($this->ongkosKirim) ?? 0.0;
 
         return [
             'baris' => $baris,

@@ -6,8 +6,8 @@
     Ikatan per baris di-key ID BARANG: jumlah.<kunci> / harga.<kunci> — dan galatnya di
     nama yang sama.
 
-    EMPAT hal yang menentukan layar ini benar atau tidak, dan semuanya sudah pernah
-    menjadi cacat nyata di layar sebelah:
+    LIMA hal yang menentukan layar ini benar atau tidak, dan semuanya sudah pernah
+    menjadi cacat nyata di layar ini atau di layar sebelah:
 
     1. **Kunci id barang, bukan indeks baris.** Nota belanja bulanan kelontong bisa 40
        barang; dengan 10 baris per halaman itu 4 halaman, dan angka yang hilang saat
@@ -16,8 +16,9 @@
     2. **Angka uang di bar bawah datang dari $ringkasan (server).** Menghitungnya lagi di
        Alpine berarti dua rumus untuk satu angka — dan angka di layar yang berbeda dari
        angka yang tersimpan adalah cara tercepat membuat orang berhenti memercayai
-       keduanya. Ikatan barisnya `.live.debounce` supaya bar itu ikut bergerak saat
-       diketik; dengan `.blur` bar berkata "0 barang" sementara kotaknya sudah berisi angka.
+       keduanya. Kolom jumlah terikat `.live.debounce` dan kotak uang menyegarkannya sendiri
+       (satu $wire.$refresh yang ditunda 600 ms) supaya bar itu ikut bergerak saat diketik;
+       dengan `.blur` bar berkata "0 barang" sementara kotaknya sudah berisi angka.
 
     3. **Blok peringatan pergantian cabang MENETAP di halaman**, bukan toast: ia membawa
        tombol keputusannya. Toast hilang sendiri, dan bersamanya hilang satu-satunya jalan
@@ -26,6 +27,11 @@
     4. **Ringkasan galat menyebut nama barangnya.** Validasi berjalan atas semua baris
        terisi termasuk yang ada di halaman lain, jadi tanpa ringkasan ini satu baris di
        halaman 3 bisa menahan simpan tanpa penjelasan apa pun di layar yang sedang dilihat.
+
+    5. **Kotak uang (potongan, ongkir, harga) TIDAK ber-wire:model dan TIDAK ber-value=.**
+       Yang dilihat mata ("Rp 58.000") dimiliki Alpine; yang dikirim ke server digit kanonik
+       ("58000"). Keduanya wajib begitu — alasannya lengkap di atas kotak Potongan, dan
+       PembelianFormatUangTest memindai berkas ini supaya tidak ada yang memasangnya kembali.
 --}}
 @php
     $angka = fn ($nilai) => rtrim(rtrim(number_format((float) $nilai, 3, ',', '.'), '0'), ',');
@@ -270,10 +276,40 @@
                 @enderror
             </div>
 
+            {{-- ── KOTAK UANG ───────────────────────────────────────────────
+                 Bentuknya sama untuk potongan, ongkir, dan harga per baris di bawah. Empat
+                 hal yang HARUS tetap begini, dan tiga di antaranya sudah pernah jadi cacat:
+
+                 1. **TANPA `wire:model`.** Ikatan Livewire membaca `element.value`, dan yang
+                    ada di situ TEKS BERFORMAT — jadi "58.000" yang terkirim persis cacat yang
+                    dibetulkan App\Support\Uang. Yang dikirim ke server dilakukan Alpine:
+                    `$wire.set('<nama>', digitKanonik, false)` tiap ketikan, tanpa perjalanan
+                    jaringan (lihat resources/js/uang.js).
+
+                 2. **TANPA atribut `value=`.** Kalau ada, morph Livewire menimpa kotaknya
+                    dengan angka MENTAH di tengah orang mengetik. Nilai awalnya masuk lewat
+                    argumen `kotakUang(...)` dan ditulis Alpine di init().
+
+                 3. **`inputmode="numeric"`, rupiah BULAT.** Kemampuan yang sengaja dihapus:
+                    "1500.5" dulu lolos, sekarang ditolak — rupiah yang diketik orang tidak
+                    punya sen. Harga pecahan tetap hidup di tempat yang butuh: harga per satuan
+                    dasar (10.000/12 = 833,33) DIHITUNG TerimaPembelianAction, bukan diketik.
+
+                 4. **`wire:key` memuat $generasiUang.** Sesudah nota tersimpan, kuncinya
+                    berubah supaya kotaknya dibuat ulang dan lahir kosong — keadaan Alpine
+                    tidak ikut terhapus oleh pengosongan properti di server, dan harga nota
+                    yang lalu yang masih terpampang akan ikut tersimpan sebagai belanja yang
+                    tidak pernah terjadi.
+
+                 Kolom JUMLAH sengaja TIDAK begini — lihat catatannya di kartu barang. --}}
             <div class="min-w-0">
                 <label for="diskon" class="block text-[0.8125rem] font-semibold text-ink">Potongan</label>
-                <input id="diskon" type="text" inputmode="decimal" autocomplete="off"
-                       wire:model.live.debounce.600ms="diskon" placeholder="0" value="{{ $diskon }}"
+                <input id="diskon" type="text" inputmode="numeric" autocomplete="off"
+                       wire:key="uang-diskon-{{ $generasiUang }}"
+                       x-data="kotakUang(@js((string) ($diskon ?? '')), 'diskon')"
+                       x-on:input="ketik()"
+                       x-on:keydown.backspace="mundur($event)"
+                       placeholder="Rp 0"
                        class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
                 @error('diskon')
                     <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
@@ -282,8 +318,12 @@
 
             <div class="min-w-0">
                 <label for="ongkos-kirim" class="block text-[0.8125rem] font-semibold text-ink">Ongkos kirim</label>
-                <input id="ongkos-kirim" type="text" inputmode="decimal" autocomplete="off"
-                       wire:model.live.debounce.600ms="ongkosKirim" placeholder="0" value="{{ $ongkosKirim }}"
+                <input id="ongkos-kirim" type="text" inputmode="numeric" autocomplete="off"
+                       wire:key="uang-ongkir-{{ $generasiUang }}"
+                       x-data="kotakUang(@js((string) ($ongkosKirim ?? '')), 'ongkosKirim')"
+                       x-on:input="ketik()"
+                       x-on:keydown.backspace="mundur($event)"
+                       placeholder="Rp 0"
                        class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
                 @error('ongkosKirim')
                     <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
@@ -523,6 +563,20 @@
                             <label for="jumlah-hp-{{ $kunci }}" class="block text-[0.8125rem] font-semibold text-ink">
                                 Jumlah ({{ mb_strtolower($satuanBeli) }})
                             </label>
+                            {{-- KOLOM JUMLAH: ikatannya WAJIB tetap `wire:model.live.debounce`,
+                                 dan ini yang paling berbahaya di seluruh berkas ini.
+
+                                 Kunci outlet lahir dari updatedJumlah() — angka pertama yang
+                                 masuk mengunci nota ke cabang tempat ia diketik. Kalau kolom
+                                 ini ikut ditangguhkan seperti kotak uang, kuncinya baru
+                                 terpasang pada permintaan BERIKUTNYA, dan dropdown outlet yang
+                                 diganti di celah itu memasukkan SELURUH belanjaan ke cabang
+                                 yang salah tanpa satu pun galat. Kotak harga tidak punya hook
+                                 seperti itu, jadi di sana penangguhan aman.
+
+                                 `inputmode="decimal"` dan TANPA titik ribuan: ini satu-satunya
+                                 kolom yang boleh pecahan (2,5 kg beras), dan titik di sini
+                                 berarti "1.500" terbaca 1,5 — seribu kali lebih sedikit. --}}
                             <input id="jumlah-hp-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
                                    wire:model.live.debounce.600ms="jumlah.{{ $kunci }}" placeholder="0" value="{{ $jumlah[$kunci] ?? '' }}"
                                    class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
@@ -532,12 +586,17 @@
                             {{-- Berbintang: `harga.<kunci>` ber-`required` begitu barisnya
                                  terisi. Nol SAH (bonus grosir) — yang ditolak adalah kosong,
                                  karena kosong yang lolos sebagai nol menghapus harga beli
-                                 barangnya di master. --}}
+                                 barangnya di master. Bentuk kotaknya = kotak uang; alasan
+                                 lengkap keempat syaratnya ada di kartu "Keterangan nota". --}}
                             <label for="harga-hp-{{ $kunci }}" class="block text-[0.8125rem] font-semibold text-ink">
                                 Harga per {{ mb_strtolower($satuanBeli) }}<x-wajib />
                             </label>
-                            <input id="harga-hp-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
-                                   wire:model.live.debounce.600ms="harga.{{ $kunci }}" placeholder="0" value="{{ $harga[$kunci] ?? '' }}"
+                            <input id="harga-hp-{{ $kunci }}" type="text" inputmode="numeric" autocomplete="off"
+                                   wire:key="uang-harga-hp-{{ $generasiUang }}-{{ $kunci }}"
+                                   x-data="kotakUang(@js((string) ($harga[$kunci] ?? '')), @js('harga.'.$kunci))"
+                                   x-on:input="ketik()"
+                                   x-on:keydown.backspace="mundur($event)"
+                                   placeholder="Rp 0"
                                    class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
                         </div>
                     </div>
@@ -619,8 +678,16 @@
 
                             <td class="px-5 py-3">
                                 <label for="harga-{{ $kunci }}" class="sr-only">Harga beli {{ $b['nama'] }}</label>
-                                <input id="harga-{{ $kunci }}" type="text" inputmode="decimal" autocomplete="off"
-                                       wire:model.live.debounce.600ms="harga.{{ $kunci }}" placeholder="0" value="{{ $harga[$kunci] ?? '' }}"
+                                {{-- Kotak uang; syaratnya dijelaskan di kartu "Keterangan nota".
+                                     Rata KANAN supaya digit satuan seluruh kolom berbaris di
+                                     tempat yang sama — dua nominal yang panjangnya berbeda
+                                     tidak bisa dibandingkan sekilas kalau rata kiri. --}}
+                                <input id="harga-{{ $kunci }}" type="text" inputmode="numeric" autocomplete="off"
+                                       wire:key="uang-harga-{{ $generasiUang }}-{{ $kunci }}"
+                                       x-data="kotakUang(@js((string) ($harga[$kunci] ?? '')), @js('harga.'.$kunci))"
+                                       x-on:input="ketik()"
+                                       x-on:keydown.backspace="mundur($event)"
+                                       placeholder="Rp 0"
                                        class="tabular h-12 w-full rounded-xl border border-line bg-white px-3 text-right text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
                                 <p class="mt-1 text-[0.6875rem] text-umber-soft">per {{ mb_strtolower($satuanBeli) }}</p>
                                 @error('harga.'.$kunci)
