@@ -45,6 +45,15 @@ vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
    yang masuk belakangan sudah benar-benar terjadi; selisih diselesaikan lewat opname.
 6. **Jangan menghapus data permanen.** Produk memakai soft delete supaya laporan lama
    tetap utuh.
+7. **JANGAN `git stash`, `git checkout <berkas>`, atau `git clean` selama ada pekerjaan
+   orang/agen lain yang belum dikomit.** Pohon kerja ini sering dipakai beberapa agen
+   sekaligus, dan ketiga perintah itu menyingkirkan perubahan yang belum tersimpan —
+   milik siapa pun, tanpa bertanya. Sudah hampir terjadi: `git stash -u` dipakai untuk
+   mengukur "patokan bersih", dan ikut mencabut satu layar baru beserta ujinya selama
+   ±13 detik. Kali itu `stash pop` berhasil; kalau prosesnya mati di sela itu, pekerjaan
+   satu putaran penuh hilang tanpa jejak di mana pun.
+   Kalau butuh patokan uji tanpa perubahan orang lain: jalankan `--filter` pada uji
+   fitur Anda sendiri, atau ukur di klon terpisah. JANGAN membersihkan pohon bersama.
 
 ## Susunan kode
 
