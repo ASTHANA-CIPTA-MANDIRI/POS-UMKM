@@ -58,6 +58,22 @@ tidak sesuai** — sekarang masih perkiraan.
 - [ ] Tutup kasir (layar owner) | | owner | 4j
 - [ ] Service worker: layar kasir tetap terbuka saat dimuat ulang tanpa jaringan | | kasir | 5j
 - [ ] Kontras lencana merah: 21 pemakaian masih 4,15:1 (butuh 4,5:1) | | owner | 1j
+- [ ] Sidebar: butir terakhir tertutup kartu pengguna | | owner | 1j
+      Kartu pengguna menempel di dasar sidebar yang bisa digulir, TANPA ruang bawah
+      sebesar kartunya, jadi butir paling bawah tidak pernah bisa terlihat penuh.
+      Terukur di 1280x800 lewat elementFromPoint: fnb menutupi "Pelanggan",
+      kelontong menutupi "Kasbon" — butir yang tertutup berbeda karena daftarnya
+      beda panjang, jadi audit kerapian menemukannya di satu layar lalu kehilangan
+      jejaknya di layar lain. SUDAH ADA sebelum layar Bahan; sempat saya kira
+      kemunduran karena menyembunyikan menu Bahan menggeser butir mana yang kena.
+      Bukan pemblokir: sidebarnya bisa digulir, jadi butirnya tetap terjangkau.
+      Perbaikannya padding-bottom pada nav sebesar tinggi kartu.
+- [ ] Pemeriksa tumpangTindih tidak mengerti penumpukan lapisan | | owner | 1j
+      `tests/browser/periksa-rapi.js` menyaring lewat konteks berposisi, dan itu
+      sudah menyelamatkannya dari menuduh dialog. Tapi pasangan di DALAM satu
+      konteks yang saling menimpa secara sah — kartu sticky di atas daftar yang
+      digulir — tetap dilaporkan. Pakai elementFromPoint sebagai wasit: yang
+      dilaporkan hanya kalau ada yang benar-benar TERTUTUP.
 - [ ] Audit kerapian seluruh layar (7 angka nol di 390/768/1280) | | owner | 4j
 - [ ] Infra rilis: domain, HTTPS, queue worker, cron, cadangan basis data | | infra | 6j
 
