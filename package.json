@@ -17,6 +17,8 @@
     },
     "dependencies": {
         "barcode-detector": "^3.2.1",
+        "laravel-echo": "^2.4.0",
+        "pusher-js": "^8.6.0",
         "sweetalert2": "^11.26.25"
     }
 }

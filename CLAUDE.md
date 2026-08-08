@@ -26,7 +26,42 @@ npm run build              # aset produksi — WAJIB sebelum memverifikasi di pe
 php artisan test           # PHPUnit
 npm run uji:js             # uji JS (node --test 'tests/js/*.test.mjs')
 vendor/bin/pint            # format PHP; jalankan sebelum melapor selesai
+php artisan reverb:start   # server realtime (WebSocket), porta 8080
 ```
+
+### Realtime (Reverb) — SELALU penambah, tidak pernah syarat
+
+Terpasang sejak 2026-08-07: Reverb + Laravel Echo. Yang perlu diketahui sebelum memakainya:
+
+- **Echo dimuat SAAT DIBUTUHKAN, bukan di setiap halaman.** `app.js` hanya mendaftarkan
+  `window.pasangEcho`; koneksinya baru terbuka kalau ada layar yang memanggilnya:
+
+  ```js
+  const echo = await window.pasangEcho();
+  echo?.private(`outlet.${id}`).listen('PesananMasuk', (e) => …);
+  ```
+
+  `echo?.` bukan kelalaian — `pasangEcho()` mengembalikan `null` kalau Reverb tidak disetel
+  atau chunk-nya gagal diunduh, dan pemanggilnya WAJIB tetap jalan tanpa realtime.
+
+- **Bentuk bawaan `install:broadcasting` SENGAJA tidak dipakai.** Ia menaruh `import './echo'`
+  di app.js dan menyambung seketika di semua halaman. Itu melanggar aturan keras nomor 3:
+  pusher-js (61 KB) ikut masuk bundel yang harus diunduh kasir sebelum bisa berjualan, dan
+  Echo mencoba menyambung ulang sepanjang shift di warung bersinyal buruk. Dengan `import()`
+  dinamis, Vite memecahnya jadi chunk terpisah — terukur: bundel utama hanya naik 2 KB
+  (183,79 → 186,05 KB), pusher-js ada di berkasnya sendiri dan tidak pernah diunduh kasir.
+  **Jangan "merapikannya" kembali ke bentuk bawaan.**
+
+- **Layar kasir tidak boleh memakai realtime untuk apa pun yang menentukan.** Ia wajib jalan
+  tanpa jaringan; siaran hanya boleh menambah kenyamanan (mis. memberi tahu dapur), bukan
+  menjadi jalan satu-satunya sebuah data sampai.
+
+- Kunci Reverb di `.env.example` sengaja KOSONG: kunci contoh yang tersalin ke produksi adalah
+  kunci yang diketahui semua orang.
+
+- Membuktikan servernya hidup: GET ke `/app/{key}` membalas **500** dan itu WAJAR — jalur itu
+  menunggu peningkatan WebSocket. Buktinya sambungan sungguhan yang membalas
+  `pusher:connection_established`.
 
 ## Aturan yang tidak boleh dilanggar
 

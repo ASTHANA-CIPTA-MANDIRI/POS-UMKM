@@ -1,5 +1,6 @@
 import { pasangBukti } from './bukti';
 import { pasangBunyi } from './bunyi';
+import { pasangEchoKeWindow } from './echo';
 import { pasangKasir } from './kasir';
 import { pasangToast } from './toast';
 import { mulaiAnimasi } from './motion';
@@ -21,6 +22,15 @@ pasangUang();
 // dan pendengarnya harus sudah ada saat event pertama tiba.
 pasangToast();
 pasangBunyi();
+
+/*
+ * Hanya MENDAFTARKAN window.pasangEcho — TIDAK menyambung.
+ *
+ * Koneksinya baru terbuka kalau ada layar yang benar-benar memanggilnya, dan pusher-js
+ * ada di chunk terpisah sehingga layar kasir tidak pernah mengunduhnya. Aturan keras
+ * nomor 3: layar kasir tidak boleh bergantung jaringan.
+ */
+pasangEchoKeWindow();
 
 function mulai() {
     pasangNavbar();
