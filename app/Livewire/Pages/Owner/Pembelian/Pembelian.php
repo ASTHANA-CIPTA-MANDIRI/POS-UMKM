@@ -247,9 +247,9 @@ class Pembelian extends Component
             return;
         }
 
-        // Dibaca SEBELUM aksinya jalan: sesudah itu kolomnya sudah menunjuk berkas baru dan
+        // Dibaca SEBELUM aksinya jalan: sesudah itu lampirannya sudah bertambah dan
         // pertanyaan "tadi sudah ada fotonya atau belum" tidak bisa dijawab lagi.
-        $adaSebelumnya = filled($nota->bukti_path);
+        $adaSebelumnya = $nota->lampiran()->exists();
 
         $berhasil = app(SimpanBuktiBelanjaAction::class)->execute($nota, $this->bukti);
 
@@ -398,22 +398,7 @@ class Pembelian extends Component
             return;
         }
 
-        /*
-         * Kolom lama ikut dikosongkan kalau yang dibuang adalah salinannya.
-         *
-         * Selama masa peralihan, `bukti_path` dan tabel lampiran menunjuk berkas yang sama.
-         * Membuang barisnya saja meninggalkan kolom yang menunjuk berkas yang sudah dihapus —
-         * dan layar mana pun yang masih membaca kolom itu akan menampilkan gambar rusak,
-         * atau lebih buruk: mengaku notanya masih berfoto padahal tidak.
-         */
-        $ikutKolomLama = (string) $nota->bukti_path === (string) $lampiran->path;
-
         app(SimpanLampiranAction::class)->hapus($lampiran);
-
-        if ($ikutKolomLama) {
-            $nota->bukti_path = null;
-            $nota->save();
-        }
 
         $this->toast('Lampiran dibuang. Notanya sendiri tetap tersimpan.');
     }

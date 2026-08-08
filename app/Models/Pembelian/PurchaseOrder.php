@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Storage;
 #[Fillable([
     'outlet_id', 'supplier_id', 'nomor_po', 'tanggal', 'total',
     'diskon', 'ongkos_kirim',
-    'status', 'catatan', 'bukti_path', 'dibuat_oleh', 'diterima_pada',
+    'status', 'catatan', 'dibuat_oleh', 'diterima_pada',
 ])]
 class PurchaseOrder extends Model
 {
@@ -115,9 +115,20 @@ class PurchaseOrder extends Model
      */
     public function punyaBukti(): bool
     {
-        $path = (string) $this->bukti_path;
+        return $this->lampiranPertama() !== null;
+    }
 
-        return $path !== '' && Storage::disk(SimpanBuktiBelanjaAction::DISK)->exists($path);
+    /**
+     * Lampiran pertama yang berkasnya BENAR-BENAR ada, atau null.
+     *
+     * Baris boleh menggantung tanpa berkas (berkas terhapus di luar aplikasi, salinan
+     * basis data dibawa ke mesin lain), jadi keberadaan barisnya saja tidak cukup —
+     * layar yang percaya baris akan menampilkan ikon gambar rusak, dan ikon rusak tidak
+     * menjelaskan apa pun selain "ada yang salah".
+     */
+    public function lampiranPertama(): ?Lampiran
+    {
+        return $this->lampiran->first(fn (Lampiran $l) => $l->ada());
     }
 
     /**
@@ -142,10 +153,10 @@ class PurchaseOrder extends Model
             return null;
         }
 
-        return route('owner.lampiran.lihat', [
-            'nota' => $this->getKey(),
-            'penanda' => self::PENANDA_BUKTI,
-        ]);
+        // Penandanya id lampiran, bukan kata 'bukti': kolom bukti_path sudah tidak ada,
+        // dan satu nota bisa punya sepuluh lampiran. Yang dikembalikan yang PERTAMA —
+        // pemanggil lama (mis. pratinjau) memang cuma butuh "ada fotonya, ini alamatnya".
+        return $this->urlLampiran($this->lampiranPertama());
     }
 
     /**

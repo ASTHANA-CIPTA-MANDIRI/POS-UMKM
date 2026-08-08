@@ -85,18 +85,24 @@ class LampiranController extends Controller
          * Urutannya sesudah gerbang outlet, bukan sebelum: yang menjawab "ada atau tidak"
          * harus orang yang memang boleh bertanya.
          */
-        $lampiran = $penanda === PurchaseOrder::PENANDA_BUKTI
-            ? null
-            : $nota->lampiran()->whereKey($penanda)->first();
+        $lampiran = $nota->lampiran()->whereKey($penanda)->first();
 
-        abort_if($penanda !== PurchaseOrder::PENANDA_BUKTI && $lampiran === null, 404);
+        /*
+         * Penanda 'bukti' (bentuk lama, satu foto per nota) TIDAK dilayani lagi.
+         *
+         * Kolom bukti_path sudah dibuang, jadi tidak ada lagi yang bisa dirujuknya. URL lama
+         * yang tersimpan di riwayat peramban akan 404 — dan itu jawaban yang jujur: berkasnya
+         * memang tidak lagi bisa ditunjuk dengan cara itu. Menjawabnya dengan "lampiran
+         * pertama" akan mengembalikan foto yang BERBEDA dari yang dulu ditandai URL itu.
+         */
+        abort_if($lampiran === null, 404);
 
         // Path yang menggantung (berkas terhapus di luar aplikasi, salinan database dibawa
         // ke mesin lain) berakhir 404, bukan 500: yang salah bukan permintaannya.
-        abort_unless($lampiran !== null ? $lampiran->ada() : $nota->punyaBukti(), 404);
+        abort_unless($lampiran->ada(), 404);
 
         $disk = Storage::disk(SimpanBuktiBelanjaAction::DISK);
-        $path = $lampiran?->path ?? (string) $nota->bukti_path;
+        $path = $lampiran->path;
 
         $balasan = new Response;
         $balasan->headers->set('X-Content-Type-Options', 'nosniff');
@@ -127,7 +133,7 @@ class LampiranController extends Controller
                 : HeaderUtils::DISPOSITION_ATTACHMENT,
             // Nama unduhannya memakai nama ASLI berkasnya kalau ada — "invoice-grosir.pdf"
             // jauh lebih berguna di folder Unduhan daripada nomor nota + uuid.
-            $lampiran?->nama_asli ?: $this->namaBerkas($nota, $path),
+            $lampiran->nama_asli ?: $this->namaBerkas($nota, $path),
         ));
 
         return $balasan;

@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Lampiran\SimpanLampiranAction;
 use App\Actions\Pembelian\BatalkanPembelianAction;
 use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Enums\DocumentStatus;
 use App\Enums\UserRole;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
+use App\Models\Lampiran\Lampiran;
 use App\Models\Pembelian\PurchaseOrder;
 use App\Models\Tenant\Outlet;
 use App\Models\Tenant\Tenant;
@@ -106,12 +108,12 @@ class PembelianBuktiTest extends TestCase
 
         $nota = PurchaseOrder::query()->sole();
 
-        $this->assertNull($nota->bukti_path, 'nota tanpa foto tetap tersimpan, kolomnya kosong');
+        $this->assertNull($this->pathBukti($nota), 'nota tanpa foto tetap tersimpan, tanpa satu pun lampiran');
         $this->assertFalse($nota->punyaBukti());
         $this->assertNull($nota->urlBukti());
 
         // Dan tidak ada satu pun berkas yang lahir dari nota tanpa foto.
-        $this->assertSame([], Storage::disk('lampiran')->allFiles(SimpanBuktiBelanjaAction::FOLDER));
+        $this->assertSame([], Storage::disk('lampiran')->allFiles(SimpanLampiranAction::FOLDER));
     }
 
     /* ── Folder ──────────────────────────────────────────────────────────── */
@@ -140,10 +142,10 @@ class PembelianBuktiTest extends TestCase
             ->assertHasNoErrors();
 
         $nota = PurchaseOrder::query()->sole();
-        $path = (string) $nota->bukti_path;
+        $path = (string) $this->pathBukti($nota);
 
         $this->assertNotSame('', $path, 'fotonya harus terpasang');
-        $this->assertStringStartsWith('bukti-belanja/'.$this->tenant->getKey().'/', $path,
+        $this->assertStringStartsWith(SimpanLampiranAction::FOLDER.'/'.$this->tenant->getKey().'/', $path,
             'bukti belanja wajib di folder sendiri per tenant, bukan di folder bersama');
         $this->assertStringNotContainsString('produk/', $path,
             'JANGAN menulis ke produk/: dilindungi aturan keras nomor 1, dan pembersih '
@@ -218,7 +220,7 @@ class PembelianBuktiTest extends TestCase
 
         $nota = PurchaseOrder::query()->sole();
 
-        $this->assertNull($nota->bukti_path, 'berkas bukan gambar tidak boleh masuk ke kolomnya');
+        $this->assertNull($this->pathBukti($nota), 'berkas bukan gambar tidak boleh jadi lampiran');
         $this->assertSame([], Storage::disk('lampiran')->allFiles(SimpanBuktiBelanjaAction::FOLDER),
             'berkas yang ditolak tidak boleh tertulis ke disk sama sekali');
     }
@@ -269,7 +271,7 @@ class PembelianBuktiTest extends TestCase
         $this->assertNotNull($nota,
             'notanya wajib tetap tersimpan walau fotonya gagal diunggah: nota belanja adalah '
             .'catatan uang keluar, fotonya cuma penguat');
-        $this->assertNull($nota->bukti_path,
+        $this->assertNull($this->pathBukti($nota),
             'kolomnya tetap kosong — path yang berkasnya tidak ada hanya menghasilkan ikon rusak');
         $this->assertEqualsWithDelta(15000.0, (float) $nota->total, 0.01,
             'uang di notanya tidak boleh terpengaruh sama sekali oleh urusan foto');
@@ -303,9 +305,11 @@ class PembelianBuktiTest extends TestCase
             'baris' => [$this->baris($kopi, 10, 1500)],
         ]);
 
-        // Berkas, bukan folder — jadi 'bukti-belanja/{tenant}/apa-pun.jpg' tidak bisa ditulis.
+        // Berkas, bukan folder — jadi 'lampiran/{tenant}/apa-pun.jpg' tidak bisa ditulis.
+        // Foldernya ikut berpindah bersama penyimpanannya: lampiran BARU tidak lagi menumpang
+        // di 'bukti-belanja/', dan uji yang menghalangi folder lama tidak menghalangi apa pun.
         Storage::disk('lampiran')->put(
-            SimpanBuktiBelanjaAction::FOLDER.'/'.$this->tenant->getKey(),
+            SimpanLampiranAction::FOLDER.'/'.$this->tenant->getKey(),
             'ini berkas, bukan folder',
         );
 
@@ -315,7 +319,7 @@ class PembelianBuktiTest extends TestCase
         $this->assertFalse($berhasil,
             'aksinya harus MENGATAKAN gagal lewat nilai kembalian, bukan melempar — pemanggilnya '
             .'sudah berada sesudah notanya tersimpan');
-        $this->assertNull($nota->fresh()->bukti_path,
+        $this->assertNull($this->pathBukti($nota),
             'kolom bukti hanya diisi kalau berkasnya benar-benar tertulis');
         $this->assertSame(DocumentStatus::Diterima, $nota->fresh()->status,
             'notanya tidak berubah apa pun karena urusan berkas');
@@ -324,34 +328,36 @@ class PembelianBuktiTest extends TestCase
     /* ── Ganti & hapus ───────────────────────────────────────────────────── */
 
     /**
-     * Berkas lama dibuang saat fotonya diganti — tapi SESUDAH yang baru tersimpan.
+     * Foto KEDUA menambah, tidak mengganti — dan yang pertama tidak boleh ikut terbuang.
      *
-     * Pola yang sama dengan Produk::buangBerkas(). Dibuang lebih dulu berarti unggahan yang
-     * gagal meninggalkan nota tanpa foto sama sekali: kehilangan yang tidak diminta siapa pun.
+     * Ini pembalikan sadar dari perilaku lama. Dulu satu nota satu foto, jadi yang baru
+     * MENGGANTI yang lama dan berkas lamanya dibuang. Sejak lampiran jadi tabel sendiri,
+     * mengganti berhenti masuk akal: nota grosir berlembar-lembar, dan orang yang memotret
+     * lembar kedua tidak sedang membatalkan lembar pertama.
+     *
+     * Yang dijaga sekarang kebalikan dari yang dulu, dan itu disengaja: kalau suatu hari
+     * penambahan diam-diam kembali menghapus yang lama, lembar pertama sebuah nota hilang
+     * tanpa satu pun pesan — dan baru ketahuan saat grosirnya menagih.
      */
-    public function test_mengganti_bukti_membuang_berkas_lama(): void
+    public function test_foto_kedua_menambah_dan_tidak_membuang_yang_pertama(): void
     {
-        $nota = $this->notaBerbukti('lama.jpg');
-        $lama = (string) $nota->bukti_path;
+        $nota = $this->notaBerbukti('lembar-1.jpg');
+        $pertama = (string) $this->pathBukti($nota);
 
         Livewire::actingAs($this->owner)
             ->test(Pembelian::class)
             ->call('bukaRincian', $nota->getKey())
-            ->set('bukti', UploadedFile::fake()->image('baru.jpg'))
-            ->call('pasangBukti')
-            ->assertDispatched('toast', fn (string $nama, array $data): bool => str_contains($data['pesan'], 'diganti'));
+            ->set('bukti', UploadedFile::fake()->image('lembar-2.jpg'))
+            ->call('pasangBukti');
 
-        $baru = (string) $nota->fresh()->bukti_path;
+        $segar = $nota->fresh();
 
-        $this->assertNotSame($lama, $baru);
-        Storage::disk('lampiran')->assertExists($baru);
-        Storage::disk('lampiran')->assertMissing($lama);
+        $this->assertSame(2, $segar->lampiran()->count(), 'foto kedua menambah, bukan mengganti');
+        Storage::disk('lampiran')->assertExists($pertama);
 
-        // SATU berkas per nota, tegas: berkas lama yang tertinggal berarti disk warung penuh
-        // oleh foto yang tidak pernah dibuka lagi.
-        $this->assertCount(1, Storage::disk('lampiran')->allFiles(
-            SimpanBuktiBelanjaAction::FOLDER.'/'.$this->tenant->getKey(),
-        ));
+        foreach ($segar->lampiran as $l) {
+            Storage::disk('lampiran')->assertExists($l->path);
+        }
     }
 
     /* ── Nota dibatalkan: buktinya TERKUNCI ──────────────────────────────── */
@@ -367,14 +373,14 @@ class PembelianBuktiTest extends TestCase
     public function test_membatalkan_nota_tidak_menghapus_berkas_buktinya(): void
     {
         $nota = $this->notaBerbukti('struk-dikembalikan.jpg');
-        $path = (string) $nota->bukti_path;
+        $path = (string) $this->pathBukti($nota);
 
         app(BatalkanPembelianAction::class)->execute($nota, $this->owner);
 
         $segar = $nota->fresh();
 
         $this->assertSame(DocumentStatus::Dibatalkan, $segar->status);
-        $this->assertSame($path, $segar->bukti_path,
+        $this->assertSame($path, $this->pathBukti($nota),
             'kolom buktinya tidak boleh dikosongkan oleh pembatalan');
         Storage::disk('lampiran')->assertExists($path);
         $this->assertTrue($segar->punyaBukti(), 'buktinya tetap BISA DILIHAT sesudah nota dibatalkan');
@@ -391,7 +397,7 @@ class PembelianBuktiTest extends TestCase
     public function test_bukti_pada_nota_dibatalkan_tidak_bisa_diganti_maupun_dihapus(): void
     {
         $nota = $this->notaBerbukti('struk-asli.jpg');
-        $path = (string) $nota->bukti_path;
+        $path = (string) $this->pathBukti($nota);
 
         app(BatalkanPembelianAction::class)->execute($nota, $this->owner);
         $nota = $nota->fresh();
@@ -406,12 +412,14 @@ class PembelianBuktiTest extends TestCase
         $this->assertFalse($aksi->hapus($nota),
             'nota dibatalkan: fotonya tidak boleh dihapus');
 
-        $this->assertSame($path, $nota->fresh()->bukti_path);
+        $this->assertSame($path, $this->pathBukti($nota));
+        $this->assertSame(1, $nota->fresh()->lampiran()->count(),
+            'penolakan harus utuh: tidak ada lampiran baru yang menyelinap masuk');
         Storage::disk('lampiran')->assertExists($path);
 
         // Dan berkas PENGGANTINYA tidak boleh ikut tertulis: satu berkas, yang asli.
         $this->assertCount(1, Storage::disk('lampiran')->allFiles(
-            SimpanBuktiBelanjaAction::FOLDER.'/'.$this->tenant->getKey(),
+            SimpanLampiranAction::FOLDER.'/'.$this->tenant->getKey(),
         ));
 
         // Lewat layar pun sama, dan pesannya mengatakan KENAPA — bukan "gagal" begitu saja.
@@ -426,7 +434,7 @@ class PembelianBuktiTest extends TestCase
         $komponen->call('hapusBukti')
             ->assertDispatched('toast', fn (string $nama, array $data): bool => str_contains($data['pesan'], 'dikunci'));
 
-        $this->assertSame($path, $nota->fresh()->bukti_path);
+        $this->assertSame($path, $this->pathBukti($nota));
         Storage::disk('lampiran')->assertExists($path);
     }
 
@@ -463,8 +471,8 @@ class PembelianBuktiTest extends TestCase
 
         $segar = $nota->fresh();
 
-        $this->assertNotNull($segar->bukti_path, 'nota belum datang WAJIB bisa dipasangi foto');
-        Storage::disk('lampiran')->assertExists($segar->bukti_path);
+        $this->assertNotNull($this->pathBukti($nota), 'nota belum datang WAJIB bisa dipasangi foto');
+        Storage::disk('lampiran')->assertExists($this->pathBukti($nota));
         $this->assertSame(DocumentStatus::Dikirim, $segar->status,
             'memasang foto tidak boleh mengubah status notanya');
         $this->assertEqualsWithDelta(7.0, $this->saldo($this->outlet, $kopi), 0.001,
@@ -480,7 +488,7 @@ class PembelianBuktiTest extends TestCase
         ]);
 
         $this->assertSame(DocumentStatus::Diterima, $nota->status);
-        $this->assertNull($nota->bukti_path, 'notanya memang lahir tanpa foto');
+        $this->assertNull($this->pathBukti($nota), 'notanya memang lahir tanpa foto');
 
         Livewire::actingAs($this->owner)
             ->test(Pembelian::class)
@@ -491,8 +499,8 @@ class PembelianBuktiTest extends TestCase
 
         $segar = $nota->fresh();
 
-        $this->assertNotNull($segar->bukti_path);
-        Storage::disk('lampiran')->assertExists($segar->bukti_path);
+        $this->assertNotNull($this->pathBukti($nota));
+        Storage::disk('lampiran')->assertExists($this->pathBukti($nota));
         $this->assertSame(DocumentStatus::Diterima, $segar->status);
     }
 
@@ -526,10 +534,21 @@ class PembelianBuktiTest extends TestCase
             ]);
         });
 
-        $pathLain = SimpanBuktiBelanjaAction::FOLDER.'/'.$lain->getKey().'/struk-sebelah.jpg';
+        // Lampirannya disusun langsung, bukan lewat aksi: yang diuji di sini gerbang
+        // AKSES, dan penyiapan yang melewati layar justru bisa gagal karena alasan lain.
+        $pathLain = SimpanLampiranAction::FOLDER.'/'.$lain->getKey().'/struk-sebelah.jpg';
         Storage::disk('lampiran')->put($pathLain, 'struk milik warung sebelah');
-        $notaLain->bukti_path = $pathLain;
-        $notaLain->save();
+
+        $this->konteks()->forTenant($lain->getKey(), function () use ($notaLain, $pathLain) {
+            Lampiran::create([
+                'lampirable_type' => $notaLain->getMorphClass(),
+                'lampirable_id' => $notaLain->getKey(),
+                'path' => $pathLain,
+                'mime' => 'image/jpeg',
+                'ukuran' => 27,
+                'urutan' => 1,
+            ]);
+        });
 
         $komponen = Livewire::actingAs($this->owner)
             ->test(Pembelian::class)
@@ -544,19 +563,22 @@ class PembelianBuktiTest extends TestCase
         $komponen->call('hapusBukti')
             ->assertDispatched('toast', fn (string $nama, array $data): bool => str_contains($data['pesan'], 'tidak ditemukan'));
 
-        $segar = PurchaseOrder::withoutGlobalScopes()->findOrFail($notaLain->getKey());
+        $lampiranLain = Lampiran::withoutGlobalScopes()
+            ->where('lampirable_id', $notaLain->getKey())
+            ->get();
 
-        $this->assertSame($pathLain, $segar->bukti_path,
+        $this->assertCount(1, $lampiranLain,
             'bukti merchant lain tidak boleh tergantikan maupun terhapus');
+        $this->assertSame($pathLain, $lampiranLain->sole()->path);
         Storage::disk('lampiran')->assertExists($pathLain);
 
         // Berkas sisipan tidak boleh mendarat di mana pun: tidak di folder tenant sendiri,
         // dan terutama tidak di folder tenant lain.
         $this->assertSame([], Storage::disk('lampiran')->allFiles(
-            SimpanBuktiBelanjaAction::FOLDER.'/'.$this->tenant->getKey(),
+            SimpanLampiranAction::FOLDER.'/'.$this->tenant->getKey(),
         ));
         $this->assertCount(1, Storage::disk('lampiran')->allFiles(
-            SimpanBuktiBelanjaAction::FOLDER.'/'.$lain->getKey(),
+            SimpanLampiranAction::FOLDER.'/'.$lain->getKey(),
         ));
 
         // Nomor nota merchant lain juga tidak boleh terbaca di daftar layar ini.
@@ -636,7 +658,10 @@ class PembelianBuktiTest extends TestCase
         $this->assertSame(
             route('owner.lampiran.lihat', [
                 'nota' => $nota->getKey(),
-                'penanda' => PurchaseOrder::PENANDA_BUKTI,
+                // Penandanya id LAMPIRAN, bukan kata 'bukti'. Bentuk lama hanya sanggup
+                // menunjuk satu foto per nota; sejak satu nota boleh punya sepuluh, penanda
+                // tetap berhenti bisa menjawab "yang mana".
+                'penanda' => $nota->fresh()->lampiranPertama()->getKey(),
             ]),
             $url,
             'satu-satunya penyusun URL bukti adalah rute berpenjaga owner.lampiran.lihat',
@@ -706,6 +731,17 @@ class PembelianBuktiTest extends TestCase
     }
 
     /* ── Bantuan ─────────────────────────────────────────────────────────── */
+
+    /**
+     * Path lampiran pertama nota — pengganti pembacaan kolom `bukti_path` yang sudah dibuang.
+     *
+     * Ada di SATU tempat supaya uji-uji di berkas ini tidak masing-masing menyusun kueri
+     * sendiri: kalau bentuk penyimpanannya berubah lagi, yang disunting satu baris.
+     */
+    private function pathBukti(PurchaseOrder $nota): ?string
+    {
+        return $nota->fresh()->lampiran()->first()?->path;
+    }
 
     /** Nota yang sudah punya foto bukti, lewat jalur aksinya (bukan disusun tangan). */
     private function notaBerbukti(string $namaBerkas): PurchaseOrder

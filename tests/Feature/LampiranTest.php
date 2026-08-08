@@ -274,16 +274,18 @@ class LampiranTest extends TestCase
             'tenant_id tidak pernah fillable — diisi BelongsToTenant, bukan muatan');
     }
 
-    /* ── Masa peralihan: bukti_path dan lampiran harus SEPAKAT ───────────── */
+    /* ── Jalur satu-foto (formulir nota baru) ────────────────────────────── */
 
     /**
-     * Selama layarnya belum berpindah, kolom lama dan tabel baru wajib sepakat.
+     * Formulir nota baru masih mengunggah SATU foto, dan itu tetap berakhir sebagai lampiran.
      *
-     * Tabel yang diisi sekali lewat migrasi lalu tidak ikut diperbarui akan melenceng diam-
-     * diam sejak hari pertama — dan peralihan berikutnya memindahkan data yang sudah tidak
-     * lengkap. Arahnya SATU: bukti_path kebenarannya, lampiran mengikutinya.
+     * Kolom `bukti_path` sudah dibuang; SimpanBuktiBelanjaAction tidak lagi menyimpan berkas
+     * sendiri, ia menyerahkannya ke SimpanLampiranAction. Yang dijaga di sini: jalur lama
+     * tidak boleh diam-diam berhenti membuat lampiran — kalau itu terjadi, foto yang
+     * dipasang saat mencatat nota hilang tanpa satu pun galat, dan pemiliknya baru tahu
+     * berminggu kemudian saat mencarinya.
      */
-    public function test_unggah_bukti_lama_ikut_membuat_baris_lampiran(): void
+    public function test_unggah_lewat_jalur_satu_foto_tetap_menjadi_lampiran(): void
     {
         $nota = $this->nota();
 
@@ -292,38 +294,47 @@ class LampiranTest extends TestCase
         );
 
         $segar = $nota->fresh();
-        $lampiran = $segar->lampiran()->get();
 
-        $this->assertCount(1, $lampiran);
-        $this->assertSame($segar->bukti_path, $lampiran->first()->path,
-            'baris lampiran harus menunjuk berkas yang SAMA dengan kolom bukti_path');
+        $this->assertSame(1, $segar->lampiran()->count());
+        $this->assertTrue($segar->punyaBukti());
+        $this->assertNotNull($segar->urlBukti());
+        Storage::disk('lampiran')->assertExists($segar->lampiran()->sole()->path);
     }
 
-    public function test_hapus_bukti_lama_ikut_membuang_baris_lampiran(): void
+    public function test_hapus_lewat_jalur_satu_foto_membuang_lampiran_pertamanya(): void
     {
         $nota = $this->nota();
 
         app(SimpanBuktiBelanjaAction::class)->execute($nota, UploadedFile::fake()->image('struk.jpg'));
-        $this->assertSame(1, $nota->fresh()->lampiran()->count());
+        $path = $nota->fresh()->lampiran()->sole()->path;
 
-        app(SimpanBuktiBelanjaAction::class)->hapus($nota->fresh());
+        $this->assertTrue(app(SimpanBuktiBelanjaAction::class)->hapus($nota->fresh()));
 
-        $this->assertSame(0, $nota->fresh()->lampiran()->count(),
-            'baris lampiran yang tertinggal menunjuk berkas yang sudah tidak ada');
+        $this->assertSame(0, $nota->fresh()->lampiran()->count());
+        Storage::disk('lampiran')->assertMissing($path);
     }
 
-    /** Mengganti foto tidak boleh meninggalkan DUA baris. */
-    public function test_ganti_bukti_menyisakan_tepat_satu_baris_lampiran(): void
+    /**
+     * punyaBukti() memeriksa BERKASNYA, bukan cuma barisnya.
+     *
+     * Baris boleh menggantung tanpa berkas: berkas terhapus di luar aplikasi, atau salinan
+     * basis data dibawa ke mesin lain tanpa foldernya. Layar yang percaya baris saja akan
+     * menampilkan ikon gambar rusak — dan ikon rusak tidak menjelaskan apa pun selain "ada
+     * yang salah".
+     */
+    public function test_baris_tanpa_berkas_tidak_dihitung_punya_bukti(): void
     {
-        $nota = $this->nota();
+        [$nota, $l] = $this->notaBerlampiran();
 
-        app(SimpanBuktiBelanjaAction::class)->execute($nota, UploadedFile::fake()->image('lama.jpg'));
-        app(SimpanBuktiBelanjaAction::class)->execute($nota->fresh(), UploadedFile::fake()->image('baru.jpg'));
+        $this->assertTrue($nota->fresh()->punyaBukti(), 'pramis: berkasnya memang ada');
+
+        Storage::disk('lampiran')->delete($l->path);
 
         $segar = $nota->fresh();
 
-        $this->assertSame(1, $segar->lampiran()->count());
-        $this->assertSame($segar->bukti_path, $segar->lampiran()->sole()->path);
+        $this->assertSame(1, $segar->lampiran()->count(), 'barisnya sengaja TIDAK ikut dihapus');
+        $this->assertFalse($segar->punyaBukti());
+        $this->assertNull($segar->urlBukti());
     }
 
     /* ── Membuang ────────────────────────────────────────────────────────── */
@@ -384,34 +395,6 @@ class LampiranTest extends TestCase
             ->call('pasangLampiran');
 
         $this->assertSame(0, $nota->fresh()->lampiran()->count());
-    }
-
-    /**
-     * Membuang lampiran hasil salinan kolom lama ikut MENGOSONGKAN kolom itu.
-     *
-     * Tanpa ini kolomnya menunjuk berkas yang sudah dihapus, dan layar mana pun yang masih
-     * membacanya akan mengaku notanya masih berfoto padahal tidak — kebohongan yang baru
-     * ketahuan saat pemilik membukanya untuk berdebat dengan grosir.
-     */
-    public function test_membuang_lampiran_salinan_ikut_mengosongkan_kolom_lama(): void
-    {
-        $nota = $this->nota();
-
-        app(SimpanBuktiBelanjaAction::class)->execute($nota, UploadedFile::fake()->image('struk.jpg'));
-
-        $segar = $nota->fresh();
-        $this->assertNotNull($segar->bukti_path, 'pramis: kolom lamanya memang terisi');
-
-        Livewire::actingAs($this->owner)
-            ->test(Pembelian::class)
-            ->call('bukaRincian', $nota->getKey())
-            ->call('hapusLampiran', $segar->lampiran()->sole()->getKey());
-
-        $akhir = $nota->fresh();
-
-        $this->assertSame(0, $akhir->lampiran()->count());
-        $this->assertNull($akhir->bukti_path,
-            'kolom lama yang menunjuk berkas terhapus membuat notanya MENGAKU masih berfoto');
     }
 
     public function test_layar_tidak_bisa_membuang_lampiran_nota_lain(): void

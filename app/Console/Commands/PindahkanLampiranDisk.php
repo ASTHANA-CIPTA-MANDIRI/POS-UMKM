@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
-use App\Models\Pembelian\PurchaseOrder;
+use App\Models\Lampiran\Lampiran;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
  * ke disk `lampiran` (hanya bisa dibuka lewat rute berpenjaga).
  *
  * KENAPA PERINTAH, BUKAN MIGRASI. Yang dipindah adalah BERKAS, bukan baris tabel: kolom
- * `bukti_path` sama sekali tidak berubah nilainya. Migrasi yang menyentuh berkas tidak bisa
+ * Path di tabel `lampiran` sama sekali tidak berubah nilainya. Migrasi yang menyentuh berkas tidak bisa
  * dijalankan kering, tidak bisa diulang dengan aman, dan `migrate:rollback` tidak akan
  * pernah bisa mengembalikan berkas yang sudah dihapus. Perintah bisa dijalankan berulang,
  * dan itu yang dibutuhkan: kalau setengah jalan mati (disk penuh), jalankan lagi.
@@ -71,13 +71,20 @@ class PindahkanLampiranDisk extends Command
             ? 'JALAN KERING — tidak ada berkas yang ditulis maupun dihapus.'
             : 'MEMINDAHKAN berkas: public -> '.SimpanBuktiBelanjaAction::DISK.'.');
 
-        $notaSemua = PurchaseOrder::withoutGlobalScopes()
-            ->whereNotNull('bukti_path')
-            ->where('bukti_path', '!=', '')
+        /*
+         * Sumbernya tabel `lampiran`, bukan kolom `bukti_path` yang sudah dibuang.
+         *
+         * Perintah ini tetap ada karena tugasnya belum tentu selesai di mesin lain: migrasi
+         * memindahkan BARISNYA, sedangkan BERKASNYA bisa saja masih tergeletak di disk
+         * publik pada salinan yang belum pernah dipindah. Yang dibaca sekarang path yang
+         * benar-benar dipakai layar.
+         */
+        $notaSemua = Lampiran::withoutGlobalScopes()
+            ->where('lampirable_type', 'purchase_order')
             // Awalannya bagian dari kueri, bukan saringan belakangan. Lihat aturan 2.
-            ->where('bukti_path', 'like', $awalan.'%')
+            ->where('path', 'like', $awalan.'%')
             ->orderBy('created_at')
-            ->get(['id', 'tenant_id', 'nomor_po', 'bukti_path']);
+            ->get(['id', 'tenant_id', 'path']);
 
         $dipindah = 0;
         $sudah = 0;
@@ -85,7 +92,7 @@ class PindahkanLampiranDisk extends Command
         $gagal = [];
 
         foreach ($notaSemua as $nota) {
-            $path = (string) $nota->bukti_path;
+            $path = (string) $nota->path;
 
             /*
              * Jaring kedua atas hal yang sama, dan ia memang tidak akan pernah menyala:
@@ -93,7 +100,7 @@ class PindahkanLampiranDisk extends Command
              * kuerinya tidak langsung berarti perintah ini boleh menghapus `produk/`.
              */
             if (! str_starts_with($path, $awalan)) {
-                $gagal[] = [$nota->nomor_po, $path, 'di luar awalan '.$awalan.' — DILEWATI'];
+                $gagal[] = [($nota->nama_asli ?: $nota->id), $path, 'di luar awalan '.$awalan.' — DILEWATI'];
 
                 continue;
             }
@@ -108,13 +115,13 @@ class PindahkanLampiranDisk extends Command
                     $this->line("  sudah di tujuan: {$path}");
                 } else {
                     $hilang++;
-                    $this->warn("  berkasnya tidak ada di kedua disk: {$path} (nota {$nota->nomor_po})");
+                    $this->warn("  berkasnya tidak ada di kedua disk: {$path} (nota {($nota->nama_asli ?: $nota->id)})");
                 }
 
                 continue;
             }
 
-            $this->line("  akan dipindah: {$path} (nota {$nota->nomor_po}, ".$this->ukuran($sumber->size($path)).')');
+            $this->line("  akan dipindah: {$path} (nota {($nota->nama_asli ?: $nota->id)}, ".$this->ukuran($sumber->size($path)).')');
 
             if ($kering) {
                 $dipindah++;
@@ -125,7 +132,7 @@ class PindahkanLampiranDisk extends Command
             $isi = (string) $sumber->get($path);
 
             if ($tujuan->put($path, $isi) !== true) {
-                $gagal[] = [$nota->nomor_po, $path, 'gagal menulis ke disk tujuan'];
+                $gagal[] = [($nota->nama_asli ?: $nota->id), $path, 'gagal menulis ke disk tujuan'];
 
                 continue;
             }
@@ -139,7 +146,7 @@ class PindahkanLampiranDisk extends Command
 
             if ($ukuranSumber !== $ukuranTujuan || $md5Sumber !== $md5Tujuan) {
                 $gagal[] = [
-                    $nota->nomor_po,
+                    ($nota->nama_asli ?: $nota->id),
                     $path,
                     "salinannya BEDA (ukuran {$ukuranSumber} vs {$ukuranTujuan}, md5 {$md5Sumber} vs {$md5Tujuan}) — sumber tidak dihapus",
                 ];

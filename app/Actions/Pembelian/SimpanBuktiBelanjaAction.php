@@ -2,14 +2,12 @@
 
 namespace App\Actions\Pembelian;
 
+use App\Actions\Lampiran\SimpanLampiranAction;
 use App\Enums\DocumentStatus;
-use App\Models\Lampiran\Lampiran;
 use App\Models\Pembelian\PurchaseOrder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
-use Throwable;
 
 /**
  * Memasang, mengganti, dan membuang foto bukti belanja (kwitansi/struk) sebuah nota.
@@ -172,119 +170,56 @@ class SimpanBuktiBelanjaAction
         }
 
         if (! $this->bolehDiubah($nota)) {
-            // Berkas LAMA tidak disentuh sama sekali, dan berkas baru tidak ditulis.
             return false;
         }
 
         // Pemeriksaan diam. fails(), bukan validate(): di sini kita sudah berada SESUDAH
         // nota tersimpan, dan melempar ValidationException dari titik ini berarti pemilik
         // melihat pesan galat untuk nota yang sebenarnya berhasil disimpan.
-        $salah = Validator::make(['bukti' => $berkas], ['bukti' => self::aturan()])->fails();
-
-        if ($salah) {
+        if (Validator::make(['bukti' => $berkas], ['bukti' => self::aturan()])->fails()) {
             return false;
         }
 
-        $lama = (string) $nota->bukti_path;
+        /*
+         * Penyimpanannya diserahkan ke SimpanLampiranAction — kelas ini tidak lagi menulis
+         * berkas sendiri.
+         *
+         * Dulu ia mengelola satu kolom `bukti_path`: satu nota satu foto, yang baru
+         * MENGGANTI yang lama. Sejak lampiran jadi tabel sendiri, kolom itu dibuang dan
+         * "mengganti" berhenti masuk akal — nota grosir berlembar-lembar, dan foto kedua
+         * dari formulir nota baru adalah TAMBAHAN, bukan pengganti.
+         *
+         * Yang tersisa di kelas ini adalah aturan(), pesan(), dan labelBatas() — dipakai
+         * layar untuk menyebut batasnya SEBELUM orang memilih berkas, dan itu tetap satu
+         * tempat supaya angkanya tidak diketik ulang di Blade.
+         */
+        $hasil = app(SimpanLampiranAction::class)->execute($nota, [$berkas], auth()->id());
 
-        try {
-            $tujuan = self::FOLDER.'/'.$nota->tenant_id.'/'.Str::uuid()->toString().'.'.$this->ekstensi($berkas);
-
-            /*
-             * put(), BUKAN $berkas->store().
-             *
-             * TemporaryUploadedFile::storeAs() mengembalikan path yang disusunnya SENDIRI
-             * tanpa memeriksa apakah penulisannya berhasil — jadi disk penuh atau izin
-             * folder yang salah menghasilkan path yang tampak sah di kolom database
-             * sementara berkasnya tidak ada. put() mengembalikan bool, dan bool itulah yang
-             * menentukan apakah kolomnya ikut diisi.
-             */
-            $berhasil = Storage::disk(self::DISK)->put($tujuan, $berkas->get());
-
-            if ($berhasil !== true) {
-                return false;
-            }
-        } catch (Throwable) {
-            // Berkas sementara sudah dibersihkan, disk mati, kuota habis. Semuanya berakhir
-            // sama: notanya tetap utuh, fotonya tidak terpasang, dan layarnya berterus
-            // terang tentang itu.
-            return false;
-        }
-
-        $nota->bukti_path = $tujuan;
-        $nota->save();
-
-        $this->selaraskanLampiran($nota, $tujuan, $berkas);
-
-        // Sesudah yang baru tersimpan DAN kolomnya menunjuk ke sana — bukan sebelumnya.
-        $this->buangBerkas($lama);
-
-        return true;
+        return $hasil['masuk'] === 1;
     }
 
-    /** Membuang foto bukti. true = ada yang dibuang. */
+    /**
+     * Membuang lampiran PERTAMA nota. true = ada yang dibuang.
+     *
+     * Dipertahankan untuk jalur "satu foto" yang masih dipakai formulir lama; panel rincian
+     * membuang per lampiran lewat Pembelian::hapusLampiran(). Keduanya berakhir di
+     * SimpanLampiranAction::hapus(), jadi tidak ada dua cara berbeda menghapus berkas.
+     */
     public function hapus(PurchaseOrder $nota): bool
     {
         if (! $this->bolehDiubah($nota)) {
             return false;
         }
 
-        $lama = (string) $nota->bukti_path;
+        $lampiran = $nota->lampiran()->first();
 
-        if ($lama === '') {
+        if ($lampiran === null) {
             return false;
         }
 
-        $nota->bukti_path = null;
-        $nota->save();
-
-        $this->selaraskanLampiran($nota, null, null);
-
-        $this->buangBerkas($lama);
+        app(SimpanLampiranAction::class)->hapus($lampiran);
 
         return true;
-    }
-
-    /**
-     * Menyelaraskan baris `lampiran` dengan kolom `bukti_path` — SEMENTARA.
-     *
-     * Tabel lampiran sudah ada dan sudah diisi ulang dari kolom ini lewat migrasi, tapi
-     * layarnya belum berpindah ke sana. Tanpa penyelarasan ini, foto yang diunggah SESUDAH
-     * migrasi tidak punya baris lampiran, dan tabelnya melenceng diam-diam sejak hari
-     * pertama — lalu peralihan berikutnya memindahkan data yang sudah tidak lengkap.
-     *
-     * Arahnya SATU: bukti_path adalah kebenarannya, lampiran mengikutinya. Dua penulis untuk
-     * satu pertanyaan ("nota ini ada buktinya?") adalah persis hal yang membuat salah satunya
-     * salah — dan yang membacanya adalah pemilik yang sedang berdebat harga dengan grosir.
-     *
-     * Dibuang begitu layarnya berpindah dan kolom bukti_path dihapus. Ada uji yang menjaga
-     * keduanya tetap sepakat selama masa peralihan ini.
-     */
-    private function selaraskanLampiran(PurchaseOrder $nota, ?string $path, mixed $berkas): void
-    {
-        Lampiran::query()
-            ->where('lampirable_type', $nota->getMorphClass())
-            ->where('lampirable_id', $nota->getKey())
-            ->delete();
-
-        if ($path === null) {
-            return;
-        }
-
-        Lampiran::create([
-            'lampirable_type' => $nota->getMorphClass(),
-            'lampirable_id' => $nota->getKey(),
-            'path' => $path,
-            'nama_asli' => $berkas instanceof UploadedFile
-                ? mb_substr($berkas->getClientOriginalName(), 0, 150)
-                : null,
-            'mime' => $berkas instanceof UploadedFile
-                ? (string) $berkas->getMimeType()
-                : 'application/octet-stream',
-            'ukuran' => $berkas instanceof UploadedFile ? (int) $berkas->getSize() : 0,
-            'urutan' => 1,
-            'diunggah_oleh' => auth()->id(),
-        ]);
     }
 
     /**
