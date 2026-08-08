@@ -32,3 +32,14 @@ Thumbs.db
 
 # Cadangan basis data (mysqldump) — berisi data pelanggan sungguhan, JANGAN pernah masuk git.
 /storage/cadangan
+
+# Salinan berkas berakhiran " 2" — lahir dari sinkronisasi berkas (iCloud/Dropbox) saat
+# banyak berkas dipindah sekaligus, lalu tersapu masuk oleh `git add -A`. Isinya duplikat
+# yang TIDAK PERNAH dimuat autoloader (nama kelas tidak cocok nama berkas) maupun PHPUnit
+# (akhirannya bukan Test.php) — jadi ia tidak merusak apa pun, dan justru itu bahayanya:
+# 39 salinan sempat terdorong sampai main tanpa satu pun uji berubah warna. Yang
+# menanggungnya orang berikutnya yang mencari sesuatu lalu menemukan dua versi.
+*\ 2.php
+*\ 2.js
+*\ 2.mjs
+*\ 2.blade.php
