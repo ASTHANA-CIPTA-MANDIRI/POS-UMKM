@@ -64,7 +64,23 @@ tidak sesuai** — sekarang masih perkiraan.
       menunda ini menambah berkas yang dipindah, dan menambah PDF — yang isinya
       DAFTAR harga, bukan satu harga. Sesudah rilis, pemindahannya tidak pernah
       murah lagi.
-- [ ] Lampiran G2: banyak lampiran + PDF, batas 10 | | backend | 6j
+- [ ] Lampiran G2 TAMPILAN: galeri + unggah banyak + kartu PDF | | owner | 4j
+      Sisi datanya SUDAH selesai (tabel, aksi, rute per-id, aksi layar
+      pasangLampiran/hapusLampiran — semuanya teruji). Yang kurang cuma galerinya.
+      BLOKIR YANG HARUS DIBERESKAN DULU, dan ini temuan tersendiri:
+      `resources/views/livewire/pages/owner/pembelian/pembelian.blade.php` TIDAK BISA
+      DITAMBAHI apa pun. Menambahkan `@php $x = 1; @endphp` sepolos itu ke ujungnya
+      membuat kompilasi Blade gagal dengan "syntax error, unexpected token endif" —
+      sudah diuji, dan bukan soal blok yang ditambahkan. Berkasnya sekarang mengompilasi
+      bersih apa adanya, jadi ada ketidakseimbangan struktural yang hanya tertutupi oleh
+      posisi akhir berkasnya. Isolasi ITU dulu (bagi berkasnya jadi partial, atau telusuri
+      direktif yang membuka tanpa menutup), baru pasang galerinya. Menambal galerinya di
+      atas berkas yang rapuh cuma memindahkan letak ledakannya.
+- [ ] Lampiran G2 DATA: SELESAI 2026-08-08 (150248f, 29905cb) — tabel polimorfik, batas
+      10, PDF, rute berpenjaga per-id, mirror sementara dari bukti_path
+- [ ] Lampiran G2 penutup: buang kolom bukti_path + mirror sementara | | backend | 1j
+      Dikerjakan SESUDAH galerinya berdiri. Selama belum, SimpanBuktiBelanjaAction
+      menyelaraskan lampiran satu arah dan ada uji yang menjaga keduanya sepakat.
       PEMILIK MEMUTUSKAN 2026-08-07: batasnya 10, bukan 5 — ada nota grosir yang
       lembarnya banyak, dan tiap lembar mau difoto terpisah supaya terbaca.
       Akibatnya galerinya TIDAK muat sebaris di 1280px, jadi perlu berhalaman

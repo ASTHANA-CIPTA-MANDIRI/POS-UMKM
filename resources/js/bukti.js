@@ -54,8 +54,32 @@ export function pasangBukti() {
              */
             abaikanKlik: false,
 
-            buka() {
+            /**
+             * Alamat foto yang sedang dibuka.
+             *
+             * Ada di STATE, bukan dipasang mati di <img src="…">, sejak satu nota bisa punya
+             * banyak lampiran: satu popup melayani semua petak, dan yang menentukan isinya
+             * adalah petak yang barusan diketuk. Popup per foto berarti sepuluh salinan
+             * markup yang sama di satu halaman — dan sepuluh tempat untuk lupa memperbaiki.
+             */
+            alamat: '',
+
+            /** Nama berkas untuk pembaca layar & tautan "buka di tab baru". */
+            judul: '',
+
+            buka(alamat = '', judul = '') {
                 if (this.terbuka) {
+                    return;
+                }
+
+                if (alamat !== '') {
+                    this.alamat = alamat;
+                    this.judul = judul;
+                }
+
+                // Popup tanpa alamat tidak dibuka sama sekali: kotak hitam berisi ikon gambar
+                // rusak tidak menjelaskan apa pun, dan orang menekan lagi mengira salah tekan.
+                if (this.alamat === '') {
                     return;
                 }
 
