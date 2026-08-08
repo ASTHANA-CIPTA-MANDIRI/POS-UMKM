@@ -12,6 +12,7 @@ use App\Enums\AlasanOpname;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
+use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
 use App\Livewire\Pages\Owner\Produk\Produk;
@@ -467,6 +468,35 @@ class PratinjauTest extends TestCase
                 Livewire::actingAs($owner)->test(BahanOwner::class)->call('tambah')->html(),
             ),
         );
+
+        /*
+         * Layar Resep, dua keadaan.
+         *
+         * Panelnya dipotret TERBUKA lewat menu yang BELUM punya resep — dua alasan: keadaan
+         * bawaan panelnya tertutup sehingga tidak akan pernah terukur sendiri, dan menu
+         * tanpa resep itulah yang memunculkan peringatan "masih punya sisa tercatat", yaitu
+         * blok terpanjang di panel dan satu-satunya yang bisa membuatnya menggulir.
+         */
+        $halamanResep = $this->ambil('owner.bahan.resep', $owner);
+
+        file_put_contents("{$tujuan}/owner-resep.html", $halamanResep);
+
+        $menuTanpaResep = Product::withoutGlobalScopes()
+            ->whereDoesntHave('recipeItems')
+            ->orderBy('nama_produk')
+            ->first();
+
+        if ($menuTanpaResep !== null) {
+            file_put_contents(
+                "{$tujuan}/owner-resep-panel.html",
+                $this->suntik(
+                    $halamanResep,
+                    Livewire::actingAs($owner)->test(ResepOwner::class)
+                        ->call('atur', $menuTanpaResep->getKey())
+                        ->html(),
+                ),
+            );
+        }
 
         $admin = User::withoutGlobalScopes()->where('role', 'super_admin')->firstOrFail();
         file_put_contents(

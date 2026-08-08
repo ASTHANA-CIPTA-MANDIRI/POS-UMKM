@@ -43,6 +43,18 @@
         keterangan="Bahan mentah yang dibeli dan dihitung per kilo, liter, atau ikat — bukan per porsi. Sisa bahan berkurang sendiri tiap menu terjual, setelah resepnya diisi."
     >
         <x-slot:aksi>
+            {{-- Pintu ke layar Resep. Tanpa tautan ini layar itu hanya bisa dicapai dengan
+                 mengetik URL-nya — persis keadaan yang membuat mesin resep tidak terpakai
+                 selama ini: kemampuannya ada, pintunya tidak. --}}
+            <a href="{{ route('owner.bahan.resep') }}" wire:navigate
+               class="tombol-kedua flex h-11 cursor-pointer items-center gap-2 px-4 text-[0.875rem]">
+                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                    <path d="M4 6h12M4 10h12M4 14h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                </svg>
+                <span class="sm:hidden">Resep</span>
+                <span class="hidden sm:inline">Resep menu</span>
+            </a>
+
             <button type="button" wire:click="tambah"
                     class="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-terracotta px-5 text-[0.875rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
                 <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">

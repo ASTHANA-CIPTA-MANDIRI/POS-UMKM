@@ -11,6 +11,7 @@ use App\Livewire\Pages\Auth\Masuk\MasukKasir;
 use App\Livewire\Pages\Kasir\Beranda\Beranda as BerandaKasir;
 use App\Livewire\Pages\Kasir\Transaksi\Transaksi as TransaksiKasir;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
+use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
 use App\Livewire\Pages\Owner\Dasbor\Dasbor as DasborOwner;
 use App\Livewire\Pages\Owner\Langganan\Langganan;
 use App\Livewire\Pages\Owner\Laporan\Laporan as LaporanOwner;
@@ -92,6 +93,16 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
              * menyentuh sidebar lagi.
              */
             Route::get('/bahan', BahanOwner::class)->name('bahan');
+
+            /*
+             * Resep menu: 1 porsi habis berapa bahan.
+             *
+             * Bersarang di bawah `bahan` bukan demi kerapian URL — nama rutenya yang
+             * penting. Sidebar menandai butir aktif dengan
+             * `routeIs('owner.bahan', 'owner.bahan.*')`, jadi menu "Bahan & resep" tetap
+             * menyala saat layar ini dibuka, tanpa satu pun perubahan di sidebar.
+             */
+            Route::get('/bahan/resep', ResepOwner::class)->name('bahan.resep');
 
             /*
              * Stok & opname sengaja HANYA di grup back office ini.
