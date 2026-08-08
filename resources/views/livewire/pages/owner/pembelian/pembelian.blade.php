@@ -562,7 +562,18 @@
 
                     {{-- ── Petak lampiran ─────────────────────────────────────── --}}
                     @if ($lampiran->isNotEmpty())
-                        <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {{-- Petak KECIL berukuran TETAP (88px), membungkus ke bawah — bukan kisi
+                             yang melebar mengikuti layar.
+
+                             Petak besar membuat lampiran mendominasi panel rincian, padahal
+                             yang dicari orang di panel itu biasanya angka notanya; fotonya
+                             penguat. Ukuran tetap juga membuat sepuluh lampiran terbaca
+                             sebagai satu deret rapi di semua lebar, bukan dua kolom raksasa
+                             di ponsel lalu enam kolom kurus di laptop.
+
+                             Yang dikecilkan hanya PRATINJAUNYA. Berkasnya tetap utuh, dan
+                             ketukan membukanya sebesar layar. --}}
+                        <div class="mt-3 flex flex-wrap gap-2.5">
                             @foreach ($lampiran as $l)
                                 {{-- Bentuk BLOK, bukan @php(...) sebaris. Blade mengekstrak blok php dengan
                                      regex `@php(.*?)@endphp` SEBELUM apa pun diproses, dan bentuk
@@ -570,15 +581,15 @@
                                      sampai `@endphp` berikutnya jadi PHP mentah, lalu meledak sebagai
                                      "unexpected endif" di ujung berkas — jauh dari sumbernya. --}}
                                 @php $alamat = $notaRincian->urlLampiran($l); @endphp
-                                <div class="group relative overflow-hidden rounded-xl border border-line bg-cream/40"
+                                <div class="group relative size-22 shrink-0 overflow-hidden rounded-xl border border-line bg-cream/40"
                                      wire:key="lampiran-{{ $l->id }}">
                                     @if (! $l->ada())
                                         {{-- Barisnya ada, berkasnya tidak. Dikatakan apa adanya:
                                              ikon gambar rusak tidak menjelaskan apa pun, dan
                                              menyembunyikannya membuat hitungan "3 dari 10" bohong. --}}
-                                        <div class="grid aspect-square place-items-center px-2 text-center">
-                                            <p class="text-[0.6875rem] leading-tight text-umber-soft">
-                                                Berkasnya tidak ditemukan lagi di penyimpanan
+                                        <div class="grid size-full place-items-center px-1.5 text-center">
+                                            <p class="text-[0.625rem] leading-tight text-umber-soft">
+                                                Berkasnya hilang
                                             </p>
                                         </div>
                                     @elseif ($l->gambar())
@@ -588,7 +599,7 @@
                                         <button type="button" x-ref="pemicu"
                                                 x-on:click="buka(@js($alamat), @js($l->namaTampil()))"
                                                 aria-label="Buka besar {{ $l->namaTampil() }}"
-                                                class="block aspect-square w-full cursor-pointer">
+                                                class="block size-full cursor-pointer">
                                             <img src="{{ $alamat }}" alt="{{ $l->namaTampil() }}"
                                                  class="size-full object-cover transition-transform group-hover:scale-105">
                                         </button>
@@ -598,17 +609,17 @@
                                              itu menuntut pdf.js ±1 MB di bundel, untuk sesuatu
                                              yang dibuka sekali saat ada selisih. --}}
                                         <a href="{{ $alamat }}"
-                                           class="flex aspect-square flex-col items-center justify-center gap-2 px-3 text-center transition-colors hover:bg-cream">
-                                            <span class="grid size-10 place-items-center rounded-lg bg-merah/10 text-merah-tua" aria-hidden="true">
-                                                <svg viewBox="0 0 24 24" class="size-5" fill="none">
+                                           class="flex size-full flex-col items-center justify-center gap-1 px-1.5 text-center transition-colors hover:bg-cream">
+                                            <span class="grid size-7 place-items-center rounded-lg bg-merah/10 text-merah-tua" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" class="size-4" fill="none">
                                                     <path d="M7 3h7l5 5v13H7V3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
                                                     <path d="M14 3v5h5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
                                                 </svg>
                                             </span>
-                                            <span class="line-clamp-2 text-[0.6875rem] leading-tight font-semibold break-all text-ink">
-                                                {{ $l->namaTampil(28) }}
+                                            <span class="line-clamp-2 text-[0.625rem] leading-tight font-semibold break-all text-ink">
+                                                {{ $l->namaTampil(18) }}
                                             </span>
-                                            <span class="text-[0.6875rem] text-umber-soft">PDF · {{ $l->ukuranTerbaca() }}</span>
+                                            <span class="text-[0.625rem] text-umber-soft">PDF</span>
                                         </a>
                                     @endif
 
@@ -624,7 +635,7 @@
                                                     tombolBatal: 'Tidak jadi',
                                                 }).then((ya) => ya && $wire.hapusLampiran({{ \Illuminate\Support\Js::from($l->id) }}))"
                                                 aria-label="Hapus {{ $l->namaTampil() }}"
-                                                class="tombol-bahaya absolute top-1.5 right-1.5 grid size-8 cursor-pointer place-items-center rounded-lg p-0">
+                                                class="tombol-bahaya absolute top-1 right-1 grid size-7 cursor-pointer place-items-center rounded-lg p-0">
                                             <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
                                                 <path d="M4 6h12M8 6V4.5h4V6m-6 0 .8 10h6.4L14 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                                             </svg>
@@ -700,52 +711,67 @@
 
                     {{-- ── Popup satu foto ────────────────────────────────────── --}}
                     <template x-if="terbuka">
-                        <div class="fixed inset-0 z-[60] flex flex-col bg-ink/85"
+                        {{-- Latar gelap penuh layar, tapi KOTAKNYA seukuran isi — bukan
+                             popup selebar layar. Dialog yang memenuhi layar membuat orang
+                             kehilangan tempatnya: ia tidak lagi terlihat sedang menimpa panel
+                             nota, dan tombol tutupnya jadi satu-satunya jalan pulang yang
+                             kelihatan. --}}
+                        <div class="fixed inset-0 z-[60] flex items-center justify-center bg-ink/85 p-4 sm:p-8"
                              x-on:click.self="tutup()" role="dialog" aria-modal="true"
                              :aria-label="'Foto ' + judul">
-                            <div class="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
-                                <p class="truncate text-[0.8125rem] font-semibold text-white" x-text="judul"></p>
-                                <div class="flex shrink-0 items-center gap-2">
-                                    {{-- Jalan keluar yang TIDAK dihapus, cuma dipindah ke sini:
-                                         zoom bawaan peramban selalu lebih baik daripada zoom yang
-                                         kita tulis sendiri, dan kalau ada yang tidak terbaca orang
-                                         harus punya cara lain. --}}
-                                    <a :href="alamat" target="_blank" rel="noopener"
-                                       class="flex h-10 items-center rounded-lg bg-white/15 px-3 text-[0.8125rem] font-semibold text-white transition-colors hover:bg-white/25">
-                                        <span class="hidden sm:inline">Buka di tab baru</span>
-                                        <span class="sm:hidden">Tab baru</span>
-                                    </a>
-                                    <button type="button" x-on:click="tutup()" aria-label="Tutup"
-                                            class="grid size-10 cursor-pointer place-items-center rounded-lg bg-white/15 text-white transition-colors hover:bg-white/25">
-                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                            <path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-                                        </svg>
-                                    </button>
+                            <div class="flex max-h-full w-auto max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+                                 x-on:click.stop>
+                                <div class="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+                                    <p class="truncate text-[0.8125rem] font-semibold text-ink" x-text="judul"></p>
+                                    <div class="flex shrink-0 items-center gap-2">
+                                        {{-- Jalan keluar yang TIDAK dihapus: zoom bawaan
+                                             peramban selalu lebih baik daripada zoom yang kita
+                                             tulis sendiri, dan kalau ada yang tetap tidak
+                                             terbaca orang harus punya cara lain. --}}
+                                        <a :href="alamat" target="_blank" rel="noopener"
+                                           class="tombol-kedua flex h-9 items-center px-3 text-[0.8125rem]">
+                                            <span class="hidden sm:inline">Buka di tab baru</span>
+                                            <span class="sm:hidden">Tab baru</span>
+                                        </a>
+                                        <button type="button" x-on:click="tutup()" aria-label="Tutup"
+                                                class="tombol-ikon size-9 shrink-0 cursor-pointer">
+                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                <path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {{-- "Pas layar" = pas LEBARNYA lalu boleh digulir ke bawah. Struk
-                                 kelontong bisa 3x lebih tinggi daripada lebar; memaskan seluruhnya
-                                 ke layar membuat hurufnya jadi setitik — dan foto struk yang tidak
-                                 terbaca sama saja tidak ada. --}}
-                            <div x-ref="jalur" class="min-h-0 flex-1 overflow-auto px-3 pb-4">
-                                <img x-ref="gambar" :src="alamat" :alt="judul"
-                                     x-on:click="ketukGambar($event)"
-                                     x-on:pointerdown="mulaiSeret($event)"
-                                     x-on:pointermove="lanjutSeret($event)"
-                                     x-on:pointerup="akhiriSeret()"
-                                     x-on:pointercancel="akhiriSeret()"
-                                     :class="asli ? 'max-w-none cursor-zoom-out' : 'w-full cursor-zoom-in'"
-                                     class="mx-auto block select-none">
-                            </div>
+                                {{-- TANPA gulir di keadaan bawaannya: seluruh foto dipaskan ke
+                                     dalam kotaknya (`object-contain`), jadi apa yang terlihat
+                                     memang seluruh struknya.
 
-                            <p class="shrink-0 px-4 pb-3 text-center text-[0.75rem] text-white/70">
-                                Ketuk fotonya untuk memperbesar. Di HP bisa dicubit.
-                            </p>
+                                     Harganya nyata dan disebut apa adanya: struk kelontong bisa
+                                     3x lebih tinggi daripada lebar, dan dipaskan utuh hurufnya
+                                     mengecil. Karena itu ketuk-untuk-perbesar TETAP ADA — dan
+                                     gulir baru muncul saat orang MEMINTA perbesaran, bukan
+                                     sebagai keadaan awal yang tidak ia minta. --}}
+                                <div x-ref="jalur"
+                                     :class="asli ? 'overflow-auto' : 'overflow-hidden'"
+                                     class="min-h-0 flex-1 bg-cream/40">
+                                    <img x-ref="gambar" :src="alamat" :alt="judul"
+                                         x-on:click="ketukGambar($event)"
+                                         x-on:pointerdown="mulaiSeret($event)"
+                                         x-on:pointermove="lanjutSeret($event)"
+                                         x-on:pointerup="akhiriSeret()"
+                                         x-on:pointercancel="akhiriSeret()"
+                                         :class="asli
+                                            ? 'max-w-none cursor-zoom-out'
+                                            : 'max-h-[70vh] max-w-full cursor-zoom-in object-contain'"
+                                         class="mx-auto block select-none">
+                                </div>
+
+                                <p class="shrink-0 border-t border-line px-4 py-2 text-center text-[0.75rem] text-umber-soft">
+                                    Ketuk fotonya untuk memperbesar. Di HP bisa dicubit.
+                                </p>
+                            </div>
                         </div>
                     </template>
-                </div>
-                    </div>
                 </div>
 
                 @php

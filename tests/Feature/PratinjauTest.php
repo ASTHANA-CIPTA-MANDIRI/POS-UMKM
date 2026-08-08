@@ -21,6 +21,7 @@ use App\Livewire\Pages\Owner\Stok\Stok;
 use App\Models\Bahan\RawMaterial;
 use App\Models\Kas\CashSession;
 use App\Models\Kasir\Transaction;
+use App\Models\Lampiran\Lampiran;
 use App\Models\Produk\Product;
 use App\Models\Stok\Stock;
 use App\Models\Tenant\Outlet;
@@ -848,17 +849,36 @@ class PratinjauTest extends TestCase
          * dalam keadaan "belum ada foto" sementara yang mau diukur justru keadaan sebaliknya.
          * Gambar yang gagal dimuat juga tercatat oleh ukur.mjs.
          */
-        Storage::disk('public')->put(
-            'pratinjau/bukti-struk.jpg',
-            UploadedFile::fake()->image('struk.jpg', 720, 1040)->get(),
-        );
-        Storage::disk('public')->put(
-            'pratinjau/bukti-struk-dibatalkan.jpg',
-            UploadedFile::fake()->image('struk-dikembalikan.jpg', 720, 1040)->get(),
-        );
+        /*
+         * Disk 'lampiran' dan tabel `lampiran` — BUKAN disk 'public' + kolom bukti_path.
+         *
+         * Kolom itu sudah dibuang. Cacat ini hanya muncul dengan PRATINJAU=1, jadi ia lolos
+         * dari suite biasa sampai tangkapan berikutnya dihasilkan — pengingat bahwa jalur
+         * yang dijaga env flag tidak pernah ikut terperiksa saat uji dijalankan biasa.
+         */
+        $berkas = [
+            [$notaPertama, 'pratinjau/bukti-struk.jpg', 'struk.jpg'],
+            [$notaDibatalkan, 'pratinjau/bukti-struk-dibatalkan.jpg', 'struk-dikembalikan.jpg'],
+        ];
 
-        $notaPertama->forceFill(['bukti_path' => 'pratinjau/bukti-struk.jpg'])->save();
-        $notaDibatalkan->forceFill(['bukti_path' => 'pratinjau/bukti-struk-dibatalkan.jpg'])->save();
+        foreach ($berkas as [$nota, $path, $nama]) {
+            $isi = UploadedFile::fake()->image($nama, 720, 1040)->get();
+
+            Storage::disk('lampiran')->put($path, $isi);
+
+            // tenant_id TIDAK fillable — aturan keras nomor 2, dan ia bekerja: mengirimnya
+            // lewat create() diabaikan begitu saja, lalu NOT NULL menolak barisnya. Diisi
+            // lewat konteks tenant, jalur yang sama dengan produksi.
+            app(TenantContext::class)->forTenant($nota->tenant_id, fn () => Lampiran::create([
+                'lampirable_type' => $nota->getMorphClass(),
+                'lampirable_id' => $nota->getKey(),
+                'path' => $path,
+                'nama_asli' => $nama,
+                'mime' => 'image/jpeg',
+                'ukuran' => strlen((string) $isi),
+                'urutan' => 1,
+            ]));
+        }
 
         return [
             'nota' => $notaPertama->getKey(),

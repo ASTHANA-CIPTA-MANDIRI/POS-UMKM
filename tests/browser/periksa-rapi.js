@@ -132,7 +132,20 @@
     const takSeragam = [];
 
     for (const induk of new Set([...document.querySelectorAll('button')].map((b) => b.parentElement))) {
-        const tombol = [...(induk?.children ?? [])].filter((e) => e.tagName === 'BUTTON' && tampak(e));
+        /*
+         * Tombol yang DITEMPELKAN di atas saudaranya bukan bagian dari deret tombol.
+         *
+         * Lencana hapus di sudut petak lampiran (28px) berdiri di atas tombol foto (86px)
+         * dengan `position: absolute`. Keduanya bersaudara dan rentang tegaknya bertumpang,
+         * jadi tanpa pengecualian ini pemeriksa melaporkan "tinggi 86/28" untuk tata letak
+         * yang justru benar — dan pemeriksa yang salah tuduh akan diabaikan orang, lalu
+         * temuan sungguhannya ikut terabaikan.
+         *
+         * Yang dikecualikan HANYA yang berposisi absolute/fixed: tombol yang mengalir
+         * berdampingan tetap wajib seukuran dan sejajar.
+         */
+        const tombol = [...(induk?.children ?? [])].filter((e) => e.tagName === 'BUTTON' && tampak(e)
+            && ! ['absolute', 'fixed'].includes(getComputedStyle(e).position));
 
         if (tombol.length < 2) {
             continue;
