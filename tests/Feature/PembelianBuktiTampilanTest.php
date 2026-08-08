@@ -300,12 +300,13 @@ class PembelianBuktiTampilanTest extends TestCase
             ->call('bukaRincian', $nota->getKey())
             ->html();
 
-        $url = (string) $nota->fresh()->urlBukti();
+        $lampiran = $nota->fresh()->lampiran()->sole();
+        $url = $nota->fresh()->urlLampiran($lampiran);
 
         $this->assertStringContainsString($url, $html, 'fotonya harus benar-benar dirender');
 
         $this->assertSame(
-            route('owner.lampiran.lihat', ['nota' => $nota->getKey(), 'penanda' => 'bukti']),
+            route('owner.lampiran.lihat', ['nota' => $nota->getKey(), 'penanda' => $lampiran->getKey()]),
             $url,
             'alamat fotonya harus rute berpenjaga untuk nota INI — bukan alamat statis dan '
             .'bukan rute nota lain',
@@ -315,8 +316,8 @@ class PembelianBuktiTampilanTest extends TestCase
             .'jadi alamat /storage/ akan 404 dengan sunyi dan kotaknya cuma kosong');
         $this->assertStringContainsString('target="_blank"', $html,
             'struk difoto dengan kamera ponsel dan tulisannya kecil: harus bisa dibuka ukuran penuh');
-        $this->assertStringContainsString('Ganti fotonya', $html);
-        $this->assertStringContainsString('Hapus foto', $html);
+        $this->assertStringContainsString('Pilih foto atau PDF', $html);
+        $this->assertStringContainsString('aria-label="Hapus ', $html);
     }
 
     /**
@@ -336,23 +337,39 @@ class PembelianBuktiTampilanTest extends TestCase
             ->call('bukaRincian', $nota->getKey())
             ->html();
 
-        $cocok = [];
-        preg_match('/<button(?:"[^"]*"|\'[^\']*\'|[^>"\'])*>\s*(?:<[^>]*>|\s)*Hapus foto\s*<\/button>/s', $html, $cocok);
+        // DIURAI, bukan diregex. Urutan atributnya tidak dijamin — di markup ini `class`
+        // justru datang SESUDAH aria-label — dan pola `<button[^>]*aria-label="…"` berhenti
+        // sebelum sampai ke kelasnya lalu melaporkan "merahnya tidak ada" untuk tombol yang
+        // merah. Cacat yang sama sudah pernah membutakan penjaga di repo ini.
+        $dokumen = new \DOMDocument;
+        $sebelumnya = libxml_use_internal_errors(true);
+        $dokumen->loadHTML('<?xml encoding="UTF-8"><div>'.$html.'</div>',
+            LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($sebelumnya);
 
-        $this->assertNotEmpty($cocok, 'tombol "Hapus foto" tidak ditemukan di panel rincian');
+        $pemicu = (new \DOMXPath($dokumen))->query('//*[starts-with(@aria-label, "Hapus ")]');
 
-        $tombol = $cocok[0];
+        $this->assertGreaterThan(0, $pemicu->length,
+            'tombol buang lampiran tidak ditemukan di panel rincian');
 
-        $this->assertStringContainsString('text-merah-tua', $tombol,
-            'merahnya harus ada tanpa hover: di HP hover TIDAK ADA');
-        $this->assertStringContainsString('bg-merah/10', $tombol);
+        /** @var \DOMElement $elemen */
+        $elemen = $pemicu->item(0);
+        $tombol = $elemen->getAttribute('class').' '.$elemen->getAttribute('x-on:click')
+            .' '.$elemen->getAttribute('aria-label');
+
+        $this->assertStringContainsString('tombol-bahaya', $tombol,
+            'merahnya harus ada tanpa hover: di HP hover TIDAK ADA. Lewat KELAS BERSAMA '
+            .'.tombol-bahaya, bukan utilitas yang diketik ulang per layar — kalau tiap layar '
+            .'memilih merahnya sendiri, "merah = merusak" berhenti terbaca sebagai aturan.');
         $this->assertStringContainsString('konfirmasiNampan', $tombol,
             'pakai pembungkus SweetAlert bersama, bukan Swal.fire mentah per layar');
-        $this->assertStringContainsString('hapusBukti', $tombol);
+        $this->assertStringContainsString('hapusLampiran', $tombol);
 
-        // Judul dialognya MENYEBUT nomor notanya: dialog yang tidak menyebut apa yang dihapus
-        // membuat orang menekan "Ya" untuk nota yang salah.
-        $this->assertStringContainsString($nota->nomor_po, $tombol);
+        // Dialognya MENYEBUT lampiran mana yang dibuang. Dulu nomor notanya, sekarang nama
+        // berkasnya — dan itu lebih tepat: yang dihapus satu lampiran, bukan notanya, dan
+        // satu nota bisa punya sepuluh. "Buang lampiran ini?" tidak memberi tahu yang mana.
+        $this->assertStringContainsString('Hapus ', $tombol);
     }
 
     /* ── Panel rincian: belum ada fotonya ────────────────────────────────── */
@@ -378,15 +395,15 @@ class PembelianBuktiTampilanTest extends TestCase
 
         $blok = $this->blokBukti($html);
 
-        $this->assertStringContainsString('Belum ada fotonya', $blok);
-        $this->assertStringContainsString('menagih ulang', $blok,
+        $this->assertStringContainsString('Belum ada.', $blok);
+        $this->assertStringContainsString('grosirnya menagih', $blok,
             'keadaan kosong harus menyebut KENAPA menyimpan struk itu berguna');
-        $this->assertStringContainsString('Pilih foto struk', $blok);
+        $this->assertStringContainsString('Pilih foto atau PDF', $blok);
         $this->assertStringContainsString(SimpanBuktiBelanjaAction::labelBatas(), $blok);
 
         $this->assertStringNotContainsString('text-merah-tua', $blok,
             'belum ada foto adalah keadaan NETRAL, bukan galat');
-        $this->assertStringNotContainsString('Hapus foto', $blok,
+        $this->assertStringNotContainsString('aria-label="Hapus ', $blok,
             'tidak ada yang bisa dihapus kalau fotonya belum ada');
     }
 
@@ -416,15 +433,15 @@ class PembelianBuktiTampilanTest extends TestCase
 
         $blok = $this->blokBukti($html);
 
-        $this->assertStringContainsString((string) $nota->urlBukti(), $html,
+        $this->assertStringContainsString($nota->urlLampiran($nota->lampiran()->sole()), $html,
             'foto nota yang dibatalkan tetap boleh dilihat');
         $this->assertStringContainsString('dikunci', $blok,
             'alasannya harus tertulis, bukan tombol yang diam-diam hilang');
         $this->assertStringContainsString('dikembalikan ke', $blok);
 
-        $this->assertStringNotContainsString('Hapus foto', $blok);
-        $this->assertStringNotContainsString('Ganti fotonya', $blok);
-        $this->assertStringNotContainsString('wire:model="bukti"', $blok,
+        $this->assertStringNotContainsString('aria-label="Hapus ', $blok);
+        $this->assertStringNotContainsString('Pilih foto atau PDF', $blok);
+        $this->assertStringNotContainsString('wire:model="lampiranBaru"', $blok,
             'kotak pilih berkas pun tidak dirender: tidak ada yang bisa dipasang di nota terkunci');
     }
 
@@ -447,7 +464,7 @@ class PembelianBuktiTampilanTest extends TestCase
      */
     private function blokBukti(string $html): string
     {
-        $awal = strpos($html, 'Foto kwitansi atau struk');
+        $awal = strpos($html, 'Foto kwitansi &amp; struk');
 
         $this->assertNotFalse($awal, 'blok foto kwitansi tidak ada di panel rincian');
 
@@ -487,7 +504,11 @@ class PembelianBuktiTampilanTest extends TestCase
 
         foreach ((new \DOMXPath($dokumen))->query('//input[@type="file"]') as $elemen) {
             /** @var \DOMElement $elemen */
-            if ($elemen->getAttribute('wire:model') !== 'bukti') {
+            // DUA nama properti, karena dua layar memang berbeda bentuk: formulir nota
+            // baru masih satu foto (`bukti`), panel rincian sudah galeri (`lampiranBaru`).
+            // Yang dijaga sama untuk keduanya — accept memuat image/*, dan `capture` tidak
+            // dipasang — jadi penjaganya satu, bukan dua yang bisa bercabang.
+            if (! in_array($elemen->getAttribute('wire:model'), ['bukti', 'lampiranBaru'], true)) {
                 continue;
             }
 

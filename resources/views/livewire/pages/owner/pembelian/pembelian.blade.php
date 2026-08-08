@@ -505,363 +505,246 @@
                     </div>
                 </div>
 
-                {{-- ── Kwitansi / struk ────────────────────────────────────────────────
-                     Inilah jawaban untuk "di mana saya menyimpan foto strukmya": di nota yang
-                     bersangkutan, bukan di album ponsel yang tidak bisa dicari.
+                {{-- Lampiran bukti: foto struk, kwitansi, PDF invoice — BISA LEBIH DARI SATU.
+
+                     Bentuk sebelumnya satu foto per nota, dan itu tidak cukup: nota grosir
+                     sering berlembar-lembar, struk panjang harus difoto dua-tiga potong, dan
+                     tagihan kadang datang sebagai PDF lewat WhatsApp. Batasnya 10 — angka
+                     dari pemilik proyek, bukan tebakan.
 
                      TIGA keadaan, dan ketiganya berbunyi berbeda karena artinya berbeda:
 
-                     1. Sudah ada fotonya  → fotonya bisa dibuka besar, boleh diganti, boleh
-                        dibuang (dengan konfirmasi).
-                     2. Belum ada fotonya  → keadaan NETRAL, bukan peringatan merah. 90% nota
+                     1. Sudah ada lampirannya → petak-petak yang bisa dibuka besar, masing-
+                        masing boleh dibuang (dengan konfirmasi).
+                     2. Belum ada             → keadaan NETRAL, bukan peringatan merah. 90% nota
                         warteg memang tanpa struk; kalau barisnya merah, 90% daftar jadi merah
                         dan orang belajar mengabaikan merah — termasuk merah yang penting.
                         Yang ditulis bukan "belum ada bukti" saja, tapi KENAPA menyimpannya
                         berguna: tanpa itu tidak ada alasan untuk memotret apa pun.
-                     3. Notanya dibatalkan → fotonya TERKUNCI. Tombol yang tidak akan bekerja
-                        tidak dirender sama sekali (aksinya di server menolak juga), dan
-                        alasannya ditulis apa adanya: kalau barangnya sudah dikembalikan ke
-                        grosir, struk itu justru buktinya.
+                     3. Notanya dibatalkan    → lampirannya TERKUNCI. Tombol yang tidak akan
+                        bekerja tidak dirender sama sekali (aksinya di server menolak juga),
+                        dan alasannya ditulis apa adanya: kalau barangnya sudah dikembalikan
+                        ke grosir, struk itu justru buktinya.
 
-                     URL fotonya SELALU dari $notaRincian->urlBukti() — ia yang memakai
-                     asset('storage/…'). Menyusunnya di Blade dengan Storage::url() membuat
-                     tablet yang membuka lewat alamat LAN kehilangan seluruh gambar tanpa satu
-                     pun pesan galat; ada penjaga sumber kode di PembelianBuktiTest. --}}
+                     Alamat berkasnya SELALU dari $notaRincian->urlLampiran($l) — rute
+                     berpenjaga. Menyusun /storage/... dengan tangan akan 404 dengan SUNYI:
+                     berkasnya sudah tidak ada di folder publik, dan kotaknya cuma kosong.
+                     Ada penjaga sumber kode di PembelianBuktiTest. --}}
                 @php
-                    $urlBukti = $notaRincian->urlBukti();
+                    $lampiran = $notaRincian->lampiran;
                     $buktiDikunci = $notaRincian->buktiTerkunci();
+                    $sisaKuota = \App\Actions\Lampiran\SimpanLampiranAction::MAKS - $lampiran->count();
                 @endphp
 
-                <div class="mt-4 border-t border-line-soft pt-4">
-                    <div class="flex flex-col gap-3.5 sm:flex-row sm:items-start">
-                        {{-- x-data DI SINI, bukan di dalam cabang @if di bawahnya: pemicunya
-                             (foto kecil) dan popup-nya harus berada di SATU komponen Alpine
-                             supaya keduanya melihat keadaan `terbuka` yang sama, dan Esc
-                             didengarkan di tingkat jendela dari elemen ini. Seluruh keadaan
-                             popup hidup di Alpine dan tidak pernah menyentuh server — itulah
-                             yang membuat panel rincian nota TETAP TERBUKA sesudah popup
-                             ditutup. --}}
-                        <div class="shrink-0" x-data="lihatBukti" x-on:keydown.escape.window="tutup()">
-                            {{-- Yang dipratinjau adalah berkas yang BARU DIPILIH kalau ada —
-                                 itulah yang akan tersimpan kalau tombolnya ditekan. Kalau tidak
-                                 ada, foto yang sudah terpasang. isPreviewable() diperiksa lebih
-                                 dulu karena temporaryUrl() melempar untuk berkas yang bukan
-                                 gambar. --}}
-                            @if ($bukti && $bukti->isPreviewable())
-                                <img src="{{ $bukti->temporaryUrl() }}" alt="Pratinjau foto struk yang dipilih"
-                                     class="size-20 rounded-xl object-cover ring-2 ring-terracotta">
-                            @elseif ($bukti)
-                                <span class="grid size-20 place-items-center rounded-xl bg-merah/10 px-2 text-center text-[0.6875rem] font-semibold text-merah-tua">
-                                    Bukan foto
-                                </span>
-                            @elseif ($urlBukti !== null)
-                                {{-- ── Pemicu popup foto struk ────────────────────────────
-                                     Sebelum ini sebuah <a target="_blank">, dan alasannya masih
-                                     berlaku sepenuhnya: struk difoto dengan kamera ponsel,
-                                     tulisannya kecil, dan gambar yang dipaskan ke dalam kotak
-                                     dialog malah MENGECIL sehingga tetap tidak terbaca. Pemilik
-                                     proyek memutuskan mau popup, jadi popup-nya dibangun —
-                                     tetapi dengan syarat yang menjawab persis alasan lama itu:
-                                     "pas layar" berarti pas LEBARNYA lalu digulir ke bawah,
-                                     ketukan berpindah ke UKURAN ASLI, cubit-perbesar peramban
-                                     tidak diganggu, dan tautan "buka di tab baru" tetap ada di
-                                     dalam popup-nya. Kemampuan yang sudah ada tidak dihapus,
-                                     hanya dipindahkan.
+                {{-- SATU x-data untuk seluruh galeri: satu popup melayani semua petak, dan
+                     yang menentukan isinya adalah petak yang barusan diketuk. Popup per foto
+                     berarti sepuluh salinan markup yang sama — dan sepuluh tempat untuk lupa
+                     memperbaiki. --}}
+                <div class="mt-4 border-t border-line-soft pt-4"
+                     x-data="lihatBukti" x-on:keydown.escape.window="tutup()">
+                    <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <p class="text-[0.8125rem] font-semibold text-ink">Foto kwitansi &amp; struk</p>
+                        @if ($lampiran->isNotEmpty())
+                            <p class="tabular text-[0.75rem] text-umber-soft">
+                                {{ $lampiran->count() }} dari {{ \App\Actions\Lampiran\SimpanLampiranAction::MAKS }}
+                            </p>
+                        @endif
+                    </div>
 
-                                     Tombol, bukan tautan: yang terjadi adalah perubahan di
-                                     halaman ini, bukan perpindahan halaman. aria-haspopup
-                                     mengatakannya lebih dulu kepada pembaca layar. --}}
-                                <button type="button" x-ref="pemicu" x-on:click="buka()"
-                                        aria-haspopup="dialog"
-                                        aria-label="Lihat foto struk nota {{ $notaRincian->nomor_po }} lebih besar"
-                                        class="block cursor-zoom-in rounded-xl border border-line transition-colors hover:border-terracotta">
-                                    <img src="{{ $urlBukti }}" alt="Foto kwitansi nota {{ $notaRincian->nomor_po }}"
-                                         class="size-20 rounded-[11px] object-cover">
-                                </button>
+                    @if ($lampiran->isEmpty())
+                        <p class="mt-1 text-[0.75rem] leading-relaxed text-umber">
+                            Belum ada. Simpan strukmu di sini kalau ada: waktu grosirnya menagih
+                            ulang, waktu harga di struk beda dengan yang dicatat, atau waktu
+                            barangnya harus dikembalikan — foto ini yang jadi pegangan, dan akhir
+                            bulan notanya tidak perlu dicari lagi di laci.
+                        </p>
+                    @endif
 
-                                {{-- ── Popup foto struk ───────────────────────────────────
-                                     <template x-if>, bukan x-show: elemennya baru ada di DOM
-                                     saat dibuka, jadi tidak ada x-cloak yang bisa tertinggal
-                                     tersembunyi selamanya kalau Alpine mati.
-
-                                     Bentuknya MENYALIN pola `fixed inset-0` + kepala berjudul +
-                                     tombol tutup di layar Produk, supaya layar owner tidak
-                                     melahirkan gaya popup ketiga. Bedanya cuma yang dituntut
-                                     isinya: di sini gambarnya BOLEH lebih besar daripada
-                                     kotaknya, dan itu justru maksudnya.
-
-                                     Tiga jalan keluar, dan ketiganya wajib: tombol X, tombol
-                                     Esc (didengarkan di tingkat jendela pada induk x-data), dan
-                                     ketukan pada latar gelapnya (`click.self` — hanya kalau yang
-                                     diketuk latar itu sendiri, bukan kartunya).
-
-                                     x-trap.inert menahan fokus papan ketik di dalam popup dan
-                                     menyembunyikan isi halaman di belakangnya dari pembaca layar;
-                                     fokus dikembalikan ke foto kecil yang tadi diketuk oleh
-                                     tutup(). --}}
-                                <template x-if="terbuka">
-                                    <div class="fixed inset-0 z-50 flex items-stretch justify-center bg-navy-900/80 p-3 backdrop-blur-sm sm:p-6"
-                                         x-trap.inert="terbuka"
-                                         x-on:click.self="tutup()"
-                                         role="dialog" aria-modal="true"
-                                         aria-label="Foto struk nota {{ $notaRincian->nomor_po }}">
-                                        <div class="flex w-full min-w-0 flex-col overflow-hidden rounded-[20px] bg-white shadow-2xl sm:max-w-3xl">
-                                            {{-- Kepala popup TIDAK ikut menggulir: kalau tombol
-                                                 tutup dan tautan tab baru hanyut bersama
-                                                 gambarnya, struk yang panjang menyembunyikan
-                                                 jalan keluarnya sendiri. --}}
-                                            <div class="flex shrink-0 items-center gap-2 border-b border-line px-3 py-2.5 sm:px-4">
-                                                <div class="min-w-0 flex-1">
-                                                    <p class="truncate text-[0.875rem] font-bold text-ink">
-                                                        Struk nota {{ $notaRincian->nomor_po }}
-                                                    </p>
-                                                    {{-- Keadaan zoom-nya dibacakan, bukan ditebak
-                                                         dari gambarnya: "kok fotonya besar sekali"
-                                                         adalah pertanyaan yang tidak perlu ada. --}}
-                                                    <p class="truncate text-[0.6875rem] text-umber-soft"
-                                                       x-text="asli
-                                                           ? 'Ukuran asli — geser untuk pindah bagian'
-                                                           : 'Pas lebar layar — ketuk fotonya untuk ukuran asli'"></p>
-                                                </div>
-
-                                                {{-- Jalan keluar yang tidak boleh hilang: zoom
-                                                     bawaan peramban selalu lebih baik daripada
-                                                     zoom yang kita tulis sendiri, dan kalau ada
-                                                     yang tetap tidak terbaca, orang harus punya
-                                                     cara lain. Teksnya disembunyikan di bawah
-                                                     640px (ikonnya bertahan) supaya judul notanya
-                                                     tidak tinggal 90px; aria-label MEMUAT teks
-                                                     yang terlihat, bukan menggantinya. --}}
-                                                <a href="{{ $urlBukti }}" target="_blank" rel="noopener"
-                                                   aria-label="Buka di tab baru — foto struk nota {{ $notaRincian->nomor_po }}"
-                                                   class="tombol-kedua h-10 shrink-0 px-2.5 text-[0.8125rem] sm:px-3">
-                                                    <span class="tombol-ikon">
-                                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                                            <path d="M11.5 4.5H15v3.5M15 5l-5.5 5.5M13 12v2.5A1.5 1.5 0 0 1 11.5 16h-6A1.5 1.5 0 0 1 4 14.5v-6A1.5 1.5 0 0 1 5.5 7H8"
-                                                                  stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                                                        </svg>
-                                                    </span>
-                                                    <span class="hidden sm:inline">Buka di tab baru</span>
-                                                </a>
-
-                                                <button type="button" x-on:click="tutup()"
-                                                        aria-label="Tutup foto struk nota {{ $notaRincian->nomor_po }}"
-                                                        class="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-line text-umber transition-colors hover:bg-cream hover:text-ink">
-                                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                                        <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-
-                                            {{-- ── Jalur gambar ───────────────────────────
-                                                 Ia MEMANG menggulir, dan itu bukan cacat panel:
-                                                 struk kelontong bisa 3× lebih tinggi daripada
-                                                 lebar, jadi "pas layar" yang berarti pas
-                                                 seluruhnya akan memperkecil hurufnya sampai
-                                                 setitik. Yang tidak boleh ikut hanyut adalah
-                                                 tombolnya, dan tombolnya ada di kepala popup.
-
-                                                 `overscroll-contain` menahan gulirnya supaya
-                                                 tidak berlanjut ke halaman di belakang; TIDAK
-                                                 ada `touch-action` di sini, karena satu baris
-                                                 itu saja sudah cukup untuk mematikan
-                                                 cubit-perbesar peramban di HP.
-
-                                                 `m-auto` pada gambarnya, BUKAN `justify-center`
-                                                 pada jalurnya: isi yang dipusatkan dengan
-                                                 justify-center terpotong di sisi kiri begitu ia
-                                                 lebih lebar daripada wadahnya, dan bagian yang
-                                                 terpotong itu tidak bisa dicapai dengan
-                                                 menggulir. --}}
-                                            <div x-ref="jalur"
-                                                 class="flex min-h-0 flex-1 overflow-auto overscroll-contain bg-cream p-3"
-                                                 x-on:pointerdown="mulaiSeret($event)"
-                                                 x-on:pointermove="lanjutSeret($event)"
-                                                 x-on:pointerup="akhiriSeret()"
-                                                 x-on:pointercancel="akhiriSeret()"
-                                                 x-on:pointerleave="akhiriSeret()">
-                                                <img x-ref="gambar" src="{{ $urlBukti }}"
-                                                     alt="Foto kwitansi nota {{ $notaRincian->nomor_po }}"
-                                                     x-on:click="ketukGambar($event)"
-                                                     x-on:dragstart.prevent
-                                                     :class="asli
-                                                         ? 'w-auto max-w-none cursor-zoom-out'
-                                                         : 'w-full cursor-zoom-in'"
-                                                     {{-- `shrink-0` WAJIB: anak flex menyusut
-                                                          sendiri kalau lebih besar daripada
-                                                          wadahnya, jadi tanpa ini "ukuran asli"
-                                                          diperkecil lagi menjadi pas lebar dan
-                                                          tombolnya terasa tidak melakukan apa-apa. --}}
-                                                     class="m-auto block h-auto shrink-0 rounded-lg bg-white">
-                                            </div>
-
-                                            {{-- Keterangan cara memakainya, dan ia tetap terlihat
-                                                 karena di sinilah satu-satunya tempat cubitan
-                                                 disebut. Kata orang warung: "cubit", bukan
-                                                 "pinch-zoom". --}}
-                                            <p class="shrink-0 border-t border-line-soft px-3 py-2 text-[0.6875rem] leading-snug text-umber-soft sm:px-4">
-                                                Ketuk fotonya untuk ukuran asli, lalu geser untuk pindah bagian.
-                                                Di HP bisa dicubit untuk memperbesar lagi.
+                    {{-- ── Petak lampiran ─────────────────────────────────────── --}}
+                    @if ($lampiran->isNotEmpty())
+                        <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                            @foreach ($lampiran as $l)
+                                {{-- Bentuk BLOK, bukan @php(...) sebaris. Blade mengekstrak blok php dengan
+                                     regex `@php(.*?)@endphp` SEBELUM apa pun diproses, dan bentuk
+                                     sebarisnya ikut tercocok: satu `@php(` di sini menelan 214 baris
+                                     sampai `@endphp` berikutnya jadi PHP mentah, lalu meledak sebagai
+                                     "unexpected endif" di ujung berkas — jauh dari sumbernya. --}}
+                                @php $alamat = $notaRincian->urlLampiran($l); @endphp
+                                <div class="group relative overflow-hidden rounded-xl border border-line bg-cream/40"
+                                     wire:key="lampiran-{{ $l->id }}">
+                                    @if (! $l->ada())
+                                        {{-- Barisnya ada, berkasnya tidak. Dikatakan apa adanya:
+                                             ikon gambar rusak tidak menjelaskan apa pun, dan
+                                             menyembunyikannya membuat hitungan "3 dari 10" bohong. --}}
+                                        <div class="grid aspect-square place-items-center px-2 text-center">
+                                            <p class="text-[0.6875rem] leading-tight text-umber-soft">
+                                                Berkasnya tidak ditemukan lagi di penyimpanan
                                             </p>
                                         </div>
-                                    </div>
-                                </template>
-                            @else
-                                <span class="grid size-20 place-items-center rounded-xl bg-cream text-umber-soft" aria-hidden="true">
-                                    <svg viewBox="0 0 24 24" class="size-7" fill="none">
-                                        <path d="M4 8.5h3l1.2-2h7.6l1.2 2h3v10H4v-10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                                        <circle cx="12" cy="13.5" r="3" stroke="currentColor" stroke-width="1.5" />
-                                    </svg>
-                                </span>
-                            @endif
-                        </div>
-
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[0.8125rem] font-semibold text-ink">Foto kwitansi atau struk</p>
-
-                            @if ($urlBukti !== null)
-                                {{-- Kalimatnya menyebut apa yang TERJADI saat diketuk, dan itu
-                                     berubah: dulu fotonya pindah ke tab baru, sekarang terbuka di
-                                     halaman ini. Keterangan yang menjanjikan hal lain daripada
-                                     yang dilakukan tombolnya membuat orang menekan dua kali lalu
-                                     mencari tab yang tidak pernah terbuka. --}}
-                                <p class="mt-0.5 text-[0.75rem] text-umber">
-                                    Fotonya tersimpan di nota ini. Ketuk fotonya untuk membukanya besar
-                                    di halaman ini — bisa diperbesar sampai ukuran asli, karena tulisan
-                                    di struk biasanya kecil.
-                                </p>
-                            @elseif ($buktiDikunci)
-                                <p class="mt-0.5 text-[0.75rem] text-umber">
-                                    Nota ini sudah dibatalkan dan tidak berfoto, jadi fotonya tidak bisa
-                                    ditambah lagi. Catatan notanya sendiri tetap tersimpan.
-                                </p>
-                            @else
-                                <p class="mt-0.5 text-[0.75rem] text-umber">
-                                    Belum ada fotonya. Simpan strukmu di sini kalau ada: waktu grosirnya
-                                    menagih ulang, waktu harga di struk beda dengan yang dicatat, atau
-                                    waktu barangnya harus dikembalikan — foto ini yang jadi pegangan, dan
-                                    akhir bulan notanya tidak perlu dicari lagi di laci.
-                                </p>
-                            @endif
-
-                            @if ($buktiDikunci)
-                                {{-- Tombolnya TIDAK dirender, bukan dirender lalu dimatikan: tombol
-                                     mati yang ditekan berkali-kali membuat orang menyimpulkan
-                                     aplikasinya rusak. Yang menggantikannya kalimat yang menyebut
-                                     sebabnya — dan sebab itu masuk akal begitu dibaca. --}}
-                                @if ($urlBukti !== null)
-                                    <p class="mt-2 text-[0.75rem] text-umber-soft">
-                                        Nota ini sudah dibatalkan, jadi fotonya dikunci: tidak bisa diganti
-                                        maupun dibuang. Itu disengaja — kalau barangnya sudah dikembalikan ke
-                                        grosir, struk inilah buktinya.
-                                    </p>
-                                @endif
-                            @else
-                                <div class="mt-2.5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                                    <label for="bukti-nota"
-                                           class="tombol-kedua h-10 w-full cursor-pointer px-3.5 text-[0.8125rem] sm:w-auto">
-                                        <span class="tombol-ikon">
-                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                                <path d="M10 13V4m0 0L6.5 7.5M10 4l3.5 3.5M3.5 13v2A1.5 1.5 0 0 0 5 16.5h10a1.5 1.5 0 0 0 1.5-1.5v-2"
-                                                      stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                                            </svg>
-                                        </span>
-                                        {{ $urlBukti !== null ? 'Ganti fotonya' : 'Pilih foto struk' }}
-                                    </label>
-
-                                    {{-- wire:key MEMUAT id notanya: tanpa itu morph Livewire memakai
-                                         ulang kotak berkas yang sama saat panel nota lain dibuka, dan
-                                         berkas yang masih menempel di elemen lama bisa terpasang ke
-                                         nota yang TIDAK sedang dilihat pemiliknya.
-
-                                         `accept="image/*"`, BUKAN daftar jenis yang spesifik. Cacat
-                                         nyata yang dilaporkan pemilik: dengan
-                                         `image/jpeg,image/png,image/webp` banyak peramban Android tidak
-                                         menawarkan kamera sama sekali — aplikasi kameranya mendaftar
-                                         sebagai penghasil `image/*` dan tersaring keluar oleh daftar
-                                         yang spesifik; di iOS pilihan "Ambil Foto" ikut hilang.
-
-                                         `capture="environment"` SENGAJA TIDAK dipakai: ia memaksa
-                                         kamera muncul, tapi MENGHAPUS pilihan galeri di banyak peramban
-                                         Android — struk yang sudah difoto kemarin jadi tidak bisa
-                                         dipilih lagi. Yang dibutuhkan dua-duanya.
-
-                                         HEIC dari iPhone tetap DITOLAK (tumpukan ini tidak bisa
-                                         membacanya — GD tanpa libheif, Imagick tidak ada), dan yang
-                                         menanggungnya pesan galat di SimpanBuktiBelanjaAction::pesan()
-                                         yang menyebut jalan keluarnya. --}}
-                                    <input id="bukti-nota" type="file" wire:model="bukti"
-                                           wire:key="bukti-{{ $notaRincian->getKey() }}"
-                                           accept="image/*" class="sr-only">
-
-                                    @if ($bukti)
-                                        {{-- Pasang dulu, baru tersimpan: memilih berkas TIDAK langsung
-                                             mengubah notanya, supaya salah pilih berkas tidak menimpa
-                                             foto lama yang masih benar. --}}
-                                        <button type="button" wire:click="pasangBukti" wire:loading.attr="disabled"
-                                                class="tombol-utama h-10 w-full cursor-pointer px-4 text-[0.8125rem] sm:w-auto">
-                                            <span wire:loading.remove wire:target="pasangBukti">
-                                                {{ $urlBukti !== null ? 'Pakai foto ini' : 'Pasang foto ke nota' }}
-                                            </span>
-                                            <span wire:loading wire:target="pasangBukti">Menyimpan…</span>
+                                    @elseif ($l->gambar())
+                                        {{-- Kotak berukuran TETAP (aspect-square + object-cover):
+                                             gambar yang gagal dimuat tidak boleh mengempiskan
+                                             petaknya dan menggeser seluruh galeri. --}}
+                                        <button type="button" x-ref="pemicu"
+                                                x-on:click="buka(@js($alamat), @js($l->namaTampil()))"
+                                                aria-label="Buka besar {{ $l->namaTampil() }}"
+                                                class="block aspect-square w-full cursor-pointer">
+                                            <img src="{{ $alamat }}" alt="{{ $l->namaTampil() }}"
+                                                 class="size-full object-cover transition-transform group-hover:scale-105">
                                         </button>
-
-                                        {{-- Membatalkan PILIHAN, bukan menghapus yang tersimpan — jadi
-                                             tidak merah. Merah disimpan untuk "Hapus foto" di bawah. --}}
-                                        <button type="button" wire:click="buangBuktiPilihan"
-                                                class="h-10 w-full cursor-pointer rounded-xl border border-line px-3.5 text-[0.8125rem] font-semibold text-ink transition-colors hover:bg-cream sm:w-auto">
-                                            Tidak pakai foto ini
-                                        </button>
-                                    @endif
-
-                                    @if ($urlBukti !== null)
-                                        {{-- Pemicu tindakan MERUSAK: tint `bg-merah/10` + `text-merah-tua`,
-                                             merah SEJAK ISTIRAHAT — di tablet dan HP tidak ada hover, jadi
-                                             merah yang menunggu disorot tidak pernah muncul. Bukan
-                                             `.tombol-bahaya`: itu untuk tombol pembenar di dalam dialognya.
-
-                                             Konfirmasinya lewat pembungkus SweetAlert bersama
-                                             (window.konfirmasiNampan, resources/js/toast.js) — bukan
-                                             Swal.fire mentah per layar, supaya teks, warna, dan urutan
-                                             tombolnya tidak bercabang. Judulnya MENYEBUT nomor notanya:
-                                             dialog yang tidak menyebut apa yang dihapus membuat orang
-                                             menekan "Ya" untuk nota yang salah. Dan dialog ini bukan
-                                             pengamannya — hapusBukti() di server tetap menolak nota yang
-                                             terkunci, tanpa peduli dialognya pernah muncul atau tidak. --}}
-                                        <button type="button" x-data
-                                                x-on:click="window.konfirmasiNampan({
-                                                    judul: 'Hapus foto struk nota {{ $notaRincian->nomor_po }}?',
-                                                    pesan: 'Yang dibuang hanya fotonya; catatan notanya tetap tersimpan lengkap. Fotonya sendiri tidak bisa dikembalikan — pasang lagi kalau struk kertasnya masih ada.',
-                                                    tombolYa: 'Ya, hapus fotonya',
-                                                    tombolBatal: 'Tidak jadi',
-                                                }).then((ya) => ya && $wire.hapusBukti())"
-                                                class="flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-merah/25 bg-merah/10 px-3.5 text-[0.8125rem] font-semibold text-merah-tua transition-colors hover:border-merah/45 hover:bg-merah/15 sm:w-auto">
-                                            <span class="tombol-ikon bg-merah/15 text-merah-tua">
-                                                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
-                                                    <path d="M4 6h12M8 6V4.5h4V6m-6 0 .8 10h6.4L14 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                    @else
+                                        {{-- PDF: kartu dokumen, BUKAN petak kosong. Halaman
+                                             pertamanya sengaja tidak dirender jadi gambar kecil —
+                                             itu menuntut pdf.js ±1 MB di bundel, untuk sesuatu
+                                             yang dibuka sekali saat ada selisih. --}}
+                                        <a href="{{ $alamat }}"
+                                           class="flex aspect-square flex-col items-center justify-center gap-2 px-3 text-center transition-colors hover:bg-cream">
+                                            <span class="grid size-10 place-items-center rounded-lg bg-merah/10 text-merah-tua" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" class="size-5" fill="none">
+                                                    <path d="M7 3h7l5 5v13H7V3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                                                    <path d="M14 3v5h5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
                                                 </svg>
                                             </span>
-                                            Hapus foto
+                                            <span class="line-clamp-2 text-[0.6875rem] leading-tight font-semibold break-all text-ink">
+                                                {{ $l->namaTampil(28) }}
+                                            </span>
+                                            <span class="text-[0.6875rem] text-umber-soft">PDF · {{ $l->ukuranTerbaca() }}</span>
+                                        </a>
+                                    @endif
+
+                                    @unless ($buktiDikunci)
+                                        {{-- Dialognya BUKAN pengamannya: hapusLampiran() di server
+                                             tetap mencari lewat relasi notanya, jadi id nota lain
+                                             berakhir "tidak ditemukan". --}}
+                                        <button type="button"
+                                                x-on:click="window.konfirmasiNampan({
+                                                    judul: {{ \Illuminate\Support\Js::from('Hapus '.$l->namaTampil().'?') }},
+                                                    pesan: 'Berkasnya dihapus dari penyimpanan dan tidak bisa dikembalikan. Notanya sendiri tetap tersimpan.',
+                                                    tombolYa: 'Ya, hapus',
+                                                    tombolBatal: 'Tidak jadi',
+                                                }).then((ya) => ya && $wire.hapusLampiran({{ \Illuminate\Support\Js::from($l->id) }}))"
+                                                aria-label="Hapus {{ $l->namaTampil() }}"
+                                                class="tombol-bahaya absolute top-1.5 right-1.5 grid size-8 cursor-pointer place-items-center rounded-lg p-0">
+                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                <path d="M4 6h12M8 6V4.5h4V6m-6 0 .8 10h6.4L14 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
                                         </button>
-                                    @endif
+                                    @endunless
                                 </div>
+                            @endforeach
+                        </div>
+                    @endif
 
-                                <p class="mt-2 text-[0.75rem] text-umber-soft">
-                                    JPG, PNG, atau WEBP, paling besar {{ $batasBukti }}.
-                                    @if ($urlBukti !== null)
-                                        Foto lamanya dibuang begitu yang baru terpasang — satu nota satu foto.
-                                    @endif
-                                </p>
+                    {{-- ── Menambah ───────────────────────────────────────────── --}}
+                    @if ($buktiDikunci)
+                        <p class="mt-3 text-[0.75rem] leading-relaxed text-umber">
+                            Nota ini sudah dibatalkan, jadi lampirannya dikunci — justru itu
+                            bukti barangnya dikembalikan ke grosir. Yang sudah ada tetap bisa dibuka.
+                        </p>
+                    @elseif ($sisaKuota <= 0)
+                        {{-- Tombol yang pasti menolak TIDAK dirender: yang ditekan berkali-kali
+                             lalu diam membuat orang menyimpulkan aplikasinya rusak. --}}
+                        <p class="mt-3 text-[0.75rem] text-umber">
+                            Sudah {{ \App\Actions\Lampiran\SimpanLampiranAction::MAKS }} lampiran — batasnya di sini.
+                            Buang salah satu dulu kalau mau menambah.
+                        </p>
+                    @else
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <label for="lampiran-baru"
+                                   class="tombol-kedua flex h-11 cursor-pointer items-center justify-center gap-2 px-4 text-[0.8125rem]">
+                                <span class="tombol-ikon">
+                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                        <path d="M10 13V4m0 0L6.5 7.5M10 4l3.5 3.5M3.5 13v2A1.5 1.5 0 0 0 5 16.5h10a1.5 1.5 0 0 0 1.5-1.5v-2"
+                                              stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                                Pilih foto atau PDF
+                            </label>
 
-                                <p wire:loading wire:target="bukti" class="mt-1.5 text-[0.75rem] font-semibold text-terracotta">
-                                    Mengunggah foto…
-                                </p>
+                            {{-- `multiple`, dan `accept="image/*,application/pdf"`.
 
-                                @error('bukti')
-                                    <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
-                                @enderror
+                                 image/* dan BUKAN daftar jenis satu per satu: daftar spesifik
+                                 membuat banyak peramban Android tidak menawarkan kamera sama
+                                 sekali, karena aplikasi kameranya mendaftar sebagai penghasil
+                                 image/* lalu tersaring keluar. `capture` TETAP tidak dipasang —
+                                 ia memaksa kamera tapi menghapus pilihan galeri, sehingga struk
+                                 yang sudah difoto kemarin tidak bisa dipilih lagi. --}}
+                            <input id="lampiran-baru" type="file" multiple wire:model="lampiranBaru"
+                                   accept="image/*,application/pdf" class="sr-only">
+
+                            @if (! empty($lampiranBaru))
+                                <button type="button" wire:click="pasangLampiran" wire:loading.attr="disabled"
+                                        class="tombol-utama h-11 cursor-pointer px-5 text-[0.8125rem]">
+                                    <span wire:loading.remove wire:target="pasangLampiran">
+                                        Pasang {{ count($lampiranBaru) }} berkas
+                                    </span>
+                                    <span wire:loading wire:target="pasangLampiran">Menyimpan…</span>
+                                </button>
                             @endif
                         </div>
+
+                        <p class="mt-2 text-[0.75rem] text-umber-soft">
+                            JPG, PNG, WEBP paling besar {{ $batasBukti }}; PDF paling besar
+                            {{ (int) (config('nampan.lampiran_pdf_maks_kb') / 1024) }} MB.
+                            Sisa {{ $sisaKuota }} lagi.
+                        </p>
+
+                        <p wire:loading wire:target="lampiranBaru" class="mt-1.5 text-[0.75rem] font-semibold text-terracotta">
+                            Mengunggah…
+                        </p>
+
+                        @error('lampiranBaru.*')
+                            <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
+                        @enderror
+                    @endif
+
+                    {{-- ── Popup satu foto ────────────────────────────────────── --}}
+                    <template x-if="terbuka">
+                        <div class="fixed inset-0 z-[60] flex flex-col bg-ink/85"
+                             x-on:click.self="tutup()" role="dialog" aria-modal="true"
+                             :aria-label="'Foto ' + judul">
+                            <div class="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+                                <p class="truncate text-[0.8125rem] font-semibold text-white" x-text="judul"></p>
+                                <div class="flex shrink-0 items-center gap-2">
+                                    {{-- Jalan keluar yang TIDAK dihapus, cuma dipindah ke sini:
+                                         zoom bawaan peramban selalu lebih baik daripada zoom yang
+                                         kita tulis sendiri, dan kalau ada yang tidak terbaca orang
+                                         harus punya cara lain. --}}
+                                    <a :href="alamat" target="_blank" rel="noopener"
+                                       class="flex h-10 items-center rounded-lg bg-white/15 px-3 text-[0.8125rem] font-semibold text-white transition-colors hover:bg-white/25">
+                                        <span class="hidden sm:inline">Buka di tab baru</span>
+                                        <span class="sm:hidden">Tab baru</span>
+                                    </a>
+                                    <button type="button" x-on:click="tutup()" aria-label="Tutup"
+                                            class="grid size-10 cursor-pointer place-items-center rounded-lg bg-white/15 text-white transition-colors hover:bg-white/25">
+                                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                            <path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- "Pas layar" = pas LEBARNYA lalu boleh digulir ke bawah. Struk
+                                 kelontong bisa 3x lebih tinggi daripada lebar; memaskan seluruhnya
+                                 ke layar membuat hurufnya jadi setitik — dan foto struk yang tidak
+                                 terbaca sama saja tidak ada. --}}
+                            <div x-ref="jalur" class="min-h-0 flex-1 overflow-auto px-3 pb-4">
+                                <img x-ref="gambar" :src="alamat" :alt="judul"
+                                     x-on:click="ketukGambar($event)"
+                                     x-on:pointerdown="mulaiSeret($event)"
+                                     x-on:pointermove="lanjutSeret($event)"
+                                     x-on:pointerup="akhiriSeret()"
+                                     x-on:pointercancel="akhiriSeret()"
+                                     :class="asli ? 'max-w-none cursor-zoom-out' : 'w-full cursor-zoom-in'"
+                                     class="mx-auto block select-none">
+                            </div>
+
+                            <p class="shrink-0 px-4 pb-3 text-center text-[0.75rem] text-white/70">
+                                Ketuk fotonya untuk memperbesar. Di HP bisa dicubit.
+                            </p>
+                        </div>
+                    </template>
+                </div>
                     </div>
                 </div>
 
@@ -962,7 +845,7 @@
                                  baris di atas, dan tombol ini terlewat: ia masih memakai panel dua
                                  langkah sebaris, jadi tindakan paling merusak di layar ini justru
                                  satu-satunya yang tidak memunculkan dialog. Judulnya MENYEBUT nomor
-                                 notanya, dan pesannya (disusun di @php di atas) menyebut apa yang
+                                 notanya, dan pesannya (disusun di blok PHP di atas) menyebut apa yang
                                  hilang, apa yang tetap ada, dan bahwa pembatalan tidak bisa dibalik.
 
                                  Js::from(), bukan echo Blade biasa: echo mengubah apostrof menjadi
