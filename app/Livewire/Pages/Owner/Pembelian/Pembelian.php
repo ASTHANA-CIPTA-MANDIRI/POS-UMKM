@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\Owner\Pembelian;
 
+use App\Actions\Lampiran\SimpanLampiranAction;
 use App\Actions\Pembelian\BatalkanPembelianAction;
 use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Actions\Pembelian\TerimaPembelianAction;
@@ -166,6 +167,16 @@ class Pembelian extends Component
      * foto lain sebelum menekan tombol, dan aksinya tetap memeriksa ulang secara diam supaya
      * tidak ada satu pun jalur yang bisa membuat nota gagal karena berkas.
      */
+    /**
+     * Berkas yang baru dipilih untuk diunggah — BANYAK sekaligus.
+     *
+     * Larik, bukan satu berkas: nota grosir bisa berlembar-lembar, dan memaksa memilih satu
+     * per satu berarti sepuluh kali menunggu unggahan di sinyal warung.
+     *
+     * @var array<int, mixed>
+     */
+    public array $lampiranBaru = [];
+
     public function updatedBukti(): void
     {
         $this->validate(
@@ -291,6 +302,120 @@ class Pembelian extends Component
                 : 'Nota '.$nota->nomor_po.' memang belum ada fotonya.',
             $terjadi ? 'sukses' : 'info',
         );
+    }
+
+    /* ── Lampiran banyak ─────────────────────────────────────────────────── */
+
+    /**
+     * Memasang beberapa lampiran sekaligus ke nota yang rinciannya sedang dibuka.
+     *
+     * Laporannya menyebut BERKAS MANA yang gagal, bukan "sebagian gagal": tanpa nama, orang
+     * mengunggah ulang semuanya — termasuk yang sudah masuk, yang lalu jadi ganda.
+     */
+    public function pasangLampiran(): void
+    {
+        $nota = $this->rincianId === null
+            ? null
+            : $this->kueri()->whereKey($this->rincianId)->first();
+
+        if ($nota === null) {
+            $this->lampiranBaru = [];
+            $this->toast('Nota belanja tidak ditemukan.', 'peringatan');
+
+            return;
+        }
+
+        if ($nota->buktiTerkunci()) {
+            $this->lampiranBaru = [];
+            $this->toast(
+                'Nota '.$nota->nomor_po.' sudah dibatalkan, jadi lampirannya dikunci — justru itu bukti barangnya dikembalikan.',
+                'peringatan',
+            );
+
+            return;
+        }
+
+        $hasil = app(SimpanLampiranAction::class)
+            ->execute($nota, $this->lampiranBaru, auth()->id());
+
+        $this->lampiranBaru = [];
+        $this->resetValidation('lampiranBaru');
+
+        if ($hasil['masuk'] > 0 && $hasil['ditolak'] === []) {
+            $this->toast($hasil['masuk'].' lampiran tersimpan di nota '.$nota->nomor_po.'.');
+
+            return;
+        }
+
+        // Nama berkasnya disebut satu per satu — sampai tiga, lalu sisanya dihitung. Daftar
+        // dua belas nama di dalam toast tidak terbaca siapa pun.
+        $nama = array_map(
+            fn (array $d) => $d['nama'].' ('.$d['sebab'].')',
+            array_slice($hasil['ditolak'], 0, 3),
+        );
+
+        $sisa = count($hasil['ditolak']) - count($nama);
+
+        $this->toast(
+            ($hasil['masuk'] > 0 ? $hasil['masuk'].' tersimpan. ' : '')
+                .'Tidak masuk: '.implode('; ', $nama).($sisa > 0 ? ' dan '.$sisa.' lagi' : '').'.',
+            $hasil['masuk'] > 0 ? 'peringatan' : 'galat',
+        );
+    }
+
+    /**
+     * Membuang SATU lampiran.
+     *
+     * Dicari lewat relasi notanya, bukan Lampiran::find(): id milik nota lain harus berakhir
+     * "tidak ditemukan" walaupun tenant dan outletnya sama.
+     */
+    public function hapusLampiran(string $id): void
+    {
+        $nota = $this->rincianId === null
+            ? null
+            : $this->kueri()->whereKey($this->rincianId)->first();
+
+        if ($nota === null) {
+            $this->toast('Nota belanja tidak ditemukan.', 'peringatan');
+
+            return;
+        }
+
+        if ($nota->buktiTerkunci()) {
+            $this->toast(
+                'Nota '.$nota->nomor_po.' sudah dibatalkan, jadi lampirannya dikunci.',
+                'peringatan',
+            );
+
+            return;
+        }
+
+        $lampiran = $nota->lampiran()->whereKey($id)->first();
+
+        if ($lampiran === null) {
+            $this->toast('Lampirannya sudah tidak ada.', 'info');
+
+            return;
+        }
+
+        /*
+         * Kolom lama ikut dikosongkan kalau yang dibuang adalah salinannya.
+         *
+         * Selama masa peralihan, `bukti_path` dan tabel lampiran menunjuk berkas yang sama.
+         * Membuang barisnya saja meninggalkan kolom yang menunjuk berkas yang sudah dihapus —
+         * dan layar mana pun yang masih membaca kolom itu akan menampilkan gambar rusak,
+         * atau lebih buruk: mengaku notanya masih berfoto padahal tidak.
+         */
+        $ikutKolomLama = (string) $nota->bukti_path === (string) $lampiran->path;
+
+        app(SimpanLampiranAction::class)->hapus($lampiran);
+
+        if ($ikutKolomLama) {
+            $nota->bukti_path = null;
+            $nota->save();
+        }
+
+        $this->toast('Lampiran dibuang. Notanya sendiri tetap tersimpan.');
     }
 
     /**

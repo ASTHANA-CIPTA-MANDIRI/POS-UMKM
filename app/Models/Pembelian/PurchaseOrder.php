@@ -149,6 +149,21 @@ class PurchaseOrder extends Model
     }
 
     /**
+     * Alamat satu lampiran — selalu lewat rute berpenjaga, sama seperti urlBukti().
+     *
+     * route() mengikuti host permintaan, jadi tablet yang membuka aplikasi lewat alamat LAN
+     * tetap mendapat gambarnya. Menyusun path /storage/... dengan tangan akan 404 dengan
+     * SUNYI: berkasnya sudah tidak ada di folder publik, dan kotaknya cuma kosong.
+     */
+    public function urlLampiran(Lampiran $lampiran): string
+    {
+        return route('owner.lampiran.lihat', [
+            'nota' => $this->getKey(),
+            'penanda' => $lampiran->getKey(),
+        ]);
+    }
+
+    /**
      * Nota dibatalkan = buktinya TERKUNCI: boleh dilihat, tidak boleh diganti/dihapus.
      *
      * Nota batal biasanya berarti barangnya dikembalikan ke grosir, dan struk itu justru

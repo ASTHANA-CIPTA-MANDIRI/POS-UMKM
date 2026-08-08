@@ -66,8 +66,6 @@ class LampiranController extends Controller
          * `bukti` di sini akan berdampingan dengan id lampiran tanpa mengubah bentuk URL —
          * URL yang sudah tersimpan di riwayat peramban pemilik tetap berlaku.
          */
-        abort_unless($penanda === PurchaseOrder::PENANDA_BUKTI, 404);
-
         $pengguna = $request->user();
 
         // 404, bukan 403 — lihat catatan kelas. outlet_id tidak pernah null di tabel ini.
@@ -76,12 +74,29 @@ class LampiranController extends Controller
             404,
         );
 
+        /*
+         * Penandanya: 'bukti' (bentuk lama, satu foto per nota) ATAU id lampiran.
+         *
+         * Lampirannya dicari LEWAT RELASI notanya, bukan Lampiran::find() — jadi id milik
+         * nota lain berakhir 404 walaupun tenant dan outletnya sama. Tanpa itu, satu id yang
+         * bocor membuka lampiran nota mana pun di tenant itu, dan gerbang outlet di atas
+         * tidak menahannya sama sekali.
+         *
+         * Urutannya sesudah gerbang outlet, bukan sebelum: yang menjawab "ada atau tidak"
+         * harus orang yang memang boleh bertanya.
+         */
+        $lampiran = $penanda === PurchaseOrder::PENANDA_BUKTI
+            ? null
+            : $nota->lampiran()->whereKey($penanda)->first();
+
+        abort_if($penanda !== PurchaseOrder::PENANDA_BUKTI && $lampiran === null, 404);
+
         // Path yang menggantung (berkas terhapus di luar aplikasi, salinan database dibawa
         // ke mesin lain) berakhir 404, bukan 500: yang salah bukan permintaannya.
-        abort_unless($nota->punyaBukti(), 404);
+        abort_unless($lampiran !== null ? $lampiran->ada() : $nota->punyaBukti(), 404);
 
         $disk = Storage::disk(SimpanBuktiBelanjaAction::DISK);
-        $path = (string) $nota->bukti_path;
+        $path = $lampiran?->path ?? (string) $nota->bukti_path;
 
         $balasan = new Response;
         $balasan->headers->set('X-Content-Type-Options', 'nosniff');
@@ -110,7 +125,9 @@ class LampiranController extends Controller
             in_array($mime, self::MIME_INLINE, true)
                 ? HeaderUtils::DISPOSITION_INLINE
                 : HeaderUtils::DISPOSITION_ATTACHMENT,
-            $this->namaBerkas($nota, $path),
+            // Nama unduhannya memakai nama ASLI berkasnya kalau ada — "invoice-grosir.pdf"
+            // jauh lebih berguna di folder Unduhan daripada nomor nota + uuid.
+            $lampiran?->nama_asli ?: $this->namaBerkas($nota, $path),
         ));
 
         return $balasan;

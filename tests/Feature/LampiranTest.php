@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Actions\Lampiran\SimpanLampiranAction;
+use App\Actions\Pembelian\BatalkanPembelianAction;
 use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Enums\UserRole;
+use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Models\Lampiran\Lampiran;
 use App\Models\Pembelian\PurchaseOrder;
 use App\Models\Tenant\Outlet;
@@ -13,6 +15,7 @@ use App\Models\Tenant\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use Tests\Concerns\MembuatDataPembelian;
 use Tests\Concerns\MembuatDataUji;
 use Tests\TestCase;
@@ -342,6 +345,171 @@ class LampiranTest extends TestCase
         Storage::disk('lampiran')->assertMissing($path);
         $this->assertSame(1, $nota->lampiran()->count(), 'yang lain tidak ikut terbawa');
         $this->assertSame('b.jpg', $nota->lampiran()->sole()->nama_asli);
+    }
+
+    /* ── Lewat layar (komponen) ──────────────────────────────────────────── */
+
+    public function test_layar_memasang_beberapa_lampiran_sekaligus(): void
+    {
+        $nota = $this->nota();
+
+        Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $nota->getKey())
+            ->set('lampiranBaru', [
+                UploadedFile::fake()->image('lembar-1.jpg'),
+                UploadedFile::fake()->image('lembar-2.jpg'),
+            ])
+            ->call('pasangLampiran');
+
+        $this->assertSame(2, $nota->fresh()->lampiran()->count());
+    }
+
+    /**
+     * Nota yang DIBATALKAN: lampirannya terkunci, dipanggil langsung sekalipun.
+     *
+     * Nota batal biasanya berarti barangnya dikembalikan ke grosir, dan struk itu justru
+     * satu-satunya bukti pengembaliannya.
+     */
+    public function test_nota_dibatalkan_menolak_lampiran_baru_walau_dipanggil_langsung(): void
+    {
+        $nota = $this->nota();
+
+        app(BatalkanPembelianAction::class)->execute($nota, $this->owner);
+
+        Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $nota->getKey())
+            ->set('lampiranBaru', [UploadedFile::fake()->image('nekat.jpg')])
+            ->call('pasangLampiran');
+
+        $this->assertSame(0, $nota->fresh()->lampiran()->count());
+    }
+
+    /**
+     * Membuang lampiran hasil salinan kolom lama ikut MENGOSONGKAN kolom itu.
+     *
+     * Tanpa ini kolomnya menunjuk berkas yang sudah dihapus, dan layar mana pun yang masih
+     * membacanya akan mengaku notanya masih berfoto padahal tidak — kebohongan yang baru
+     * ketahuan saat pemilik membukanya untuk berdebat dengan grosir.
+     */
+    public function test_membuang_lampiran_salinan_ikut_mengosongkan_kolom_lama(): void
+    {
+        $nota = $this->nota();
+
+        app(SimpanBuktiBelanjaAction::class)->execute($nota, UploadedFile::fake()->image('struk.jpg'));
+
+        $segar = $nota->fresh();
+        $this->assertNotNull($segar->bukti_path, 'pramis: kolom lamanya memang terisi');
+
+        Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $nota->getKey())
+            ->call('hapusLampiran', $segar->lampiran()->sole()->getKey());
+
+        $akhir = $nota->fresh();
+
+        $this->assertSame(0, $akhir->lampiran()->count());
+        $this->assertNull($akhir->bukti_path,
+            'kolom lama yang menunjuk berkas terhapus membuat notanya MENGAKU masih berfoto');
+    }
+
+    public function test_layar_tidak_bisa_membuang_lampiran_nota_lain(): void
+    {
+        [$notaA, $lampiranA] = $this->notaBerlampiran('punya-a.jpg');
+        $notaB = $this->nota();
+
+        Livewire::actingAs($this->owner)
+            ->test(Pembelian::class)
+            ->call('bukaRincian', $notaB->getKey())
+            ->call('hapusLampiran', $lampiranA->getKey());
+
+        $this->assertSame(1, $notaA->fresh()->lampiran()->count(),
+            'lampiran nota lain tidak boleh terbuang lewat rincian nota ini');
+    }
+
+    /* ── Rute berpenjaga ─────────────────────────────────────────────────── */
+
+    private function notaBerlampiran(string $nama = 'struk.jpg'): array
+    {
+        $nota = $this->nota();
+
+        app(SimpanLampiranAction::class)->execute($nota, [
+            UploadedFile::fake()->image($nama),
+        ], $this->owner->getKey());
+
+        return [$nota->fresh(), $nota->lampiran()->sole()];
+    }
+
+    public function test_pemilik_bisa_membuka_lampirannya_dan_jenisnya_dari_kolom_mime(): void
+    {
+        [$nota, $l] = $this->notaBerlampiran();
+
+        $balasan = $this->actingAs($this->owner)->get($nota->urlLampiran($l));
+
+        $balasan->assertOk();
+        $balasan->assertHeader('Content-Type', $l->mime);
+        $balasan->assertHeader('X-Content-Type-Options', 'nosniff');
+        $this->assertStringContainsString('inline', (string) $balasan->headers->get('Content-Disposition'));
+    }
+
+    /**
+     * Id lampiran milik NOTA LAIN → 404, walaupun tenant dan outletnya sama.
+     *
+     * Ini gerbang yang paling mudah terlewat: gerbang outlet di atasnya sudah lolos, jadi
+     * tanpa pencarian LEWAT RELASI notanya, satu id yang bocor membuka lampiran nota mana
+     * pun di tenant itu — termasuk harga beli dari pemasok yang berbeda.
+     */
+    public function test_id_lampiran_nota_lain_balas_404_walau_satu_tenant(): void
+    {
+        [$notaA, $lampiranA] = $this->notaBerlampiran('punya-a.jpg');
+        $notaB = $this->nota();
+
+        $this->actingAs($this->owner)
+            ->get(route('owner.lampiran.lihat', ['nota' => $notaB->getKey(), 'penanda' => $lampiranA->getKey()]))
+            ->assertNotFound();
+    }
+
+    public function test_tamu_tidak_bisa_membuka_lampiran(): void
+    {
+        [$nota, $l] = $this->notaBerlampiran();
+
+        $balasan = $this->get($nota->urlLampiran($l));
+
+        $balasan->assertRedirect();
+        $this->assertStringNotContainsString('JFIF', $balasan->getContent() ?: '',
+            'isi berkasnya tidak boleh ikut terkirim ke yang belum masuk');
+    }
+
+    /** PDF dikirim sebagai UNDUHAN, bukan dibuka sebaris. */
+    public function test_pdf_dikirim_sebagai_unduhan_dengan_nama_aslinya(): void
+    {
+        $nota = $this->nota();
+
+        app(SimpanLampiranAction::class)->execute($nota, [
+            $this->pdfAsli('invoice-grosir-agustus.pdf', 8),
+        ], $this->owner->getKey());
+
+        $l = $nota->lampiran()->sole();
+        $balasan = $this->actingAs($this->owner)->get($nota->urlLampiran($l));
+
+        $balasan->assertOk();
+        $disposisi = (string) $balasan->headers->get('Content-Disposition');
+
+        $this->assertStringContainsString('attachment', $disposisi,
+            'penampil PDF sebaris menuntut Range yang tidak kita layani, dan attachment+nosniff '
+            .'menutup peluang berkas lolos di-sniff sebagai HTML di origin kita sendiri');
+        $this->assertStringContainsString('invoice-grosir-agustus.pdf', $disposisi,
+            'nama aslinya jauh lebih berguna di folder Unduhan daripada nomor nota + uuid');
+    }
+
+    public function test_lampiran_yang_berkasnya_hilang_balas_404_bukan_500(): void
+    {
+        [$nota, $l] = $this->notaBerlampiran();
+
+        Storage::disk('lampiran')->delete($l->path);
+
+        $this->actingAs($this->owner)->get($nota->urlLampiran($l))->assertNotFound();
     }
 
     /* ── Bentuk yang dibaca orang ────────────────────────────────────────── */
