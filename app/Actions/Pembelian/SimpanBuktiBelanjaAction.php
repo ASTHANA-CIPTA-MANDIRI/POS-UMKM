@@ -3,6 +3,7 @@
 namespace App\Actions\Pembelian;
 
 use App\Enums\DocumentStatus;
+use App\Models\Lampiran\Lampiran;
 use App\Models\Pembelian\PurchaseOrder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -213,6 +214,8 @@ class SimpanBuktiBelanjaAction
         $nota->bukti_path = $tujuan;
         $nota->save();
 
+        $this->selaraskanLampiran($nota, $tujuan, $berkas);
+
         // Sesudah yang baru tersimpan DAN kolomnya menunjuk ke sana — bukan sebelumnya.
         $this->buangBerkas($lama);
 
@@ -235,9 +238,53 @@ class SimpanBuktiBelanjaAction
         $nota->bukti_path = null;
         $nota->save();
 
+        $this->selaraskanLampiran($nota, null, null);
+
         $this->buangBerkas($lama);
 
         return true;
+    }
+
+    /**
+     * Menyelaraskan baris `lampiran` dengan kolom `bukti_path` — SEMENTARA.
+     *
+     * Tabel lampiran sudah ada dan sudah diisi ulang dari kolom ini lewat migrasi, tapi
+     * layarnya belum berpindah ke sana. Tanpa penyelarasan ini, foto yang diunggah SESUDAH
+     * migrasi tidak punya baris lampiran, dan tabelnya melenceng diam-diam sejak hari
+     * pertama — lalu peralihan berikutnya memindahkan data yang sudah tidak lengkap.
+     *
+     * Arahnya SATU: bukti_path adalah kebenarannya, lampiran mengikutinya. Dua penulis untuk
+     * satu pertanyaan ("nota ini ada buktinya?") adalah persis hal yang membuat salah satunya
+     * salah — dan yang membacanya adalah pemilik yang sedang berdebat harga dengan grosir.
+     *
+     * Dibuang begitu layarnya berpindah dan kolom bukti_path dihapus. Ada uji yang menjaga
+     * keduanya tetap sepakat selama masa peralihan ini.
+     */
+    private function selaraskanLampiran(PurchaseOrder $nota, ?string $path, mixed $berkas): void
+    {
+        Lampiran::query()
+            ->where('lampirable_type', $nota->getMorphClass())
+            ->where('lampirable_id', $nota->getKey())
+            ->delete();
+
+        if ($path === null) {
+            return;
+        }
+
+        Lampiran::create([
+            'lampirable_type' => $nota->getMorphClass(),
+            'lampirable_id' => $nota->getKey(),
+            'path' => $path,
+            'nama_asli' => $berkas instanceof UploadedFile
+                ? mb_substr($berkas->getClientOriginalName(), 0, 150)
+                : null,
+            'mime' => $berkas instanceof UploadedFile
+                ? (string) $berkas->getMimeType()
+                : 'application/octet-stream',
+            'ukuran' => $berkas instanceof UploadedFile ? (int) $berkas->getSize() : 0,
+            'urutan' => 1,
+            'diunggah_oleh' => auth()->id(),
+        ]);
     }
 
     /**

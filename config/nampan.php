@@ -64,4 +64,26 @@ return [
 
     'bukti_maks_kb' => (int) env('NAMPAN_BUKTI_MAKS_KB', 4096),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Batas ukuran PDF lampiran (KB)
+    |--------------------------------------------------------------------------
+    |
+    | Angka SENDIRI, bukan ikut batas foto, dan asimetrinya disengaja. Foto di atas 4 MB
+    | berarti kamera yang salah setelan — dan unggahan yang tidak pernah selesai di
+    | sinyal warung. PDF hasil pindai tiga halaman dari grosir memang wajar 5–6 MB.
+    |
+    | Satu batas 8 MB untuk keduanya mengundang foto 8 MB; satu batas 4 MB menolak
+    | invoice yang sah. Jadi dua angka, dan pesan penolakannya menyebut jenisnya supaya
+    | orang tahu batas mana yang ia kena.
+    |
+    | Batas PHP harus ikut: upload_max_filesize >= 8M dan post_max_size >= 32M. Kalau
+    | muatan melebihi post_max_size, PHP membuang SELURUH badan permintaan — $_FILES
+    | kosong, token CSRF ikut hilang, dan layarnya tampak beku tanpa satu pun pesan.
+    | PHPUnit tidak bisa menangkap itu; syaratnya dicatat di docs/RENCANA.md.
+    |
+    */
+
+    'lampiran_pdf_maks_kb' => (int) env('NAMPAN_LAMPIRAN_PDF_MAKS_KB', 8192),
+
 ];

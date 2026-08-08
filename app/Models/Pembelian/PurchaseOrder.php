@@ -5,6 +5,7 @@ namespace App\Models\Pembelian;
 use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Enums\DocumentStatus;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\Lampiran\Lampiran;
 use App\Models\Stok\StockMovement;
 use App\Models\Tenant\Outlet;
 use App\Models\Tenant\User;
@@ -70,6 +71,21 @@ class PurchaseOrder extends Model
     public function stockMovements(): MorphMany
     {
         return $this->morphMany(StockMovement::class, 'referensi');
+    }
+
+    /**
+     * Lampiran bukti (foto struk, kwitansi, PDF invoice) — bisa lebih dari satu.
+     *
+     * Urutan tampilnya dipastikan TIGA kunci, bukan satu: dua perangkat bisa menulis
+     * `urutan` yang sama, dan urutan yang berubah-ubah tiap muat membuat pemilik mengira
+     * lampirannya berpindah sendiri.
+     */
+    public function lampiran(): MorphMany
+    {
+        return $this->morphMany(Lampiran::class, 'lampirable')
+            ->orderBy('urutan')
+            ->orderBy('created_at')
+            ->orderBy('id');
     }
 
     public function hitungTotal(): string
