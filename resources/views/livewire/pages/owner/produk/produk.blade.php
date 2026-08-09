@@ -19,6 +19,26 @@
 {{-- Lingkup zoom gambar dipasang di akar halaman, bukan per baris: satu modal
      dipakai bersama seluruh baris, jadi tidak ada puluhan salinan markup modal
      yang ikut dikirim di setiap muatan halaman. --}}
+@php
+    /*
+     * Penolong margin, diketik SEKALI untuk dua bentuk (kartu di ponsel, tabel di ≥lg).
+     * Angkanya sendiri datang dari App\Actions\Produk\HitungHppAction lewat $hpp — Blade
+     * tidak menghitung apa pun, supaya rumusnya tidak pernah bercabang dari layar lain.
+     */
+    $rp = fn ($nilai) => 'Rp '.number_format((float) $nilai, 0, ',', '.');
+
+    $marginProduk = function ($produk) use ($hpp) {
+        $h = $hpp[$produk->id] ?? null;
+
+        if ($h === null) {
+            return null;
+        }
+
+        return app(\App\Actions\Produk\HitungHppAction::class)
+            ->margin($h['hpp'], (float) $produk->harga_default) + ['info' => $h];
+    };
+@endphp
+
 <div x-data="{ zoom: null }" @keydown.escape.window="zoom = null">
     <x-kartu-alat
         judul="Daftar produk"
@@ -187,10 +207,34 @@
                             <p class="tabular text-[1.125rem] font-bold text-terracotta">
                                 Rp {{ number_format((float) $produk->harga_default, 0, ',', '.') }}
                             </p>
-                            @if ($produk->harga_beli !== null)
+                            @php($m = $marginProduk($produk))
+                            @if ($m !== null && $m['rupiah'] !== null)
+                                {{-- Modal DAN margin bersama, bukan salah satu. "Beli
+                                     Rp 9.000" tidak menjawab pertanyaan yang dibawa orang ke
+                                     daftar ini — yaitu apakah barangnya masih untung setelah
+                                     harga bahan naik. --}}
                                 <p class="tabular text-[0.75rem] text-umber-soft">
-                                    beli Rp {{ number_format((float) $produk->harga_beli, 0, ',', '.') }}
+                                    modal {{ $rp($m['info']['hpp']) }}
+                                    <span @class([
+                                        'font-bold',
+                                        'text-merah-tua' => $m['rugi'],
+                                        'text-hijau-tua' => ! $m['rugi'],
+                                    ])>
+                                        · {{ $m['rugi'] ? 'rugi ' : '+' }}{{ $rp(abs($m['rupiah'])) }}
+                                        @if ($m['persen'] !== null)
+                                            ({{ number_format($m['persen'], 1, ',', '.') }}%)
+                                        @endif
+                                    </span>
                                 </p>
+                            @elseif ($m !== null && ($m['info']['bahanTanpaHarga'] ?? []) !== [])
+                                {{-- Menyebut BAHAN MANA yang kurang, bukan sekadar "belum
+                                     bisa dihitung": tanpa nama, pemilik membuka satu per satu
+                                     enam bahan untuk mencari yang mana. --}}
+                                <p class="text-[0.75rem] text-umber-soft">
+                                    modal belum terhitung — {{ collect($m['info']['bahanTanpaHarga'])->join(', ') }} belum ada harganya
+                                </p>
+                            @else
+                                <p class="text-[0.75rem] text-umber-soft">modal belum diisi</p>
                             @endif
                             @php($statusStokKartu = $produk->statusStokTerjoin())
                             @if ($statusStokKartu !== null)
@@ -268,7 +312,7 @@
                         <th class="px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Produk</th>
                         <th class="w-40 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Kategori</th>
                         <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Harga jual</th>
-                        <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Harga beli</th>
+                        <th class="w-40 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Modal &amp; margin</th>
                         <th class="w-28 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Stok</th>
                         <th class="w-28 px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
                         <th class="w-56 px-5 py-3.5"><span class="sr-only">Aksi</span></th>
@@ -327,8 +371,33 @@
                             <td class="tabular px-5 py-3.5 text-right text-[0.9375rem] font-bold text-ink">
                                 Rp {{ number_format((float) $produk->harga_default, 0, ',', '.') }}
                             </td>
+                            @php($m = $marginProduk($produk))
                             <td class="tabular px-5 py-3.5 text-right text-[0.875rem] text-umber">
-                                {{ $produk->harga_beli !== null ? 'Rp '.number_format((float) $produk->harga_beli, 0, ',', '.') : '—' }}
+                                @if ($m !== null && $m['rupiah'] !== null)
+                                    <span class="block">{{ $rp($m['info']['hpp']) }}</span>
+                                    <span @class([
+                                        'block text-[0.6875rem] font-bold',
+                                        'text-merah-tua' => $m['rugi'],
+                                        'text-hijau-tua' => ! $m['rugi'],
+                                    ])>
+                                        {{ $m['rugi'] ? 'rugi ' : '+' }}{{ $rp(abs($m['rupiah'])) }}
+                                        @if ($m['persen'] !== null)
+                                            ({{ number_format($m['persen'], 1, ',', '.') }}%)
+                                        @endif
+                                    </span>
+                                @else
+                                    {{-- "—" WAJIB, bukan sel kosong. Baris keduanya menyebut
+                                         SEBABNYA, karena "belum bisa dihitung" tanpa sebab
+                                         membuat orang menyimpulkan fiturnya rusak. --}}
+                                    <span class="block text-umber-soft">—</span>
+                                    <span class="block text-[0.6875rem] text-umber-soft">
+                                        @if ($m !== null && ($m['info']['bahanTanpaHarga'] ?? []) !== [])
+                                            {{ collect($m['info']['bahanTanpaHarga'])->join(', ') }} belum berharga
+                                        @else
+                                            modal belum diisi
+                                        @endif
+                                    </span>
+                                @endif
                             </td>
                             {{-- "—" WAJIB, bukan sel kosong: kosong membuat pembacanya
                                  menebak "nol, atau belum diisi?" — dan nol adalah pernyataan

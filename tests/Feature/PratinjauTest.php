@@ -437,6 +437,26 @@ class PratinjauTest extends TestCase
             ?->forceFill(['is_active' => false])->save();
 
         // Halaman produk owner, beserta panel formulirnya.
+        /*
+         * Satu produk sengaja dibuat MERUGI, supaya keadaan merah di kolom "Modal & margin"
+         * ikut terpotret.
+         *
+         * Bukan kasus tepi: harga bahan naik dan harga menu tidak ikut disesuaikan
+         * berbulan-bulan adalah cara paling biasa sebuah warung kehilangan uang tanpa
+         * sadar. Justru keadaan itulah yang paling perlu dilihat mata sebelum dipercaya —
+         * dan data demo tidak punya satu pun produk merugi, jadi tanpa pembengkokan ini
+         * warna merahnya tidak pernah terukur sama sekali.
+         */
+        $produkRugi = Product::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->whereNotNull('harga_beli')
+            ->orderByDesc('harga_beli')
+            ->first();
+
+        $produkRugi?->forceFill([
+            'harga_default' => round((float) $produkRugi->harga_beli * 0.85),
+        ])->save();
+
         file_put_contents(
             "{$tujuan}/owner-produk.html",
             $this->ambil('owner.produk', $owner),

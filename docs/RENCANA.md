@@ -233,6 +233,103 @@ tidak sesuai** — sekarang masih perkiraan.
 - [ ] Audit kerapian seluruh layar (7 angka nol di 390/768/1280) | | owner | 4j
 - [ ] Infra rilis: domain, HTTPS, queue worker, cron, cadangan basis data | | infra | 6j
 
+## Harga, HPP & margin
+
+Diminta pemilik 2026-08-09. Ditulis sebagai satu kelompok karena SALING BERGANTUNG,
+dan urutan di bawah adalah urutan ketergantungannya — bukan urutan kepentingan.
+Mengerjakannya terbalik menghasilkan angka yang kelihatan benar dan tidak bisa
+dipercaya: diskon tanpa HPP tidak tahu kapan ia membuat rugi, dan harga
+rekomendasi tanpa biaya operasional cuma menutup harga beli.
+
+KEADAAN SEKARANG, supaya tidak ada yang mengira ini dibangun dari nol:
+`transaction_items.diskon` dan `transactions.diskon` SUDAH ADA sebagai angka rupiah
+datar — tanpa satu pun aturan di belakangnya, tanpa jejak siapa yang memberi, dan
+tanpa batas. `products.harga_beli` ada tapi cuma SATU angka (harga beli terakhir).
+Resep sudah bisa dihitung (`recipe_items.jumlah_terpakai` x
+`raw_materials.harga_beli_terakhir`). Biaya operasional BELUM ADA tabelnya.
+
+- [x] HPP per produk: satu rumus, satu tempat | 2026-08-09 | owner | 5j
+      SELESAI sebagian: App\Actions\Produk\HitungHppAction + kolom "Modal & margin"
+      di layar Produk (rupiah, persen, dan tanda MERAH saat harga jual sudah di
+      bawah modal). Barang jadi memakai `products.harga_beli`; menu berresep
+      dihitung dari bahannya.
+      ASUMSI YANG DIAMBIL SENDIRI, dan pemilik boleh membatalkannya: sumbernya
+      "harga beli TERAKHIR", bukan rata-rata bergerak. Alasannya angkanya sudah
+      tersimpan dan bisa dijelaskan satu kalimat. Kalau nanti dipilih rata-rata
+      bergerak, yang berubah HANYA berkas aksi itu dan satu migrasi — itulah
+      gunanya semua layar memanggilnya, bukan menghitung sendiri.
+      SISANYA (belum dikerjakan): penelusuran rincian bahan di LAYAR. Rinciannya
+      sudah dikembalikan aksi itu (nama bahan, jumlah, harga, subtotal) tapi belum
+      ada layar yang menampilkannya — sekarang baru nama bahan yang belum berharga
+      yang disebut. Tempat yang benar: panel produk atau layar Resep.
+      FONDASI seluruh kelompok ini — butir 3, 6, dan peringatan diskon semuanya
+      membacanya. Dua jenis produk, dua cara hitung, dan bedanya harus tegas:
+      barang jadi (kelontong) HPP-nya harga beli per satuan jual; menu berresep
+      (warteg) HPP-nya jumlah bahan x harga bahan, jadi satu porsi lele goreng
+      dihitung dari 0,25 kg lele + minyak + bumbu.
+      KEPUTUSAN PEMILIK YANG BELUM DIAMBIL, dan ia mengubah seluruh angkanya:
+      HPP dipakai "harga beli TERAKHIR" atau "rata-rata bergerak"? Harga terakhir
+      lebih mudah dijelaskan (dan itu yang sudah tersimpan sekarang), tapi satu
+      nota mahal membuat seluruh margin bulan itu terlihat jelek. Rata-rata
+      bergerak lebih adil tapi butuh kolom baru dan tidak bisa dijelaskan dengan
+      satu kalimat ke pemilik warung.
+      Yang WAJIB ada apa pun keputusannya: HPP yang ditampilkan harus bisa
+      DITELUSURI ke angka pembentuknya di layar, bukan muncul sebagai satu angka.
+      Pemilik yang tidak bisa melihat asal angkanya tidak akan memakainya.
+- [ ] Biaya operasional: sewa, listrik, gaji, gas | | owner | 5j
+      Tabel baru. Tiap biaya punya nominal, periode (harian/mingguan/bulanan), dan
+      tanggal mulai — bukan sekadar catatan pengeluaran sekali jalan.
+      KENAPA TERPISAH dari kas keluar yang sudah ada: yang ini BUKAN transaksi, ini
+      ANGKA PERENCANAAN. Sewa Rp 1.500.000/bulan tetap harus ikut hitungan margin
+      pada hari sewanya belum dibayar. Menggabungkannya dengan pengeluaran nyata
+      membuat margin melonjak di tanggal 1 dan anjlok di tanggal 5.
+      Dipakai butir 3 dan 6, dan tanpa ini keduanya cuma menutup harga beli —
+      pemilik merasa untung Rp 4.000 per porsi padahal listrik dan sewanya belum
+      dihitung sama sekali.
+- [ ] Target laba/margin + harga jual rekomendasi | | owner | 4j
+      Butir 6 dan 3 digabung karena yang satu adalah masukan bagi yang lain.
+      Pemilik menyetel target margin (mis. 30%), aplikasinya menghitung
+      harga jual = HPP / (1 - margin) lalu MEMBULATKAN ke rupiah yang wajar
+      (Rp 500 / Rp 1.000 terdekat, ke ATAS) — harga Rp 17.857 tidak pernah ditulis
+      di daftar menu mana pun, dan pembulatan ke bawah diam-diam memakan marginnya.
+      Ditampilkan sebagai SARAN di formulir produk, tidak pernah menimpa harga yang
+      sudah ada: harga adalah keputusan pemilik yang tahu harga warung sebelah.
+      Margin ditampilkan dua angka yang berbeda artinya dan sering tertukar:
+      MARGIN KOTOR (harga - HPP) dan MARGIN BERSIH (sesudah biaya operasional per
+      porsi). Satu angka saja membuat pemilik menyimpulkan untung padahal rugi.
+- [ ] Diskon per satuan barang | | kasir | 4j
+      Kolomnya (`transaction_items.diskon`) SUDAH ADA dan sudah dipakai, tapi tanpa
+      aturan: nilainya rupiah datar yang bisa diisi apa saja. Yang perlu dibangun:
+      diskon persen ATAU rupiah, batas maksimum, dan PERINGATAN saat diskonnya
+      membuat harga jatuh di bawah HPP.
+      YANG PALING PENTING dan paling mudah dilupakan: BATAS DISKON PER PERAN plus
+      jejak siapa yang memberi. Kasir yang bisa memberi diskon tanpa batas bisa
+      menjual seharga nol untuk temannya, dan tidak ada satu pun angka di aplikasi
+      yang akan terlihat aneh. Ini gerbang uang, bukan kenyamanan.
+- [ ] Diskon borongan: harga bertingkat per jumlah | | owner | 6j
+      "Beli 1 Rp 3.000, beli 12 Rp 30.000" — bentuk yang dipakai kelontong tiap
+      hari dan satu-satunya alasan orang membeli sedus di warung, bukan di
+      minimarket. Tabel tingkatan harga per produk (jumlah minimal -> harga per
+      satuan), dan kasir memakai tingkat tertinggi yang jumlahnya terpenuhi.
+      BERSINGGUNGAN dengan butir "Jual ketengan" di bawah, dan keduanya jangan
+      dibangun terpisah: yang satu memecah dus jadi satuan, yang lain menyatukan
+      satuan jadi harga dus. Kalau modelnya beda, satu barang bisa punya dua harga
+      untuk jumlah yang sama, dan kasir tidak tahu mana yang benar.
+      Butuh HPP lebih dulu: harga borongan adalah tempat margin paling mudah jadi
+      MINUS tanpa ada yang sadar.
+- [ ] Laporan margin per produk + barang yang rugi | | owner | 4j
+      Yang membuat kelima butir di atas ada gunanya. Daftar produk diurutkan dari
+      margin paling tipis, ditambah tanda untuk yang harga jualnya SUDAH DI BAWAH
+      HPP — keadaan yang benar-benar terjadi saat harga bahan naik dan harga menu
+      tidak ikut disesuaikan berbulan-bulan.
+      Tanpa layar ini, HPP dan margin cuma jadi angka di formulir yang tidak pernah
+      dibuka lagi sesudah barangnya dibuat.
+- [ ] Titik impas: berapa yang harus terjual per hari | | owner | 3j
+      Biaya operasional per hari dibagi margin kotor rata-rata = berapa porsi/berapa
+      rupiah omzet yang harus tercapai supaya tidak rugi. Satu angka yang paling
+      sering ditanyakan pemilik warung dan paling jarang ada di POS mana pun.
+      Butuh butir 1 dan 2 lebih dulu.
+
 ## Sesudah deploy (pembeda dari POS lain di pasaran)
 
 - [ ] Laporan harian otomatis ke pemilik lewat WhatsApp/Telegram + ucapan | | infra | 4j

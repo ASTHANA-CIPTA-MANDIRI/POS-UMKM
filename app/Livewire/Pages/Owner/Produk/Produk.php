@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages\Owner\Produk;
 
+use App\Actions\Produk\HitungHppAction;
 use App\Actions\Stok\SiapkanBarisStokAction;
 use App\Enums\Satuan;
 use App\Livewire\Concerns\MengirimToast;
@@ -647,7 +648,16 @@ class Produk extends Component
     {
         $kueri = Product::query()
             ->select('products.*')
-            ->with('kategori:id,nama');
+            ->with('kategori:id,nama')
+            /*
+             * Resep dimuat sekaligus KHUSUS untuk menghitung HPP menu berresep.
+             *
+             * Tanpa ini, HitungHppAction menembakkan dua kueri per baris (resep + bahannya)
+             * dan daftar sepuluh produk jadi dua puluh satu kueri. Halaman yang lambat
+             * membuat pemilik berhenti membukanya — dan seluruh angka margin di bawah ini
+             * tidak pernah dilihat siapa pun.
+             */
+            ->with('recipeItems.rawMaterial:id,nama,satuan,harga_beli_terakhir');
 
         if ($outletId !== null) {
             $kueri->leftJoin('stocks', fn (JoinClause $join) => $join
@@ -711,10 +721,21 @@ class Produk extends Component
     {
         $outletId = $this->outletStokTerpakai();
 
+        $daftar = $this->kueriProduk($outletId)
+            ->orderBy('products.nama_produk')
+            ->paginate(config('nampan.per_halaman'));
+
         return view('livewire.pages.owner.produk.produk', [
-            'daftar' => $this->kueriProduk($outletId)
-                ->orderBy('products.nama_produk')
-                ->paginate(config('nampan.per_halaman')),
+            'daftar' => $daftar,
+            /*
+             * HPP & margin dihitung lewat SATU aksi bersama, bukan di Blade.
+             *
+             * Angka ini akan dibaca beberapa layar (saran harga, laporan barang rugi,
+             * peringatan diskon), dan rumus yang disalin ke tiap layar cepat atau lambat
+             * menjawab berbeda untuk barang yang sama. Yang diperdebatkan bukan tampilan,
+             * melainkan apakah barangnya untung.
+             */
+            'hpp' => app(HitungHppAction::class)->untukBanyak($daftar),
             'kategori' => Category::orderBy('urutan')->orderBy('nama')->get(['id', 'nama']),
             'satuanTersedia' => Satuan::cases(),
             'jumlahAktif' => Product::where('is_active', true)->count(),
