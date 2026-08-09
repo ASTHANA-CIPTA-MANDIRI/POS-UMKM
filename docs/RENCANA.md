@@ -82,7 +82,27 @@ tidak sesuai** — sekarang masih perkiraan.
       baris — pemilik menagih separuhnya tanpa satu pun galat di layar.
       Poin SENGAJA tidak dimunculkan di formulir: kolomnya ada sejak migrasi pertama
       tapi tidak ada satu baris kode pun yang menaikkan atau membacanya.
-- [ ] Impor produk dari Excel/CSV | | owner | 5j
+- [x] Impor produk dari CSV | 2026-08-09 | owner | 5j
+      Dua langkah: PERIKSA dulu, simpan belakangan. Mengimpor 300 baris yang salah
+      jauh lebih buruk daripada menolak berkasnya — yang telanjur masuk harus
+      dihapus satu per satu, sebagian sudah dipakai transaksi sehingga tidak bisa
+      dihapus lagi, dan harga yang salah sudah dipakai kasir hari itu.
+      App\Support\BacaCsv lahir bersamanya, dan ia dibuat TIDAK tahu arti kolom apa
+      pun supaya bisa dipakai ulang untuk impor pelanggan dan bahan baku nanti.
+      Tiga jebakan yang dijaganya, semuanya sunyi: Excel Indonesia memakai pemisah
+      titik koma, Excel menaruh BOM sehingga judul kolom PERTAMA saja yang gagal
+      dicocokkan, dan Excel lama menyimpan dalam Windows-1252.
+      Pencocokan HANYA lewat SKU, tidak pernah lewat nama: "Teh Manis" dan "Teh
+      manis" adalah dua barang bagi orang yang mengetiknya, dan menimpakan harga
+      baru ke barang yang salah tidak bersuara.
+- [ ] Impor produk: terima berkas .xlsx langsung | | owner | 3j
+      KEPUTUSAN PEMILIK yang belum diambil, dan itu sebabnya belum dikerjakan:
+      membaca .xlsx butuh phpspreadsheet, sementara composer.json proyek ini cuma
+      berisi empat paket dan kerampingan itu tampak disengaja. Sekarang pemilik
+      harus "Save as CSV" dulu — satu butir menu, tapi setiap daftar harga yang
+      beredar di WhatsApp berbentuk .xlsx, jadi sebagian orang akan tersandung di
+      langkah pertama. Kalau nanti dikerjakan, yang ditambah HANYA satu pembaca:
+      seluruh pipa periksa-pratinjau-simpan sudah tidak bergantung bentuk berkas.
 - [ ] Karyawan | | owner | 5j
 - [ ] Outlet & perangkat | | owner | 5j
 - [ ] Bill terbuka (layar owner) | | owner | 4j

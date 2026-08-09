@@ -19,6 +19,7 @@ use App\Livewire\Pages\Owner\Kasbon\Kasbon as KasbonOwner;
 use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
+use App\Livewire\Pages\Owner\Produk\ImporProduk as ImporProdukOwner;
 use App\Livewire\Pages\Owner\Produk\Produk;
 use App\Livewire\Pages\Owner\Stok\Opname;
 use App\Livewire\Pages\Owner\Stok\Stok;
@@ -544,6 +545,59 @@ class PratinjauTest extends TestCase
             $this->suntik(
                 $halamanPelanggan,
                 Livewire::actingAs($owner)->test(PelangganOwner::class)->call('tambah')->html(),
+            ),
+        );
+
+        /*
+         * Layar Impor produk, dua keadaan.
+         *
+         * Keadaan AWAL (belum ada berkas) dan keadaan PRATINJAU. Yang kedua dibuat dengan
+         * berkas yang sengaja berisi campuran: baris yang benar, baris berharga tak terbaca,
+         * baris ber-SKU yang sudah ada, dan satu baris ber-SKU yang sudah ada. Berkas yang
+         * seluruhnya benar cuma memotret satu dari empat blok di layar itu — dan tiga blok
+         * yang tidak terpotret justru yang paling panjang dan paling mudah berantakan.
+         */
+        file_put_contents("{$tujuan}/owner-impor-produk.html", $this->ambil('owner.produk.impor', $owner));
+
+        /*
+         * Satu baris memakai SKU produk yang SUDAH ADA, supaya lencana "Diperbarui" ikut
+         * terpotret di samping "Baru". Kedua keadaan itu berbeda artinya bagi pemilik —
+         * yang satu menambah barang, yang lain MENGUBAH HARGA barang yang sudah dijual —
+         * jadi keduanya harus terbukti bisa dibedakan mata, bukan cuma oleh uji.
+         */
+        $produkAda = Product::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->whereNotNull('sku')
+            ->orderBy('nama_produk')
+            ->firstOrFail();
+
+        /*
+         * Berkas contohnya sengaja BERCAMPUR, karena berkas yang seluruhnya benar cuma
+         * memotret satu dari empat blok di layar itu:
+         *  - baris yang benar          → tabel "yang akan masuk"
+         *  - harga "3.000"             → membuktikan titik ribuan memang terbaca
+         *  - baris tanpa nama          → blok "baris yang dilewati"
+         *  - satuan "meter"            → penolakan yang menyebut daftar satuan
+         *  - harga "tidak tahu"        → penolakan harga tak terbaca
+         *  - SKU yang sudah ada        → lencana "Diperbarui"
+         *  - kolom "stok"              → kotak "kolom yang tidak dibaca"
+         */
+        $csvContoh = "nama,harga,satuan,kategori,sku,stok\n"
+            ."Kerupuk Udang,3.000,pcs,Camilan,,20\n"
+            ."Teh Kotak,5000,pcs,Minuman,,15\n"
+            ."Kopi Sachet,2500,bungkus,Minuman,,40\n"
+            .",9000,pcs,Minuman,,3\n"
+            ."Kain Lap,25000,meter,Rumah Tangga,,5\n"
+            ."Sirup Marjan,tidak tahu,pcs,Minuman,,8\n"
+            .$produkAda->nama_produk.' (harga baru),19500,porsi,Makanan,'.$produkAda->sku.",\n";
+
+        file_put_contents(
+            "{$tujuan}/owner-impor-produk-pratinjau.html",
+            $this->suntik(
+                $this->ambil('owner.produk.impor', $owner),
+                Livewire::actingAs($owner)->test(ImporProdukOwner::class)
+                    ->set('berkas', UploadedFile::fake()->createWithContent('daftar.csv', $csvContoh))
+                    ->html(),
             ),
         );
 

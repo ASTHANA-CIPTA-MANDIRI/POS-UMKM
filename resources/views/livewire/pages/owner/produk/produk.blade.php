@@ -26,6 +26,19 @@
         keterangan="Daftar ini yang muncul di layar kasir. Harga di sini adalah harga yang ditagih."
     >
         <x-slot:aksi>
+            {{-- Pintu ke impor massal. Ditaruh di sini, bukan hanya di halaman kosong:
+                 pemilik yang sudah punya 20 barang lalu mendapat daftar harga dari grosir
+                 tetap butuh mengimpor, dan tautan yang cuma muncul saat kosong membuat ia
+                 mengetik 200 barang satu per satu tanpa tahu ada jalan lain. --}}
+            <a href="{{ route('owner.produk.impor') }}" wire:navigate
+               class="tombol-kedua flex h-11 cursor-pointer items-center gap-2 px-4 text-[0.875rem]">
+                <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                    <path d="M10 12V3m0 9 3.5-3.5M10 12 6.5 8.5M4 15.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span class="sm:hidden">Impor</span>
+                <span class="hidden sm:inline">Impor dari CSV</span>
+            </a>
+
             <button type="button" wire:click="tambah"
                     class="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-terracotta px-5 text-[0.875rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
                 <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">

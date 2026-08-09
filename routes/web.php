@@ -19,6 +19,7 @@ use App\Livewire\Pages\Owner\Laporan\Laporan as LaporanOwner;
 use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian as PembelianOwner;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru as PembelianBaruOwner;
+use App\Livewire\Pages\Owner\Produk\ImporProduk as ImporProdukOwner;
 use App\Livewire\Pages\Owner\Produk\Produk as ProdukOwner;
 use App\Livewire\Pages\Owner\Stok\Opname as OpnameOwner;
 use App\Livewire\Pages\Owner\Stok\Stok as StokOwner;
@@ -77,6 +78,16 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
         Route::middleware('tenant-aktif')->group(function () {
             Route::get('/', DasborOwner::class)->name('dasbor');
             Route::get('/produk', ProdukOwner::class)->name('produk');
+
+            /*
+             * Impor massal produk dari CSV.
+             *
+             * Bersarang di bawah `produk` bukan demi kerapian URL — nama rutenya yang
+             * penting. Sidebar menandai butir aktif dengan `routeIs($rute, $rute.'.*')`,
+             * jadi menu "Produk" tetap menyala saat layar ini dibuka, tanpa satu pun
+             * perubahan di sidebar. Pola yang sama dengan `owner.bahan.resep`.
+             */
+            Route::get('/produk/impor', ImporProdukOwner::class)->name('produk.impor');
 
             /*
              * Bahan baku sejajar produk, dan SENGAJA tidak diberi middleware jenis usaha.
