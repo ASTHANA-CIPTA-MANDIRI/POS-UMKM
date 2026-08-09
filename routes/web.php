@@ -13,6 +13,7 @@ use App\Livewire\Pages\Kasir\Transaksi\Transaksi as TransaksiKasir;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
 use App\Livewire\Pages\Owner\Dasbor\Dasbor as DasborOwner;
+use App\Livewire\Pages\Owner\Kasbon\Kasbon as KasbonOwner;
 use App\Livewire\Pages\Owner\Langganan\Langganan;
 use App\Livewire\Pages\Owner\Laporan\Laporan as LaporanOwner;
 use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
@@ -169,6 +170,14 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
              * dan tidak menyentuh rute ini.
              */
             Route::get('/pelanggan', PelangganOwner::class)->name('pelanggan');
+
+            /*
+             * Kasbon ikut gerbang yang sama dengan Pelanggan, dan di sini alasannya lebih
+             * keras: layar ini MENGUBAH catatan uang yang belum kembali. Kasir yang bisa
+             * mencatat setoran bisa menyatakan utang seseorang lunas tanpa satu rupiah pun
+             * masuk laci — dan sesudah itu tidak ada lagi yang menagih.
+             */
+            Route::get('/kasbon', KasbonOwner::class)->name('kasbon');
 
             Route::get('/laporan', LaporanOwner::class)->name('laporan');
         });

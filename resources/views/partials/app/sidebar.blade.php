@@ -76,7 +76,7 @@
             'Katalog & stok' => $katalog,
             'Pelanggan' => [
                 ['Pelanggan', 'owner.pelanggan', 'orang'],
-                ['Kasbon', null, 'buku'],
+                ['Kasbon', 'owner.kasbon', 'buku'],
             ],
             'Kelola' => [
                 ['Karyawan', null, 'orang'],

@@ -49,12 +49,28 @@ tidak sesuai** — sekarang masih perkiraan.
 
 ## Wajib sebelum deploy
 
-- [ ] Kasbon: daftar piutang + pelunasan tercatat | | owner | 6j
-      Pintunya sudah terbuka: layar Pelanggan ada, jadi kasbon bisa dibangun di atas
-      pelanggan sungguhan. Yang WAJIB dipakai ulang, bukan ditulis lagi: gerbang
-      hapus di Pelanggan::hapus() membaca Customer::totalUtang(), jadi layar Kasbon
-      harus menjaga rumus sisa utang (utang - dibayar) tetap satu — dua rumus untuk
-      satu angka cepat atau lambat berbeda, dan yang berbeda adalah uang.
+- [x] Kasbon: daftar piutang + pelunasan tercatat | 2026-08-09 | owner | 6j
+      Tabel BARU `credit_payments`: tiap setoran satu baris. `jumlah_dibayar` di
+      `credit_ledgers` dipertahankan sebagai angka turunan yang disimpan, dihitung
+      ULANG dari SUM tabel itu — bukan ditambahkan, supaya pembatalan satu setoran
+      otomatis mengembalikan sisa utang tanpa ada yang mengurangi dengan tangan.
+      Seluruh perubahannya lewat CatatPelunasanAction, satu pintu.
+      TEMUAN UJI MUTASI, dan ini jalan buntu sungguhan: kasbon bersen (kolomnya
+      decimal(15,2), dan kasbon dari struk berpajak bisa membawa 100000.50) DULU
+      tidak bisa dilunasi sama sekali — mengisi apa adanya ditolak Uang::baca()
+      yang menolak desimal, dan round() menghasilkan 100001 yang ditolak aksinya
+      sebagai melebihi sisa. Ditutup dengan dua hal: tombol "isi sisa" membulatkan
+      KE BAWAH, dan sisa di bawah SATU rupiah dinyatakan lunas (bukan seratus —
+      Rp 50 yang benar-benar terutang tetap utang, dan ada ujinya).
+      Yang SENGAJA tidak ada: mengubah jumlah utang kasbon yang lahir dari struk
+      (struk dan buku kasbon akan bercerita beda tentang belanja yang sama), dan
+      menghapus kasbon (piutang yang bisa dihapus adalah piutang yang bisa
+      dihilangkan oleh orang yang menerima uangnya).
+- [ ] Kasbon: rekap "setoran masuk hari ini" | | owner | 2j
+      Datanya sudah ada — `credit_payments.dibayar_pada` memang dipisahkan dari
+      created_at justru untuk ini. Yang belum ada layarnya. Berguna saat pemilik
+      menutup hari: uang penagihan tidak lewat laci kasir, jadi ia tidak muncul di
+      Tutup kasir maupun di omzet.
 - [x] Pelanggan: daftar + formulir | 2026-08-09 | owner | 4j
       Dikerjakan MENDAHULUI Kasbon meski urutan di sini sebaliknya:
       `credit_ledgers.customer_id` tidak nullable, jadi tanpa pintu ini kasbon cuma

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -54,6 +55,18 @@ class CreditLedger extends Model
     public function outlet(): BelongsTo
     {
         return $this->belongsTo(Outlet::class);
+    }
+
+    /**
+     * Riwayat setoran. Yang dibatalkan tidak ikut (SoftDeletingScope pada CreditPayment).
+     *
+     * `jumlah_dibayar` di baris ini adalah SUM dari relasi ini, dihitung ulang oleh
+     * CatatPelunasanAction. Kalau keduanya pernah berbeda, yang benar adalah tabel setoran —
+     * ia punya tanggal, penerima, dan jejak pembatalan; kolom agregatnya tidak punya apa-apa.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(CreditPayment::class);
     }
 
     public function sisaUtang(): float

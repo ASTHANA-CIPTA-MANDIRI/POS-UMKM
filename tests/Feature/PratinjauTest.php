@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Kas\BukaSesiKasAction;
 use App\Actions\Kas\KoreksiModalAwalAction;
+use App\Actions\Kasbon\CatatPelunasanAction;
 use App\Actions\Kasir\SusunSisaStokAction;
 use App\Actions\Pembelian\BatalkanPembelianAction;
 use App\Actions\Pembelian\CatatPembelianAction;
@@ -14,6 +15,7 @@ use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
+use App\Livewire\Pages\Owner\Kasbon\Kasbon as KasbonOwner;
 use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
@@ -544,6 +546,83 @@ class PratinjauTest extends TestCase
                 Livewire::actingAs($owner)->test(PelangganOwner::class)->call('tambah')->html(),
             ),
         );
+
+        /*
+         * Layar Kasbon, tiga keadaan sekaligus di satu tangkapan.
+         *
+         * Datanya dibengkokkan supaya KETIGA lencana terpotret: lunas, belum lunas, dan lewat
+         * jatuh tempo. Seeder demo meninggalkan semuanya belum lunas tanpa jatuh tempo, jadi
+         * tangkapan apa adanya cuma membuktikan satu dari tiga — dan justru lencana merah
+         * yang paling perlu dilihat mata, karena kontrasnya pernah jadi temuan tersendiri.
+         *
+         * Satu kasbon juga diberi riwayat setoran, karena riwayat itulah alasan barisnya
+         * berbentuk kartu dan bukan baris tabel. Tanpa satu pun setoran, bentuk kartunya
+         * terlihat boros ruang tanpa alasan yang kelihatan.
+         */
+        $kasbonWarteg = CreditLedger::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->orderBy('created_at')
+            ->get();
+
+        if ($kasbonWarteg->count() >= 2) {
+            $kasbonWarteg[0]->forceFill([
+                'tanggal_jatuh_tempo' => now()->subWeeks(2)->toDateString(),
+                'catatan' => 'Belanja lauk 3 hari, minta ditagih akhir bulan.',
+            ])->save();
+
+            app(CatatPelunasanAction::class)->execute(
+                $kasbonWarteg[0],
+                round((float) $kasbonWarteg[0]->jumlah_utang * 0.3),
+                $owner,
+                now()->subDays(4),
+                catatan: 'dititip anaknya',
+            );
+
+            // Satu dibuat lunas penuh, supaya lencana hijau ikut terpotret.
+            app(CatatPelunasanAction::class)->execute(
+                $kasbonWarteg[1],
+                (float) $kasbonWarteg[1]->jumlah_utang,
+                $owner,
+            );
+        }
+
+        // Saringan bawaannya "belum lunas"; potret memakai "semua" supaya ketiga lencana
+        // benar-benar ada di halaman yang sama.
+        $halamanKasbon = $this->ambil('owner.kasbon', $owner, ['status' => 'semua']);
+
+        file_put_contents("{$tujuan}/owner-kasbon.html", $halamanKasbon);
+
+        /*
+         * Tangkapan KETIGA khusus yang sudah lunas.
+         *
+         * Bukan kelebihan: potret "semua" TIDAK membuktikan lencana hijau ada. Daftarnya
+         * berisi 11 kasbon dengan `created_at` yang sama detik, jadi urutan di antara yang
+         * seri tidak ditentukan apa pun — kasbon yang dilunasi bisa jatuh di halaman 2 dan
+         * lencana hijaunya tidak pernah ikut terukur. Diperiksa pertama kali lewat potret,
+         * bukan lewat angka: ketiga lencana memang tidak muncul bersama di satu halaman.
+         *
+         * Saringan `lunas` menjadikannya pasti, dan sekaligus mengukur satu keadaan saringan
+         * yang lain.
+         */
+        $halamanLunas = $this->ambil('owner.kasbon', $owner, ['status' => 'lunas']);
+
+        file_put_contents("{$tujuan}/owner-kasbon-lunas.html", $halamanLunas);
+
+        // Dijaga di sini, bukan dipercaya: pembengkokan data yang gagal menghasilkan halaman
+        // kosong, dan halaman kosong yang diukur akan dilaporkan BERSIH tanpa membuktikan apa pun.
+        $this->assertStringContainsString('Lunas', $halamanLunas);
+
+        if ($kasbonWarteg->isNotEmpty()) {
+            file_put_contents(
+                "{$tujuan}/owner-kasbon-setor.html",
+                $this->suntik(
+                    $halamanKasbon,
+                    Livewire::actingAs($owner)->test(KasbonOwner::class)
+                        ->call('setor', $kasbonWarteg[0]->getKey())
+                        ->html(),
+                ),
+            );
+        }
 
         $admin = User::withoutGlobalScopes()->where('role', 'super_admin')->firstOrFail();
         file_put_contents(
