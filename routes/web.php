@@ -15,6 +15,7 @@ use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
 use App\Livewire\Pages\Owner\Dasbor\Dasbor as DasborOwner;
 use App\Livewire\Pages\Owner\Langganan\Langganan;
 use App\Livewire\Pages\Owner\Laporan\Laporan as LaporanOwner;
+use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian as PembelianOwner;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru as PembelianBaruOwner;
 use App\Livewire\Pages\Owner\Produk\Produk as ProdukOwner;
@@ -155,6 +156,19 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
                 ->whereUuid('nota')
                 ->where('penanda', '[A-Za-z0-9-]+')
                 ->name('lampiran.lihat');
+
+            /*
+             * Pelanggan ikut grup back office yang sama, dan itu keputusan sadar meskipun
+             * kasir jugalah yang paling sering menanyakan "atas nama siapa".
+             *
+             * Yang ditahan bukan pengetahuan tentang pelanggan, melainkan kemampuan
+             * MENGUBAHNYA. Nomor HP adalah penanda orang yang dipakai kasbon; kasir yang
+             * bisa menyuntingnya bisa memindahkan utang dari satu orang ke orang lain hanya
+             * dengan mengganti nomor, dan tidak ada satu pun jejak yang menunjukkan itu
+             * terjadi. Pemilihan pelanggan saat menjual berjalan lewat layar kasir sendiri
+             * dan tidak menyentuh rute ini.
+             */
+            Route::get('/pelanggan', PelangganOwner::class)->name('pelanggan');
 
             Route::get('/laporan', LaporanOwner::class)->name('laporan');
         });

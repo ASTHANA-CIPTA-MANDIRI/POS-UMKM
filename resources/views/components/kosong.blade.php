@@ -21,6 +21,9 @@
         'cari' => 'M9 15.5a6.5 6.5 0 1 1 0-13 6.5 6.5 0 0 1 0 13Zm4.6.1L19 21',
         // Lembar — untuk riwayat/mutasi yang belum ada.
         'lembar' => 'M6 3.5h9l3 3v14H6v-17Zm3 6h6M9 13h6M9 16.5h3',
+        // Orang — untuk daftar pelanggan/karyawan yang belum ada. Bentuknya disamakan dengan
+        // ikon 'orang' di sidebar supaya butir menu dan layar kosongnya saling mengenali.
+        'orang' => 'M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm-7 9c0-3.3 3.1-6 7-6s7 2.7 7 6',
         default => 'M4 7.5 12 4l8 3.5v9L12 20l-8-3.5v-9Zm0 0 8 3.5m0 0 8-3.5M12 11v9',
     };
 @endphp

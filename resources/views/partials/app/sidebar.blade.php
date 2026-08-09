@@ -75,7 +75,7 @@
             ],
             'Katalog & stok' => $katalog,
             'Pelanggan' => [
-                ['Pelanggan', null, 'orang'],
+                ['Pelanggan', 'owner.pelanggan', 'orang'],
                 ['Kasbon', null, 'buku'],
             ],
             'Kelola' => [
@@ -124,6 +124,22 @@
          mt-[58px] mb-7, dan jarak itulah yang membuat sidebarnya terasa lapang. --}}
     <div class="mt-[3.625rem] mb-7 h-px bg-line-soft"></div>
 
+{{--
+    Pembungkus BERPOSISI untuk menu, supaya penanda "masih ada lanjutannya" bisa ditempel
+    di dasarnya.
+
+    KENAPA PERLU. Menunya memang bisa digulir (`overflow-y-auto`) dan butir terbawah memang
+    bisa diklik — sudah diukur. Yang tidak ada adalah TANDANYA: Chrome dan Safari
+    menyembunyikan bilah gulir sampai ada gulungan, jadi di layar 800px butir terakhir
+    berhenti begitu saja di atas kartu pengguna dan terbaca sebagai ujung daftar. Orang yang
+    yakin sudah melihat seluruh menu tidak akan menggulir untuk memeriksanya.
+
+    `min-h-0` WAJIB ada di sini. Butir flex bernilai bawaan `min-height: auto`, jadi tanpa
+    ini pembungkusnya menolak menyusut lebih kecil daripada isinya: menunya memanjang
+    melewati dasar sidebar, `overflow-y-auto` tidak pernah menyala, dan yang tadinya cuma
+    tak-terlihat berubah jadi benar-benar tak-terjangkau.
+--}}
+<div class="relative flex min-h-0 flex-1 flex-col">
     <nav aria-label="Navigasi aplikasi" class="flex-1 overflow-y-auto pb-6">
         @foreach ($menu as $grup => $butir)
             <p class="px-8 pt-3 pb-2 font-mono text-[0.5625rem] tracking-[0.14em] text-umber-soft uppercase">{{ $grup }}</p>
@@ -169,6 +185,17 @@
             </ul>
         @endforeach
     </nav>
+
+    {{-- Kabut penanda gulir. `pointer-events-none` supaya butir menu di bawahnya tetap bisa
+         diklik — kabut yang menelan klik jauh lebih buruk daripada menu yang tampak buntu.
+
+         Selalu ada, tidak dinyalakan-matikan oleh JavaScript: gradiennya berangkat DARI
+         warna latar sidebar, jadi saat menunya tidak cukup panjang untuk digulir ia menimpa
+         paper di atas paper dan tidak terlihat sama sekali. Saklar JS untuk keadaan yang
+         sudah benar sendiri hanya menambah satu hal yang bisa rusak. --}}
+    <div aria-hidden="true"
+         class="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-paper to-transparent"></div>
+</div>
 
     {{-- Horizon menaruh kartu promo di dasar sidebar; di sini diganti identitas
          pengguna dan tombol keluar, yang jauh lebih berguna di aplikasi nyata. --}}

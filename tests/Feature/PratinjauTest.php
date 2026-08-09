@@ -9,10 +9,12 @@ use App\Actions\Pembelian\BatalkanPembelianAction;
 use App\Actions\Pembelian\CatatPembelianAction;
 use App\Actions\Stok\AdjustStockAction;
 use App\Enums\AlasanOpname;
+use App\Enums\CreditStatus;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
+use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru;
 use App\Livewire\Pages\Owner\Produk\Produk;
@@ -22,6 +24,8 @@ use App\Models\Bahan\RawMaterial;
 use App\Models\Kas\CashSession;
 use App\Models\Kasir\Transaction;
 use App\Models\Lampiran\Lampiran;
+use App\Models\Pelanggan\CreditLedger;
+use App\Models\Pelanggan\Customer;
 use App\Models\Produk\Product;
 use App\Models\Stok\Stock;
 use App\Models\Tenant\Outlet;
@@ -498,6 +502,48 @@ class PratinjauTest extends TestCase
                 ),
             );
         }
+
+        /*
+         * Layar Pelanggan, dua keadaan.
+         *
+         * Datanya SENGAJA dibengkokkan lebih dulu. Seeder demo meninggalkan tiap kasbon
+         * berstatus belum lunas dengan `jumlah_dibayar` nol, dan layar dalam keadaan itu
+         * tidak membuktikan apa pun tentang kolom yang paling mudah salah: kolom kasbon
+         * menampilkan SISA utang, bukan utang awal, dan selama belum ada satu pun yang
+         * dicicil, kedua rumus itu menghasilkan angka yang sama persis.
+         *
+         * Satu pelanggan juga dikosongkan nomornya supaya keadaan "—" ikut terpotret. Sel
+         * kosong tanpa penanda adalah cacat yang paling sering lolos dari mata, dan justru
+         * itu yang dijaga angka `selKosong` di alat ukur.
+         */
+        $kasbonDicicil = CreditLedger::withoutGlobalScopes()
+            ->where('status', CreditStatus::BelumLunas->value)
+            ->orderBy('created_at')
+            ->first();
+
+        $kasbonDicicil?->forceFill([
+            'jumlah_dibayar' => round((float) $kasbonDicicil->jumlah_utang * 0.4, 2),
+        ])->save();
+
+        Customer::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->whereNotNull('no_hp')
+            ->orderByDesc('nama')
+            ->first()
+            ?->forceFill(['no_hp' => null])->save();
+
+        $halamanPelanggan = $this->ambil('owner.pelanggan', $owner);
+
+        file_put_contents("{$tujuan}/owner-pelanggan.html", $halamanPelanggan);
+
+        // Panel formulirnya hanya ada di DOM saat dibuka — sama seperti layar Bahan.
+        file_put_contents(
+            "{$tujuan}/owner-pelanggan-form.html",
+            $this->suntik(
+                $halamanPelanggan,
+                Livewire::actingAs($owner)->test(PelangganOwner::class)->call('tambah')->html(),
+            ),
+        );
 
         $admin = User::withoutGlobalScopes()->where('role', 'super_admin')->firstOrFail();
         file_put_contents(

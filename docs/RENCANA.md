@@ -50,7 +50,22 @@ tidak sesuai** — sekarang masih perkiraan.
 ## Wajib sebelum deploy
 
 - [ ] Kasbon: daftar piutang + pelunasan tercatat | | owner | 6j
-- [ ] Pelanggan: daftar + formulir | | owner | 4j
+      Pintunya sudah terbuka: layar Pelanggan ada, jadi kasbon bisa dibangun di atas
+      pelanggan sungguhan. Yang WAJIB dipakai ulang, bukan ditulis lagi: gerbang
+      hapus di Pelanggan::hapus() membaca Customer::totalUtang(), jadi layar Kasbon
+      harus menjaga rumus sisa utang (utang - dibayar) tetap satu — dua rumus untuk
+      satu angka cepat atau lambat berbeda, dan yang berbeda adalah uang.
+- [x] Pelanggan: daftar + formulir | 2026-08-09 | owner | 4j
+      Dikerjakan MENDAHULUI Kasbon meski urutan di sini sebaliknya:
+      `credit_ledgers.customer_id` tidak nullable, jadi tanpa pintu ini kasbon cuma
+      bisa dibangun di atas pelanggan hasil seeder dan gerbangnya tidak pernah
+      teruji dengan data sungguhan.
+      Yang lahir bersamanya: App\Support\NomorHp (penyeragam nomor telepon). Tanpa
+      itu "0812-3456-7890" dan "+62 812 3456 7890" adalah dua teks berbeda bagi
+      basis data, keduanya lolos aturan unik, dan utang SATU orang terpecah ke dua
+      baris — pemilik menagih separuhnya tanpa satu pun galat di layar.
+      Poin SENGAJA tidak dimunculkan di formulir: kolomnya ada sejak migrasi pertama
+      tapi tidak ada satu baris kode pun yang menaikkan atau membacanya.
 - [ ] Impor produk dari Excel/CSV | | owner | 5j
 - [ ] Karyawan | | owner | 5j
 - [ ] Outlet & perangkat | | owner | 5j
@@ -131,16 +146,24 @@ tidak sesuai** — sekarang masih perkiraan.
       serupa "ada nota belum datang (NB-…)" menghemat satu penolakan. Butuh data
       tambahan di kueriBahan() + perubahan Blade. Bukan pemblokir: gerbangnya
       sudah menahan di server dan pesannya menyebut jalan keluarnya.
-- [ ] Sidebar: butir terakhir tertutup kartu pengguna | | owner | 1j
-      Kartu pengguna menempel di dasar sidebar yang bisa digulir, TANPA ruang bawah
-      sebesar kartunya, jadi butir paling bawah tidak pernah bisa terlihat penuh.
-      Terukur di 1280x800 lewat elementFromPoint: fnb menutupi "Pelanggan",
-      kelontong menutupi "Kasbon" — butir yang tertutup berbeda karena daftarnya
-      beda panjang, jadi audit kerapian menemukannya di satu layar lalu kehilangan
-      jejaknya di layar lain. SUDAH ADA sebelum layar Bahan; sempat saya kira
-      kemunduran karena menyembunyikan menu Bahan menggeser butir mana yang kena.
-      Bukan pemblokir: sidebarnya bisa digulir, jadi butirnya tetap terjangkau.
-      Perbaikannya padding-bottom pada nav sebesar tinggi kartu.
+- [ ] Sidebar: menu tidak muat di layar 800px, butir terbawah di bawah lipatan | | owner | 1j
+      JUDUL DAN SEBABNYA DIKOREKSI 2026-08-09, catatan lama keliru. Diukur ulang di
+      1280x800 saat menyalakan menu Pelanggan: dasar nav ada di y=636 dan kartu
+      pengguna baru mulai di y=655, jadi TIDAK ADA yang tertutup kartu — nav adalah
+      wadah gulir tersendiri (`flex-1 overflow-y-auto`) dan kartunya saudara di
+      bawahnya. Yang benar: menunya 316px lebih panjang daripada ruang yang ada,
+      jadi butir terbawah berada di bawah lipatan. elementFromPoint sesudah
+      digulir menjawab `bisaDiklik=ya`, jadi bukan pemblokir.
+      SUDAH DIKERJAKAN 2026-08-09: kabut gradien di dasar nav sebagai tanda "masih
+      ada lanjutannya", karena Chrome dan Safari menyembunyikan bilah gulirnya
+      sampai ada gulungan — orang yang yakin sudah melihat seluruh menu tidak akan
+      menggulir untuk memeriksa. Terukur 300x32 di y=604..636, dan
+      `pointer-events-none` terbukti tidak menelan klik (titik tengahnya mengenai
+      isi menu, bukan kabutnya).
+      SISANYA: kabut cuma memberi tahu, tidak membuat butirnya terlihat. Ruang atas
+      sidebar memakan ~108px sebelum menu pertama (pt-[3.125rem] + mt-[3.625rem]);
+      merapatkannya adalah yang benar-benar membuat menunya muat, dan itu menyentuh
+      bahasa visual seluruh aplikasi — jadi keputusan pemilik, bukan tempelan.
 - [ ] Pemeriksa tumpangTindih tidak mengerti penumpukan lapisan | | owner | 1j
       `tests/browser/periksa-rapi.js` menyaring lewat konteks berposisi, dan itu
       sudah menyelamatkannya dari menuduh dialog. Tapi pasangan di DALAM satu
