@@ -85,10 +85,23 @@ tidak sesuai** — sekarang masih perkiraan.
       atau digulir mendatar; spesifikasi asli mengandaikan 5 dan bentuk galerinya
       harus disesuaikan. Batas 10 juga menaikkan risiko batas PHP terlampaui,
       jadi saringan sisi klien (saringPilihan) makin wajib, bukan opsional.
-- [ ] Lampiran G3: kamera dekstop | | owner | 3j
-      Panel kamera sendiri, campuran kode bersama diekstrak dari pemindai.js.
-      JANGAN jadi cabang di dalam pemindaiBarcode. tests/js/pemindai.test.mjs
-      wajib hijau TANPA disunting — kalau perlu disunting, ekstraksinya salah.
+- [x] Lampiran G3: kamera dekstop | 2026-08-09 | owner | 3j
+      resources/js/kamera.js + tests/js/kamera.test.mjs (20 uji). pemindai.js dan
+      tests/js/pemindai.test.mjs TIDAK disentuh sama sekali, sesuai syaratnya.
+      MENYIMPANG DARI RENCANA, dan disengaja: campuran kode bersamanya BELUM
+      diekstrak dari pemindai.js — ekstraksi itu menyunting berkas layar kasir,
+      dan itu pekerjaan sendiri, bukan yang diselundupkan ke fitur owner. Lihat
+      butir "Kamera: satukan plumbing" di bawah. Sampai itu dikerjakan, gerbang
+      konteks aman dan penerjemahan galat ada di DUA tempat.
+- [ ] Kamera: satukan plumbing kamera.js dan pemindai.js | | kasir | 2j
+      Yang kembar: gerbang konteks aman, nyalakan/matikan aliran, penerjemahan
+      galat getUserMedia. Yang TIDAK boleh ikut disatukan: pemindai membaca
+      terus-menerus dan memuat ZXing, kamera bukti memotret sekali lalu ditinjau
+      — satu panel untuk keduanya akan penuh cabang. Syaratnya sama seperti G3:
+      tests/js/pemindai.test.mjs wajib hijau TANPA disunting; kalau perlu
+      disunting, ekstraksinya salah. Kerjakan bersama butir "Pesan galat kamera
+      barcode kemungkinan tidak pernah terlihat" — keduanya menyentuh berkas yang
+      sama, dan kamera.js sudah memakai bentuk yang benar (galat di LUAR panel).
 - [ ] Lampiran: tautan berumur yang bisa dibagikan | | backend | 2j
       PEMILIK MEMUTUSKAN 2026-08-07: "belum tahu, jangan dikunci dulu". Jadi G1
       jalan apa adanya sekarang; ini ditambahkan HANYA kalau ternyata pemilik

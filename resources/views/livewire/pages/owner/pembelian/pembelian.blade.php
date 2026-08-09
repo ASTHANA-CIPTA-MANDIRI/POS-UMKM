@@ -660,6 +660,12 @@
                             Buang salah satu dulu kalau mau menambah.
                         </p>
                     @else
+                        {{-- Lingkup kamera membungkus tombol DAN panelnya: keduanya harus
+                             melihat keadaan `terbuka` yang sama. Id kotak berkasnya
+                             diserahkan sebagai argumen supaya hasil potret masuk lewat jalur
+                             unggah yang SAMA dengan berkas yang dipilih tangan — satu jalur,
+                             satu tempat memeriksa. --}}
+                        <div x-data="kameraBukti('lampiran-baru')" x-on:keydown.escape.window="tutup()">
                         <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                             <label for="lampiran-baru"
                                    class="tombol-kedua flex h-11 cursor-pointer items-center justify-center gap-2 px-4 text-[0.8125rem]">
@@ -683,6 +689,28 @@
                             <input id="lampiran-baru" type="file" multiple wire:model="lampiranBaru"
                                    accept="image/*,application/pdf" class="sr-only">
 
+                            {{-- Tombol kamera DISEMBUNYIKAN di konteks tidak aman, dan
+                                 alasannya ditulis di bawah.
+
+                                 Dua bentuk lain sudah ditimbang dan ditolak: tombol yang tetap
+                                 ada lalu diam saat ditekan (sudah pernah terjadi di panel
+                                 pemindai — galatnya ada di panel yang tidak pernah terbuka),
+                                 dan tombol nonaktif ber-tooltip (di tablet tidak ada hover,
+                                 jadi tooltipnya tidak pernah muncul).
+
+                                 Diputuskan KLIEN, bukan server: server tidak tahu apakah
+                                 peramban membuka lewat https, localhost, atau alamat LAN. --}}
+                            <button type="button" x-show="bisaKamera" x-cloak x-on:click="buka()"
+                                    class="tombol-kedua flex h-11 cursor-pointer items-center justify-center gap-2 px-4 text-[0.8125rem]">
+                                <span class="tombol-ikon">
+                                    <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                        <path d="M3.5 6.5h2.2l1-1.6h4.6l1 1.6h2.2v8H3.5v-8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+                                        <circle cx="10" cy="10.5" r="2.6" stroke="currentColor" stroke-width="1.5" />
+                                    </svg>
+                                </span>
+                                Ambil dari kamera
+                            </button>
+
                             @if (! empty($lampiranBaru))
                                 <button type="button" wire:click="pasangLampiran" wire:loading.attr="disabled"
                                         class="tombol-utama h-11 cursor-pointer px-5 text-[0.8125rem]">
@@ -692,6 +720,83 @@
                                     <span wire:loading wire:target="pasangLampiran">Menyimpan…</span>
                                 </button>
                             @endif
+                        </div>
+
+                        {{-- Kalimat ini tetap dibutuhkan WALAUPUN tombolnya ada, untuk
+                             menjelaskan kenapa ia tidak ada. Kalimat terakhirnya wajib: di HP,
+                             pemilih berkas memang membuka kamera — tanpa itu pemilik
+                             menyimpulkan kameranya tidak bisa dipakai sama sekali. --}}
+                        <p x-show="! bisaKamera" x-cloak class="mt-2 text-[0.75rem] leading-relaxed text-umber">
+                            Ambil foto langsung dari kamera cuma bisa kalau aplikasi dibuka lewat
+                            alamat aman (https) atau di komputer ini sendiri. Sekarang pakai tombol
+                            "Pilih foto atau PDF" — kamera HP tetap bisa dipakai dari situ.
+                        </p>
+
+                        {{-- Galat kamera ditaruh DI LUAR panel, dan itu bukan selera: panel
+                             pemindai barcode menaruhnya di dalam, lalu menutup panelnya sesudah
+                             menyetel galatnya — sehingga penjelasannya berada di tempat yang
+                             tidak pernah dirender. --}}
+                        <p x-show="galat" x-cloak x-text="galat"
+                           class="mt-2 text-[0.8125rem] leading-relaxed text-merah-deep"></p>
+
+                        {{-- ── Panel kamera ───────────────────────────────────── --}}
+                        <template x-if="terbuka">
+                            <div class="fixed inset-0 z-[70] flex items-center justify-center bg-ink/85 p-4 sm:p-8"
+                                 x-on:click.self="tutup()" role="dialog" aria-modal="true" aria-label="Ambil foto struk">
+                                <div class="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white">
+                                    <div class="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+                                        <p class="text-[0.8125rem] font-semibold text-ink"
+                                           x-text="pratinjau ? 'Sudah pas?' : 'Arahkan ke struknya'"></p>
+                                        <button type="button" x-on:click="tutup()" aria-label="Tutup"
+                                                class="tombol-ikon size-9 shrink-0 cursor-pointer">
+                                            <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                                                <path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    <div class="relative min-h-0 flex-1 bg-ink">
+                                        {{-- object-contain, BUKAN object-cover: cover memotong
+                                             struk yang tinggi, dan yang terpotong biasanya
+                                             justru bagian totalnya. --}}
+                                        <video x-ref="video" muted playsinline x-show="! pratinjau"
+                                               class="max-h-[60vh] w-full object-contain"></video>
+                                        <img x-show="pratinjau" :src="pratinjau" alt="Hasil potret"
+                                             class="max-h-[60vh] w-full object-contain">
+
+                                        <p x-show="menyiapkan" x-cloak
+                                           class="absolute inset-0 grid place-items-center text-[0.8125rem] text-white">
+                                            Menyiapkan kamera…
+                                        </p>
+                                    </div>
+
+                                    <div class="shrink-0 border-t border-line px-4 py-3">
+                                        <p x-show="! pratinjau" class="mb-2 text-center text-[0.75rem] text-umber-soft">
+                                            Dekatkan sampai struknya mengisi bingkai — keterbacaan datang dari
+                                            pembingkaian, bukan dari megapiksel.
+                                        </p>
+
+                                        <div class="flex justify-center gap-2">
+                                            {{-- Tombol jepret sengaja besar (56px): ini satu-satunya
+                                                 tombol yang ditekan sambil tangan satunya memegang
+                                                 struk. --}}
+                                            <button type="button" x-show="! pratinjau" x-on:click="jepret()"
+                                                    class="tombol-utama h-14 cursor-pointer px-8 text-[0.9375rem]">
+                                                Jepret
+                                            </button>
+                                            <button type="button" x-show="pratinjau" x-cloak x-on:click="ulangi()"
+                                                    class="tombol-kedua h-12 cursor-pointer px-5 text-[0.875rem]">
+                                                Ulangi
+                                            </button>
+                                            <button type="button" x-show="pratinjau" x-cloak x-on:click="pakai()"
+                                                    class="tombol-utama h-12 cursor-pointer px-6 text-[0.875rem]">
+                                                Pakai foto ini
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                         </div>
 
                         <p class="mt-2 text-[0.75rem] text-umber-soft">

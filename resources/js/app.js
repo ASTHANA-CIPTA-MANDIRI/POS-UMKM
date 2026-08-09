@@ -1,6 +1,7 @@
 import { pasangBukti } from './bukti';
 import { pasangBunyi } from './bunyi';
 import { pasangEchoKeWindow } from './echo';
+import { pasangKamera } from './kamera';
 import { pasangKasir } from './kasir';
 import { pasangToast } from './toast';
 import { mulaiAnimasi } from './motion';
@@ -17,6 +18,7 @@ pasangPemindai();
 pasangOpname();
 pasangBukti();
 pasangUang();
+pasangKamera();
 
 // Dipasang di luar mulai(): toast bisa dikirim Livewire sebelum DOMContentLoaded,
 // dan pendengarnya harus sudah ada saat event pertama tiba.
