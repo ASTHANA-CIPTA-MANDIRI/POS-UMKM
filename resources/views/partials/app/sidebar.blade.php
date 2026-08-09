@@ -79,6 +79,7 @@
                 ['Kasbon', 'owner.kasbon', 'buku'],
             ],
             'Kelola' => [
+                ['Biaya operasional', 'owner.biaya', 'kalkulator'],
                 ['Karyawan', 'owner.karyawan', 'orang'],
                 ['Outlet & perangkat', null, 'toko'],
                 ['Laporan', 'owner.laporan', 'grafik'],

@@ -11,10 +11,12 @@ use App\Actions\Pembelian\CatatPembelianAction;
 use App\Actions\Stok\AdjustStockAction;
 use App\Enums\AlasanOpname;
 use App\Enums\CreditStatus;
+use App\Enums\PeriodeBiaya;
 use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
+use App\Livewire\Pages\Owner\Biaya\Biaya as BiayaOwner;
 use App\Livewire\Pages\Owner\Karyawan\Karyawan as KaryawanOwner;
 use App\Livewire\Pages\Owner\Kasbon\Kasbon as KasbonOwner;
 use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
@@ -25,6 +27,7 @@ use App\Livewire\Pages\Owner\Produk\Produk;
 use App\Livewire\Pages\Owner\Stok\Opname;
 use App\Livewire\Pages\Owner\Stok\Stok;
 use App\Models\Bahan\RawMaterial;
+use App\Models\Biaya\BiayaOperasional;
 use App\Models\Kas\CashSession;
 use App\Models\Kasir\Transaction;
 use App\Models\Lampiran\Lampiran;
@@ -727,6 +730,77 @@ class PratinjauTest extends TestCase
                 Livewire::actingAs($owner)->test(KaryawanOwner::class)->call('tambah')->html(),
             ),
         );
+
+        /*
+         * Layar Biaya operasional, dua keadaan.
+         *
+         * Seeder demo tidak membuat satu pun biaya — layar ini akan terpotret KOSONG, dan
+         * yang terukur cuma keadaan kosongnya. Datanya karena itu ditanam di sini, sengaja
+         * bercampur periode (bulanan, mingguan, tahunan) supaya kolom "Per hari" membuktikan
+         * konversinya, plus satu biaya yang SUDAH BERHENTI supaya lencana abu-abunya ikut
+         * terpotret bersama yang hijau.
+         */
+        $outletDemo = Outlet::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->orderBy('outlet_name')
+            ->first();
+
+        app(TenantContext::class)->forTenant($owner->tenant_id, function () use ($outletDemo) {
+            BiayaOperasional::create([
+                'nama' => 'Sewa tempat',
+                'nominal' => 1500000,
+                'periode' => PeriodeBiaya::Bulanan,
+                'outlet_id' => $outletDemo?->getKey(),
+                'mulai' => now()->subMonths(8)->toDateString(),
+                'catatan' => 'Bayar tiap tanggal 5',
+            ]);
+
+            BiayaOperasional::create([
+                'nama' => 'Listrik & air',
+                'nominal' => 650000,
+                'periode' => PeriodeBiaya::Bulanan,
+                'outlet_id' => $outletDemo?->getKey(),
+                'mulai' => now()->subMonths(8)->toDateString(),
+            ]);
+
+            BiayaOperasional::create([
+                'nama' => 'Gas elpiji',
+                'nominal' => 140000,
+                'periode' => PeriodeBiaya::Mingguan,
+                'mulai' => now()->subMonths(6)->toDateString(),
+            ]);
+
+            BiayaOperasional::create([
+                'nama' => 'PBB & retribusi',
+                'nominal' => 730000,
+                'periode' => PeriodeBiaya::Tahunan,
+                'mulai' => now()->subYear()->toDateString(),
+            ]);
+
+            BiayaOperasional::create([
+                'nama' => 'Sewa lapak lama',
+                'nominal' => 400000,
+                'periode' => PeriodeBiaya::Bulanan,
+                'mulai' => now()->subYear()->toDateString(),
+                'selesai' => now()->subMonths(2)->toDateString(),
+            ]);
+        });
+
+        $halamanBiaya = $this->ambil('owner.biaya', $owner, ['berhenti' => 1]);
+
+        file_put_contents("{$tujuan}/owner-biaya.html", $halamanBiaya);
+
+        file_put_contents(
+            "{$tujuan}/owner-biaya-form.html",
+            $this->suntik(
+                $halamanBiaya,
+                Livewire::actingAs($owner)->test(BiayaOwner::class)->call('tambah')->html(),
+            ),
+        );
+
+        // Dijaga, bukan dipercaya: penanaman data yang gagal menghasilkan halaman kosong,
+        // dan halaman kosong yang diukur akan dilaporkan BERSIH tanpa membuktikan apa pun.
+        $this->assertStringContainsString('Sewa tempat', $halamanBiaya);
 
         $admin = User::withoutGlobalScopes()->where('role', 'super_admin')->firstOrFail();
         file_put_contents(

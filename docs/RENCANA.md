@@ -276,7 +276,22 @@ Resep sudah bisa dihitung (`recipe_items.jumlah_terpakai` x
       Yang WAJIB ada apa pun keputusannya: HPP yang ditampilkan harus bisa
       DITELUSURI ke angka pembentuknya di layar, bukan muncul sebagai satu angka.
       Pemilik yang tidak bisa melihat asal angkanya tidak akan memakainya.
-- [ ] Biaya operasional: sewa, listrik, gaji, gas | | owner | 5j
+- [x] Biaya operasional: sewa, listrik, gaji, gas | 2026-08-09 | owner | 5j
+      Tabel `biaya_operasional` + App\Actions\Biaya\HitungBiayaHarianAction + layar
+      sendiri. Tiap biaya punya nominal, periode, rentang berlaku, dan cabang
+      (kosong = semua cabang).
+      PEMBAGINYA angka bulat (30 / 7 / 365), bukan jumlah hari sebenarnya di bulan
+      berjalan. Pemilik yang menghitung 1.500.000 : 30 = 50.000 di kertasnya harus
+      mendapat angka yang SAMA dari aplikasi; yang menjawab Rp 48.387 di Januari
+      dan Rp 53.571 di Februari untuk sewa yang tidak berubah akan dianggap salah
+      hitung. Harganya diakui: 12 x 30 = 360, jadi jumlah setahun meleset ~1,4%.
+      "Hentikan" DIPISAH dari "Hapus": menghapus membuat hitungan bulan LALU ikut
+      berubah seolah sewanya tidak pernah ada.
+      BELUM TERSAMBUNG ke margin di layar Produk — angkanya sudah ada dan sudah
+      benar, tapi kolom "Modal & margin" masih margin KOTOR. Penyambungannya ikut
+      butir "Target laba/margin + harga jual rekomendasi" di bawah, karena di situ
+      keputusan pembagian beban per porsi harus diambil (dibagi rata per transaksi?
+      per omzet?) dan itu keputusan pemilik.
       Tabel baru. Tiap biaya punya nominal, periode (harian/mingguan/bulanan), dan
       tanggal mulai — bukan sekadar catatan pengeluaran sekali jalan.
       KENAPA TERPISAH dari kas keluar yang sudah ada: yang ini BUKAN transaksi, ini

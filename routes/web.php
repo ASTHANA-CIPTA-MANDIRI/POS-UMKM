@@ -12,6 +12,7 @@ use App\Livewire\Pages\Kasir\Beranda\Beranda as BerandaKasir;
 use App\Livewire\Pages\Kasir\Transaksi\Transaksi as TransaksiKasir;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
+use App\Livewire\Pages\Owner\Biaya\Biaya as BiayaOwner;
 use App\Livewire\Pages\Owner\Dasbor\Dasbor as DasborOwner;
 use App\Livewire\Pages\Owner\Karyawan\Karyawan as KaryawanOwner;
 use App\Livewire\Pages\Owner\Kasbon\Kasbon as KasbonOwner;
@@ -201,6 +202,15 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
              * peran apa".
              */
             Route::get('/karyawan', KaryawanOwner::class)->name('karyawan');
+
+            /*
+             * Biaya operasional: beban warung yang berulang.
+             *
+             * Di grup back office, bukan kasir, dan alasannya bukan sekadar kerapian: angka
+             * di layar ini yang menentukan apakah warung untung. Kasir yang bisa mengubahnya
+             * bisa membuat warung terlihat untung pada hari mana pun.
+             */
+            Route::get('/biaya', BiayaOwner::class)->name('biaya');
 
             Route::get('/laporan', LaporanOwner::class)->name('laporan');
         });
