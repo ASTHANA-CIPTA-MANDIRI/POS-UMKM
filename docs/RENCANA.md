@@ -103,7 +103,31 @@ tidak sesuai** — sekarang masih perkiraan.
       beredar di WhatsApp berbentuk .xlsx, jadi sebagian orang akan tersandung di
       langkah pertama. Kalau nanti dikerjakan, yang ditambah HANYA satu pembaca:
       seluruh pipa periksa-pratinjau-simpan sudah tidak bergantung bentuk berkas.
-- [ ] Karyawan | | owner | 5j
+- [x] Karyawan | 2026-08-09 | owner | 5j
+      BERBEDA dari layar lain: `User` sengaja TIDAK memakai BelongsToTenant (global
+      scope akan ikut membatasi kueri auth guard), jadi TIDAK ADA jaring pengaman —
+      satu kueri yang lupa `where('tenant_id')` menyentuh karyawan warung lain.
+      Seluruh akses karena itu lewat kueriDasar()/karyawanMilikSaya().
+      Gerbang: super_admin tidak bisa dibuat dari sini; pemilik tidak bisa
+      menonaktifkan/menurunkan/menghapus dirinya sendiri; pemilik aktif TERAKHIR
+      tidak bisa dihapus; karyawan bersesi kas TERBUKA tidak bisa dihapus maupun
+      dinonaktifkan (sesinya tidak akan bisa ditutup siapa pun, jadi uang laci hari
+      itu tidak pernah dicocokkan).
+      DUA TEMUAN UJI MUTASI. (1) Aturan Closure TIDAK dijalankan Laravel untuk nilai
+      kosong, jadi gerbang "kasir wajib punya cabang" diam justru saat kolomnya
+      kosong — diganti Rule::requiredIf yang implisit. (2) Gerbang "owner terakhir"
+      tidak pernah teruji karena tertutup gerbang "tidak bisa hapus diri sendiri";
+      menelusurinya memunculkan keadaan yang belum dipikirkan — manajer outlet juga
+      boleh membuka layar ini, jadi DIA yang bisa menghapus pemilik atau mengangkat
+      diri jadi pemilik. Ditutup dengan aturan "hanya pemilik yang boleh memberikan
+      peran pemilik".
+- [ ] Karyawan: tinjau ulang hak manajer outlet di seluruh back office | | owner | 2j
+      Grup rute back office memberi manager_outlet dan regional_manager akses yang
+      SAMA dengan pemilik ke hampir semua layar — termasuk Karyawan, Kasbon, dan
+      Impor produk (yang bisa mengubah harga seluruh katalog sekali tekan). Dua
+      celah paling tajam sudah ditutup di layar Karyawan, tapi itu tambalan per
+      layar. Yang belum ada: keputusan pemilik tentang sampai mana manajer boleh
+      pergi, lalu satu gerbang yang menegakkannya di satu tempat.
 - [ ] Outlet & perangkat | | owner | 5j
 - [ ] Bill terbuka (layar owner) | | owner | 4j
 - [ ] Tutup kasir (layar owner) | | owner | 4j

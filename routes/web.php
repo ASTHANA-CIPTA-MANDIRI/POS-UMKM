@@ -13,6 +13,7 @@ use App\Livewire\Pages\Kasir\Transaksi\Transaksi as TransaksiKasir;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
 use App\Livewire\Pages\Owner\Dasbor\Dasbor as DasborOwner;
+use App\Livewire\Pages\Owner\Karyawan\Karyawan as KaryawanOwner;
 use App\Livewire\Pages\Owner\Kasbon\Kasbon as KasbonOwner;
 use App\Livewire\Pages\Owner\Langganan\Langganan;
 use App\Livewire\Pages\Owner\Laporan\Laporan as LaporanOwner;
@@ -189,6 +190,17 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
              * masuk laci — dan sesudah itu tidak ada lagi yang menagih.
              */
             Route::get('/kasbon', KasbonOwner::class)->name('kasbon');
+
+            /*
+             * Karyawan: layar yang menentukan SIAPA yang bisa masuk dan sampai mana.
+             *
+             * Gerbang perannya sama dengan layar lain di grup ini, tapi taruhannya berbeda:
+             * di sini seseorang bisa memberi orang lain akses. Peran yang boleh diberikan
+             * dibatasi di komponennya (super_admin tidak pernah ada di daftar), karena
+             * middleware cuma menjawab "boleh membuka layar ini" — bukan "boleh memberi
+             * peran apa".
+             */
+            Route::get('/karyawan', KaryawanOwner::class)->name('karyawan');
 
             Route::get('/laporan', LaporanOwner::class)->name('laporan');
         });

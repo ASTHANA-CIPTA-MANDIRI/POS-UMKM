@@ -15,6 +15,7 @@ use App\Enums\Satuan;
 use App\Enums\StockMovementType;
 use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
+use App\Livewire\Pages\Owner\Karyawan\Karyawan as KaryawanOwner;
 use App\Livewire\Pages\Owner\Kasbon\Kasbon as KasbonOwner;
 use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian;
@@ -677,6 +678,35 @@ class PratinjauTest extends TestCase
                 ),
             );
         }
+
+        /*
+         * Layar Karyawan, dua keadaan.
+         *
+         * Satu karyawan sengaja dinonaktifkan supaya lencana abu-abu "Nonaktif" ikut
+         * terpotret di samping "Aktif", DAN supaya kartu ringkasan "yang bisa masuk sekarang"
+         * muncul — kartu itu hanya dirender kalau jumlah aktif berbeda dari jumlah total,
+         * jadi tanpa pembengkokan ini ia tidak akan pernah terukur sama sekali.
+         */
+        User::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->where('role', 'kasir')
+            ->orderBy('name')
+            ->first()
+            ?->forceFill(['is_active' => false])->save();
+
+        $halamanKaryawan = $this->ambil('owner.karyawan', $owner);
+
+        file_put_contents("{$tujuan}/owner-karyawan.html", $halamanKaryawan);
+
+        // Panel formulirnya dipotret dalam keadaan peran KASIR, karena bentuk itulah yang
+        // paling banyak medannya: username, PIN, dan cabang yang wajib.
+        file_put_contents(
+            "{$tujuan}/owner-karyawan-form.html",
+            $this->suntik(
+                $halamanKaryawan,
+                Livewire::actingAs($owner)->test(KaryawanOwner::class)->call('tambah')->html(),
+            ),
+        );
 
         $admin = User::withoutGlobalScopes()->where('role', 'super_admin')->firstOrFail();
         file_put_contents(

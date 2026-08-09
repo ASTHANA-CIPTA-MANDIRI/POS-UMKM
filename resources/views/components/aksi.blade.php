@@ -37,10 +37,22 @@
     };
 @endphp
 
+{{--
+    Keadaan MATI harus terlihat mati.
+
+    Ditambahkan sesudah tombol "Nonaktifkan" pada baris akun sendiri terbukti terender sama
+    persis dengan tombol yang hidup: atributnya benar (hanya baris itu yang `disabled`), tapi
+    matanya tidak bisa membedakan. Tombol yang tampak bisa ditekan lalu diam saat ditekan
+    terbaca sebagai aplikasi yang rusak, bukan sebagai aturan.
+
+    `disabled:hover:*` ikut dikembalikan ke keadaan diam: tanpa itu, latar hover tetap muncul
+    saat kursor lewat, dan justru itu yang paling meyakinkan orang bahwa tombolnya hidup.
+--}}
 <button
     {{ $attributes->merge([
         'type' => 'button',
-        'class' => "grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg border transition-colors {$gaya}",
+        'class' => "grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg border transition-colors {$gaya}"
+            .' disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-inherit',
     ]) }}
     aria-label="{{ $label }}"
     title="{{ $label }}"
