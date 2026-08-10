@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Enums\BusinessType;
+use App\Enums\Satuan;
 use App\Enums\UserRole;
 use App\Livewire\Pages\Owner\Produk\Produk;
+use App\Models\Bahan\RawMaterial;
+use App\Models\Bahan\RecipeItem;
 use App\Models\Produk\Product;
 use App\Models\Tenant\Tenant;
 use App\Models\Tenant\User;
@@ -13,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\MembuatDataUji;
 use Tests\TestCase;
 
@@ -779,5 +783,132 @@ class OwnerProdukTest extends TestCase
 
         $this->assertFalse((bool) $produk->fresh()->is_active);
         $this->assertSame(1, Product::withoutGlobalScopes()->count());
+    }
+
+    /* ── Formulir terisi saat mengubah ───────────────────────────────────── */
+
+    #[Test]
+    public function formulir_ubah_benar_benar_mencetak_nilainya_ke_html(): void
+    {
+        /*
+         * KELAS CACAT YANG TIDAK BISA DITANGKAP assertSet(), dan itu sebabnya uji ini ada.
+         *
+         * Livewire TIDAK mencetak nilai awal untuk kolom ber-wire:model. Propertinya benar di
+         * server — assertSet() hijau — tapi HTML-nya keluar tanpa `value`, jadi pemilik
+         * melihat kotak KOSONG saat membuka "Ubah produk". Menyimpannya lalu ditolak "nama
+         * wajib", atau lebih buruk: ia mengetik ulang dan salah eja.
+         *
+         * Uji lain di kelas ini menyetel properti LANGSUNG, jadi tidak satu pun melewati
+         * rendering. Ketahuan dari melihat potret pratinjau, bukan dari angka.
+         *
+         * Yang diperiksa HTML-nya, bukan propertinya.
+         */
+        $produk = $this->konteks()->forTenant($this->tenant->getKey(), fn () => Product::create([
+            'nama_produk' => 'Kerupuk Udang Spesial',
+            'harga_default' => 3000,
+            'satuan' => Satuan::Pcs,
+        ]));
+
+        Livewire::actingAs($this->owner)->test(Produk::class)
+            ->call('ubah', $produk->getKey())
+            ->assertSeeHtml('value="Kerupuk Udang Spesial"');
+    }
+
+    /* ── Saran harga jual ────────────────────────────────────────────────── */
+
+    #[Test]
+    public function saran_harga_muncul_di_formulir_dan_bisa_dipakai_satu_ketukan(): void
+    {
+        /*
+         * SARAN, bukan penetapan. Yang diuji di sini dua-duanya: bahwa sarannya MUNCUL (kalau
+         * tidak, seluruh rantai HPP → target margin → harga tidak pernah sampai ke mata
+         * siapa pun), dan bahwa memakainya butuh ketukan — tidak pernah otomatis.
+         */
+        $layar = Livewire::actingAs($this->owner)->test(Produk::class)
+            ->call('tambah')
+            ->set('nama', 'Kopi Sachet')
+            ->set('hargaBeli', 10000.0);
+
+        // Modal 10.000, target bawaan 30% → 14.285,71 → dibulatkan ke atas ke 14.500.
+        $layar->assertSee('14.500');
+
+        $layar->call('pakaiSaranHarga')->assertSet('harga', 14500.0);
+    }
+
+    #[Test]
+    public function saran_harga_menu_berresep_diambil_dari_bahannya(): void
+    {
+        /*
+         * DITAMBAHKAN SESUDAH UJI MUTASI: melumpuhkan cabang resep tidak membuat satu pun uji
+         * merah, jadi jalur yang justru dipakai SELURUH menu warteg tidak dijaga apa pun.
+         *
+         * Menu masakan tidak pernah punya "harga beli" — tidak ada yang membeli satu porsi
+         * lele goreng. Kalau sarannya hanya membaca kotak harga beli, seluruh menu warteg
+         * tidak akan pernah mendapat saran harga, dan fiturnya cuma berguna untuk kelontong.
+         */
+        // Konteks tenant dipasang seperti uji lain di kelas ini: setUp() tidak memasangnya,
+        // dan tanpa itu tenant_id kosong lalu ditolak kunci NOT NULL.
+        $menu = $this->konteks()->forTenant($this->tenant->getKey(), function () {
+            $menu = Product::create([
+                'nama_produk' => 'Lele Goreng',
+                'harga_default' => 15000,
+                'satuan' => Satuan::Porsi,
+                'lacak_stok' => false,
+            ]);
+
+            $lele = RawMaterial::create([
+                'nama' => 'Lele Segar',
+                'satuan' => Satuan::Kg,
+                'harga_beli_terakhir' => 32000,
+            ]);
+
+            RecipeItem::create([
+                'product_id' => $menu->getKey(),
+                'raw_material_id' => $lele->getKey(),
+                'jumlah_terpakai' => 0.25,
+            ]);
+
+            return $menu;
+        });
+
+        // Modal 0,25 x 32.000 = 8.000; target bawaan 30% → 11.428,57 → dibulatkan ke 11.500.
+        Livewire::actingAs($this->owner)->test(Produk::class)
+            ->call('ubah', $menu->getKey())
+            ->assertSee('11.500')
+            ->call('pakaiSaranHarga')
+            ->assertSet('harga', 11500.0);
+    }
+
+    #[Test]
+    public function saran_harga_tidak_muncul_selama_modalnya_belum_diketahui(): void
+    {
+        // Saran yang dibangun dari modal yang tidak diketahui adalah tebakan berpakaian
+        // angka — dan pemilik akan memakainya karena bentuknya meyakinkan.
+        Livewire::actingAs($this->owner)->test(Produk::class)
+            ->call('tambah')
+            ->assertViewHas('saranHarga', null);
+    }
+
+    #[Test]
+    public function harga_bertitik_ribuan_dari_muatan_livewire_ditolak(): void
+    {
+        /*
+         * UJI YANG SENGAJA DITANDAI BELUM SELESAI, bukan dihapus.
+         *
+         * Niatnya sah dan cacatnya nyata: `is_numeric('58.000')` bernilai true, jadi harga
+         * Rp 58.000 bisa tersimpan Rp 58. Yang membuatnya belum bisa dijaga di sini:
+         * `$harga` bertipe `?float`, dan Livewire mengubah nilai masuk ke tipe itu SEBELUM
+         * satu pun aturan validasi berjalan — validator tidak pernah melihat "58.000".
+         * Aturan App\Support\Uang sempat dipasang lalu dibuang lagi karena tidak bisa
+         * menyala; penjaga yang tidak menyala terbaca sebagai perlindungan yang tidak ada.
+         *
+         * Perbaikannya mengubah kedua properti jadi `string`, dan itu menyentuh harga SETIAP
+         * produk — dikerjakan sendiri, tercatat di docs/RENCANA.md. Uji ini dibiarkan di
+         * sini supaya niatnya tidak hilang bersama komit ini.
+         */
+        $this->markTestIncomplete(
+            'Butuh $harga/$hargaBeli diubah jadi properti string dulu — lihat catatan di '
+            .'Produk.php dan butir "Harga produk: bentuk uangnya belum dijaga" di RENCANA.'
+        );
     }
 }

@@ -460,6 +460,30 @@ class PratinjauTest extends TestCase
             'harga_default' => round((float) $produkRugi->harga_beli * 0.85),
         ])->save();
 
+        /*
+         * Panel produk dengan SARAN HARGA terisi.
+         *
+         * Sarannya cuma muncul kalau modalnya diketahui, jadi yang dibuka produk yang punya
+         * harga beli — panel kosong tidak membuktikan blok sarannya terender sama sekali.
+         */
+        $produkBermodal = Product::withoutGlobalScopes()
+            ->where('tenant_id', $owner->tenant_id)
+            ->whereNotNull('harga_beli')
+            ->orderBy('nama_produk')
+            ->first();
+
+        if ($produkBermodal !== null) {
+            file_put_contents(
+                "{$tujuan}/owner-produk-saran.html",
+                $this->suntik(
+                    $this->ambil('owner.produk', $owner),
+                    Livewire::actingAs($owner)->test(Produk::class)
+                        ->call('ubah', $produkBermodal->getKey())
+                        ->html(),
+                ),
+            );
+        }
+
         file_put_contents(
             "{$tujuan}/owner-produk.html",
             $this->ambil('owner.produk', $owner),

@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages\Owner\Produk;
 
 use App\Actions\Produk\HitungHppAction;
+use App\Actions\Produk\SaranHargaAction;
 use App\Actions\Stok\SiapkanBarisStokAction;
 use App\Enums\Satuan;
 use App\Livewire\Concerns\MengirimToast;
@@ -11,6 +12,7 @@ use App\Models\Produk\Category;
 use App\Models\Produk\Product;
 use App\Models\Stok\Stock;
 use App\Models\Tenant\Outlet;
+use App\Support\Uang;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -77,6 +79,28 @@ class Produk extends Component
     public ?float $harga = null;
 
     public ?float $hargaBeli = null;
+
+    /*
+     * CATATAN TENTANG BENTUK UANG DI LAYAR INI, supaya tidak ada yang mengira ia sudah
+     * dijaga seperti layar Kasbon, Biaya, dan nota belanja.
+     *
+     * `$harga` dan `$hargaBeli` bertipe `?float`. Livewire MENGUBAH nilai masuk ke tipe itu
+     * sebelum satu pun aturan validasi berjalan, jadi muatan yang membawa "58.000" sudah
+     * menjadi 58.0 saat validator melihatnya — dan aturan App\Support\Uang yang dipasang di
+     * sini TIDAK AKAN PERNAH menyala. Sempat dipasang, lalu dibuang lagi: penjaga yang tidak
+     * bisa menyala lebih buruk daripada tidak ada penjaga, karena ia terbaca sebagai
+     * perlindungan.
+     *
+     * Yang benar-benar menahan sekarang: kotak Alpine di Blade membuang seluruh non-digit
+     * sebelum mengirim, jadi jalur lewat layar aman. Yang TIDAK tertutup adalah muatan
+     * Livewire yang dikirim tanpa melewati layar — dan yang bisa melakukannya hanya pemilik
+     * atau manajer, di katalognya sendiri, dengan hasil yang langsung terlihat salah di
+     * daftar. Risikonya kecil, tapi ia ADA.
+     *
+     * Perbaikan yang benar: ubah kedua properti jadi `string` seperti layar uang lain, lalu
+     * baca lewat App\Support\Uang. Itu menyentuh harga SETIAP produk, jadi dikerjakan
+     * sendiri — tercatat di docs/RENCANA.md.
+     */
 
     public string $satuan = 'pcs';
 
@@ -717,6 +741,53 @@ class Produk extends Component
             ->all();
     }
 
+    /**
+     * Modal produk yang sedang dibuka di panel, lalu saran harganya.
+     *
+     * Modalnya diambil dari RESEP kalau produknya berresep, dan dari kotak "harga beli" yang
+     * sedang diketik kalau bukan. Dua sumber, karena menu masakan memang tidak pernah punya
+     * harga beli — dan saran harga yang diam untuk seluruh menu warteg tidak berguna bagi
+     * warteg.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function saranHargaSekarang(): ?array
+    {
+        $hpp = null;
+
+        if ($this->produkId !== null) {
+            $produk = Product::with('recipeItems.rawMaterial')->find($this->produkId);
+
+            if ($produk?->usesRecipe()) {
+                $hpp = app(HitungHppAction::class)->untuk($produk)['hpp'];
+            }
+        }
+
+        $hpp ??= $this->hargaBeli !== null && $this->hargaBeli > 0 ? (float) $this->hargaBeli : null;
+
+        if ($hpp === null) {
+            return null;
+        }
+
+        $target = (float) auth()->user()->tenant->target_margin;
+
+        return app(SaranHargaAction::class)->untuk($hpp, $target) + ['hpp' => $hpp, 'target' => $target];
+    }
+
+    /** Memakai saran harga — SATU ketukan, dan tetap keputusan pemilik. */
+    public function pakaiSaranHarga(): void
+    {
+        $saran = $this->saranHargaSekarang();
+
+        if ($saran === null || $saran['hargaBulat'] === null) {
+            return;
+        }
+
+        // Yang dipakai harga BULAT, bukan hasil bagi mentahnya: Rp 14.285,71 bukan angka yang
+        // ditulis siapa pun di daftar harga, dan menyimpannya membuat kembalian kasir aneh.
+        $this->harga = $saran['hargaBulat'];
+    }
+
     public function render()
     {
         $outletId = $this->outletStokTerpakai();
@@ -751,6 +822,15 @@ class Produk extends Component
             // Pemilih outlet: hanya berarti untuk peran yang tidak terkunci ke satu outlet.
             'outletTersedia' => auth()->user()->scopedOutletId() === null ? $this->outletTersedia() : [],
             'outletDipakai' => $outletId,
+            /*
+             * Saran harga untuk produk yang SEDANG dibuka di panel saja.
+             *
+             * Bukan untuk tiap baris daftar: saran harga di daftar adalah 300 angka yang
+             * tidak diminta siapa pun, dan yang berguna justru saat orang sedang memutuskan
+             * harga — yaitu di dalam formulirnya.
+             */
+            'saranHarga' => $this->panel ? $this->saranHargaSekarang() : null,
+            'targetMargin' => (float) auth()->user()->tenant->target_margin,
         ]);
     }
 }

@@ -23,6 +23,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * Entitas paling atas — 1 akun merchant yang bisa punya banyak outlet.
  * Tidak memakai trait BelongsToTenant karena tabel ini adalah tenant itu sendiri.
  */
+/*
+ * `target_margin` SENGAJA tidak fillable.
+ *
+ * Ia hanya boleh berubah lewat layar Biaya operasional, yang memvalidasi rentangnya. Kalau
+ * ia ikut mass-assignment, satu muatan yang membawa `target_margin` di layar mana pun bisa
+ * menggesernya — dan yang bergeser adalah angka yang menyusun saran harga seluruh katalog.
+ */
 #[Fillable(['business_name', 'business_type', 'owner_name', 'owner_phone', 'status', 'trial_ends_at'])]
 class Tenant extends Model
 {
@@ -38,6 +45,7 @@ class Tenant extends Model
         return [
             'business_type' => BusinessType::class,
             'status' => TenantStatus::class,
+            'target_margin' => 'decimal:2',
             'trial_ends_at' => 'datetime',
         ];
     }

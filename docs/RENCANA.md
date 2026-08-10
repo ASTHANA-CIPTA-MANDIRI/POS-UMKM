@@ -301,7 +301,44 @@ Resep sudah bisa dihitung (`recipe_items.jumlah_terpakai` x
       Dipakai butir 3 dan 6, dan tanpa ini keduanya cuma menutup harga beli —
       pemilik merasa untung Rp 4.000 per porsi padahal listrik dan sewanya belum
       dihitung sama sekali.
-- [ ] Target laba/margin + harga jual rekomendasi | | owner | 4j
+- [x] Target laba/margin + harga jual rekomendasi | 2026-08-09 | owner | 4j
+      Kolom `tenants.target_margin` (bawaan 30%, disetel di layar Biaya operasional)
+      + App\Actions\Produk\SaranHargaAction + blok saran di formulir Produk.
+      RUMUSNYA HPP / (1 - margin), BUKAN HPP x (1 + margin). Yang kedua menghasilkan
+      MARKUP: modal 10.000 dengan "30%" jadi 13.000 dan marginnya cuma 23% —
+      pemilik yang menargetkan 30% mendapat 23% tanpa pernah tahu.
+      Dibulatkan KE ATAS ke pecahan yang benar-benar ditulis orang (100 / 500 /
+      1.000 menurut besarnya); ke bawah memakan margin pada SETIAP barang sekaligus.
+      Yang ditampilkan margin NYATA sesudah pembulatan, bukan targetnya.
+      SARAN, tidak pernah menimpa: harga tetap keputusan pemilik yang tahu harga
+      warung sebelah, dan memakainya butuh satu ketukan.
+      SISANYA: margin BERSIH (sesudah biaya operasional) belum ada — lihat butir di
+      bawah, keputusannya belum diambil pemilik.
+- [ ] Margin bersih: bagi beban operasional ke tiap barang | | owner | 3j
+      KEPUTUSAN PEMILIK YANG BELUM DIAMBIL, dan itu satu-satunya yang menahan.
+      Beban per hari sudah ada angkanya (layar Biaya operasional). Yang belum
+      diputuskan: beban itu dibagi ke tiap porsi BAGAIMANA — rata per transaksi,
+      proporsional terhadap omzet, atau proporsional terhadap HPP? Pembagi yang
+      salah membuat menu murah terlihat rugi dan menu mahal terlihat terlalu untung,
+      lalu pemilik menaikkan harga barang yang sebenarnya sudah sehat.
+      Rekomendasi: proporsional terhadap OMZET, karena bisa dijelaskan satu kalimat
+      ("dari tiap Rp 1.000 yang masuk, Rp 240 habis untuk sewa dan listrik") dan
+      tidak menghukum barang murah. Butuh riwayat penjualan; warung baru belum punya,
+      jadi harus ada keadaan "belum bisa dihitung" yang jujur.
+- [ ] Harga produk: bentuk uangnya belum dijaga seperti layar lain | | owner | 2j
+      DITEMUKAN 2026-08-09 saat memasang saran harga. `$harga` dan `$hargaBeli` di
+      layar Produk bertipe `?float`, dan Livewire mengubah nilai masuk ke tipe itu
+      SEBELUM satu pun aturan validasi berjalan — jadi muatan yang membawa "58.000"
+      sudah menjadi 58.0 saat validator melihatnya, dan aturan App\Support\Uang
+      TIDAK BISA menyala. Sempat dipasang lalu dibuang lagi: penjaga yang tidak bisa
+      menyala terbaca sebagai perlindungan yang tidak ada.
+      Yang menahan sekarang: kotak Alpine membuang seluruh non-digit sebelum
+      mengirim, jadi jalur lewat layar aman. Yang TIDAK tertutup: muatan Livewire
+      yang dikirim tanpa melewati layar — pelakunya hanya pemilik/manajer di
+      katalognya sendiri, hasilnya langsung terlihat salah di daftar. Risiko kecil,
+      tapi ADA. Perbaikannya: ubah kedua properti jadi `string` seperti layar Kasbon
+      dan Biaya. Menyentuh harga SETIAP produk, jadi dikerjakan sendiri. Ujinya
+      sudah ada dan ditandai markTestIncomplete di OwnerProdukTest.
       Butir 6 dan 3 digabung karena yang satu adalah masukan bagi yang lain.
       Pemilik menyetel target margin (mis. 30%), aplikasinya menghitung
       harga jual = HPP / (1 - margin) lalu MEMBULATKAN ke rupiah yang wajar

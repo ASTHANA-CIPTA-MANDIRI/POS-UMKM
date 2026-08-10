@@ -572,7 +572,16 @@
                                 {{-- Fokus awal jatuh ke kolom barcode kalau usahanya memakai barcode
                                      dan produknya baru: di kelontong, memindai barang adalah langkah
                                      pertama. Di luar itu, nama tetap yang pertama. --}}
-                                <input id="nama" type="text" wire:model="nama"
+                                {{-- value= DITULIS SENDIRI. Livewire TIDAK mencetak nilai awal
+                                     untuk kolom ber-wire:model, jadi tanpa ini "Ubah produk"
+                                     terbuka dengan nama KOSONG walau barangnya jelas punya
+                                     nama — lalu menyimpannya ditolak "nama wajib", atau lebih
+                                     buruk: pemilik mengetik ulang dan salah eja.
+
+                                     Tidak tertangkap uji Livewire mana pun, karena uji
+                                     menyetel properti LANGSUNG dan tidak pernah melewati
+                                     rendering. Ketahuan dari melihat potretnya. --}}
+                                <input id="nama" type="text" wire:model="nama" value="{{ $nama }}"
                                        @if (! ($this->pakaiBarcode() && ! $produkId)) autofocus @endif
                                        class="mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink focus:border-terracotta focus:outline-none">
                                 @error('nama')
@@ -604,6 +613,47 @@
                                     @error('harga')
                                         <p class="mt-1.5 text-[0.8125rem] text-merah-deep">{{ $message }}</p>
                                     @enderror
+
+                                    {{--
+                                        SARAN, bukan penetapan — dan bentuknya harus mengatakan itu.
+
+                                        Harga adalah keputusan pemilik yang tahu harga warung
+                                        sebelah. Aplikasi yang MENIMPA harga dengan hasil
+                                        hitungannya akan salah pada barang yang paling menentukan,
+                                        dan sesudah itu pemilik berhenti memercayai seluruh
+                                        layarnya. Jadi: satu tombol untuk memakainya, tidak
+                                        pernah otomatis.
+
+                                        Margin yang ditulis adalah margin NYATA sesudah
+                                        pembulatan, bukan targetnya — pemilik yang menghitung
+                                        sendiri akan menemukan selisihnya kalau kita membulatkan
+                                        angkanya di layar.
+                                    --}}
+                                    @if ($saranHarga !== null && $saranHarga['hargaBulat'] !== null)
+                                        <div class="mt-2 rounded-xl border border-line bg-cream/60 px-3 py-2.5">
+                                            <p class="text-[0.8125rem] text-umber">
+                                                Saran:
+                                                <span class="tabular font-bold text-ink">Rp {{ number_format($saranHarga['hargaBulat'], 0, ',', '.') }}</span>
+                                                <span class="text-umber-soft">
+                                                    — modal Rp {{ number_format($saranHarga['hpp'], 0, ',', '.') }},
+                                                    margin {{ number_format($saranHarga['marginNyata'], 1, ',', '.') }}%
+                                                </span>
+                                            </p>
+                                            <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                <button type="button" wire:click="pakaiSaranHarga"
+                                                        class="cursor-pointer text-[0.8125rem] font-semibold text-terracotta-deep underline decoration-terracotta/40 underline-offset-2">
+                                                    Pakai harga ini
+                                                </button>
+                                                {{-- Targetnya disebut BERIKUT tempat mengubahnya:
+                                                     angka yang muncul tanpa asal-usul akan
+                                                     dianggap tebakan aplikasi. --}}
+                                                <a href="{{ route('owner.biaya') }}" wire:navigate
+                                                   class="text-[0.75rem] text-umber-soft underline decoration-line underline-offset-2">
+                                                    dari target margin {{ number_format($saranHarga['target'], 0, ',', '.') }}% — ubah
+                                                </a>
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
 
                                 <div>
@@ -617,7 +667,15 @@
                                                    const digit = String($event.target.value).replace(/\D/g, '');
                                                    nilai = digit === '' ? null : Number(digit);
                                                    $event.target.value = nilai === null ? '' : new Intl.NumberFormat('id-ID').format(nilai);
-                                                   $wire.set('hargaBeli', nilai, false);
+                                                   $wire.set('hargaBeli', nilai, false);"
+                                               {{-- @change (saat kotaknya ditinggalkan), BUKAN
+                                                    setiap ketukan: sarannya butuh nilai di
+                                                    server, tapi menyinkronkan tiap huruf berarti
+                                                    satu perjalanan ke server per angka yang
+                                                    diketik. Satu kali saat pindah kolom sudah
+                                                    cukup, dan di situlah orang berhenti mengetik
+                                                    lalu melihat ke bawah. --}}
+                                               @change="$wire.set('hargaBeli', nilai)"
                                                "
                                                class="tabular h-12 w-full rounded-xl border border-line bg-white pr-4 pl-12 text-right text-[1rem] font-bold text-ink focus:border-terracotta focus:outline-none">
                                     </div>
@@ -761,7 +819,7 @@
                                         <label for="isi-per-satuan" class="block text-[0.8125rem] font-semibold text-ink">
                                             Isinya berapa
                                         </label>
-                                        <input id="isi-per-satuan" type="text" inputmode="decimal" wire:model="isiPerSatuan"
+                                        <input id="isi-per-satuan" type="text" inputmode="decimal" wire:model="isiPerSatuan" value="{{ $isiPerSatuan }}"
                                                placeholder="mis. 12"
                                                class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
                                         @error('isiPerSatuan')
@@ -799,7 +857,7 @@
                                         <label for="stok-minimum" class="block text-[0.8125rem] font-semibold text-ink">
                                             Ambang minimum
                                         </label>
-                                        <input id="stok-minimum" type="text" inputmode="decimal" wire:model="stokMinimum"
+                                        <input id="stok-minimum" type="text" inputmode="decimal" wire:model="stokMinimum" value="{{ $stokMinimum }}"
                                                placeholder="0"
                                                class="tabular mt-1.5 h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.9375rem] text-ink placeholder:text-umber-soft/70 focus:border-terracotta focus:outline-none">
                                         <p class="mt-1 text-[0.75rem] text-umber-soft">

@@ -373,6 +373,49 @@ class OwnerBiayaTest extends TestCase
         $this->assertSame(0, CashMovement::count());
     }
 
+    /* ── Target margin ───────────────────────────────────────────────────── */
+
+    #[Test]
+    public function target_margin_tersimpan_dan_terbaca_lagi_saat_layar_dibuka(): void
+    {
+        $this->layar()
+            ->set('targetMargin', '35')
+            ->call('simpanTargetMargin')
+            ->assertHasNoErrors();
+
+        $this->assertSame(35.0, (float) $this->tenant->fresh()->target_margin);
+        $this->layar()->assertSet('targetMargin', '35');
+    }
+
+    #[Test]
+    public function target_margin_seratus_persen_ditolak(): void
+    {
+        /*
+         * Pada 100% pembagi rumus saran harga menjadi NOL, dan di atasnya hasilnya negatif —
+         * aplikasi akan menyarankan harga minus tanpa satu pun galat, dan angka itu terlihat
+         * seperti hitungan yang sah. Batasnya 95%.
+         */
+        $this->layar()
+            ->set('targetMargin', '100')
+            ->call('simpanTargetMargin')
+            ->assertHasErrors('targetMargin');
+
+        $this->assertSame(30.0, (float) $this->tenant->fresh()->target_margin);
+    }
+
+    #[Test]
+    public function target_margin_tidak_bisa_digeser_lewat_mass_assignment(): void
+    {
+        /*
+         * Kolomnya sengaja TIDAK fillable. Kalau ia ikut mass-assignment, satu muatan yang
+         * membawa `target_margin` di layar mana pun bisa menggesernya — dan yang bergeser
+         * adalah angka yang menyusun saran harga SELURUH katalog.
+         */
+        $this->tenant->update(['target_margin' => 90]);
+
+        $this->assertSame(30.0, (float) $this->tenant->fresh()->target_margin);
+    }
+
     /* ── Tenant & peran ──────────────────────────────────────────────────── */
 
     #[Test]
