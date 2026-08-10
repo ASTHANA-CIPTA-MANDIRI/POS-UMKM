@@ -224,7 +224,15 @@ tidak sesuai** — sekarang masih perkiraan.
       sidebar memakan ~108px sebelum menu pertama (pt-[3.125rem] + mt-[3.625rem]);
       merapatkannya adalah yang benar-benar membuat menunya muat, dan itu menyentuh
       bahasa visual seluruh aplikasi — jadi keputusan pemilik, bukan tempelan.
-- [ ] Pemeriksa tumpangTindih tidak mengerti penumpukan lapisan | | owner | 1j
+- [ ] Pemeriksa tumpangTindih: dua titik buta yang sudah terukur | | owner | 2j
+      (1) Tidak mengerti penumpukan lapisan: panel `fixed` yang menutupi sidebar
+      dilaporkan bertumpuk dengan teks di bawahnya. Terjadi di panel Produk
+      (768 & 1280) — diperiksa satu per satu, seluruh pasangannya sidebar vs isi
+      panel.
+      (2) Tidak mengerti elemen inline yang MEMBUNGKUS: getBoundingClientRect()
+      mengembalikan kotak gabungan kedua barisnya, yang lalu tampak bertumpuk
+      dengan tetangganya. Terjadi di halaman Istilah (390px, tiga laporan palsu).
+      Perbaikannya getClientRects() per baris, bukan kotak gabungan.
       `tests/browser/periksa-rapi.js` menyaring lewat konteks berposisi, dan itu
       sudah menyelamatkannya dari menuduh dialog. Tapi pasangan di DALAM satu
       konteks yang saling menimpa secara sah — kartu sticky di atas daftar yang
@@ -232,6 +240,60 @@ tidak sesuai** — sekarang masih perkiraan.
       dilaporkan hanya kalau ada yang benar-benar TERTUTUP.
 - [ ] Audit kerapian seluruh layar (7 angka nol di 390/768/1280) | | owner | 4j
 - [ ] Infra rilis: domain, HTTPS, queue worker, cron, cadangan basis data | | infra | 6j
+
+## Mudah dipahami orang awam & orang tua
+
+Diminta pemilik 2026-08-10, dengan keluhan yang konkret: target untung disetel di
+layar Biaya operasional padahal yang terpengaruh layar Produk — "pindah fitur ke
+fitur akan susah". Dan minta input manual diperkecil.
+
+- [x] Setelan bisa diubah di TEMPAT ia dipakai + halaman Pengaturan | 2026-08-10 | owner | 4j
+      Dua jalan ke satu angka, dan keduanya perlu. (1) Target untung bisa diubah
+      langsung dari formulir Produk, tepat di sebelah saran harga yang
+      dihasilkannya — ini jalan sehari-hari, dan ia menghapus perpindahan layar
+      sama sekali. (2) Halaman Pengaturan memuat semuanya, supaya pertanyaan "di
+      mana saya mengubah ini?" punya satu jawaban yang bisa diingat.
+      Kartu target margin DIBUANG dari layar Biaya operasional — tempatnya memang
+      salah sejak awal.
+      Halaman Pengaturan MENUNJUK ke angka perencanaan lain, bukan menyalinnya:
+      dua tempat mengubah hal yang sama justru menambah kebingungan.
+      Tiap setelan ditemani CONTOH HIDUP berangka rupiah yang ikut berubah saat
+      angkanya diubah, sebelum disimpan — jadi tidak perlu simpan lalu periksa di
+      layar lain.
+- [x] Halaman "Arti istilah" + penjelasan yang bisa dibuka di layar | 2026-08-10 | owner | 4j
+      App\Support\Istilah (satu sumber) + komponen <x-jelaskan> + halaman sendiri.
+      Tiap istilah punya arti dalam bahasa warung DAN contoh berangka — dijaga uji
+      yang menolak istilah tanpa contoh berangka, dan uji itu menemukan tiga contoh
+      lemah yang langsung diperbaiki.
+      <x-jelaskan> membuat ISTILAHNYA SENDIRI jadi tombol, bukan ikon "?" 16px di
+      sebelahnya: sasaran sentuh sekecil itu meleset terus di ponsel, dan yang
+      paling sering meleset jari orang tua — yaitu orang yang paling butuh
+      penjelasannya.
+- [ ] Istilah: pasang <x-jelaskan> di layar yang belum | | owner | 3j
+      Sudah dipasang di: Produk (modal & untung), Biaya (beban per hari), Kasbon
+      (total belum kembali), Karyawan (peran), Pengaturan (target untung).
+      BELUM: layar Stok & hitung stok (batas menipis, kartu stok, hitung stok),
+      Pembelian, Laporan (omzet), beranda kasir (sesi kas, modal awal, selisih
+      kas), dan formulir Produk (kode barang, barcode).
+      Kamusnya sudah memuat semuanya — yang kurang cuma pemasangannya.
+- [ ] Teks lebih besar untuk yang matanya sudah tidak tajam | | owner | 4j
+      Banyak teks pendamping di aplikasi ini berukuran 0,75rem (12px) dan 0,6875rem
+      (11px) — di bawah 16px yang jadi patokan keterbacaan di ponsel. Untuk orang
+      tua inilah penghalang pertama, sebelum istilah.
+      TIDAK dikerjakan sekarang karena menaikkannya menggeser SELURUH tata letak
+      yang sudah diukur bersih di 390/768/1280, jadi ia butuh satu putaran
+      pengukuran ulang menyeluruh — bukan tempelan. Pilihannya juga perlu
+      diputuskan: naikkan untuk semua orang, atau saklar "teks besar" per pengguna?
+      Saklar berarti dua tata letak yang harus dijaga selamanya.
+- [ ] Kurangi input manual: tebak isian dari kebiasaan | | owner | 5j
+      Diminta bersama butir di atas ("minimalisir input manual"), belum dikerjakan.
+      Yang paling menjanjikan, berurut dari yang paling sering diketik:
+      harga beli terisi sendiri dari nota belanja terakhir barang itu; satuan
+      ditebak dari nama barang ("Beras 5kg" → kg); batas menipis diusulkan dari
+      rata-rata penjualan seminggu; kategori ditebak dari barang serupa.
+      SEMUANYA harus berupa USULAN yang terlihat dan bisa ditolak, bukan pengisian
+      diam-diam — nilai yang muncul sendiri tanpa dikatakan asalnya membuat orang
+      berhenti memercayai kolom mana pun.
 
 ## Harga, HPP & margin
 

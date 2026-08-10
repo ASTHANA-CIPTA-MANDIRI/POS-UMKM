@@ -70,7 +70,7 @@
     <div class="kartu mb-4 p-5">
         <div class="grid gap-4 sm:grid-cols-2">
             <div class="min-w-0">
-                <p class="eyebrow text-umber-soft">Beban per hari</p>
+                <p class="eyebrow text-umber-soft"><x-jelaskan kunci="biaya-operasional" sebagai="Beban per hari" /></p>
                 <p class="tabular mt-0.5 text-[1.75rem] font-bold text-ink">{{ $rp($perHari) }}</p>
                 <p class="mt-1 text-[0.8125rem] text-umber">
                     Segini yang harus tertutup omzet sebelum warung mulai untung.
@@ -94,43 +94,6 @@
                 <span class="font-semibold">margin kotor</span> — belum dipotong sewa, listrik, dan gas.
             </p>
         @endif
-    </div>
-
-    {{--
-        Target margin. Di layar ini, bukan di layar Produk, karena ia satu angka untuk SELURUH
-        usaha dan sifatnya sama dengan biaya di bawahnya: angka perencanaan. Di layar Produk ia
-        akan terlihat seperti setelan per barang, dan orang mengubahnya berulang kali sambil
-        mengira hanya barang itu yang terpengaruh.
-    --}}
-    <div class="kartu mb-4 p-5">
-        <form wire:submit="simpanTargetMargin" class="flex flex-wrap items-end gap-4">
-            <div class="min-w-0 grow">
-                <label for="target-margin" class="block text-[0.8125rem] font-semibold text-ink">
-                    Target margin
-                </label>
-                <p class="mt-0.5 text-[0.8125rem] text-umber">
-                    Dipakai menyusun <span class="font-semibold text-ink">saran harga jual</span> tiap kali kamu membuat
-                    atau mengubah produk. Sarannya tidak pernah menimpa harga yang sudah ada — harga tetap keputusanmu.
-                </p>
-            </div>
-
-            <div class="flex items-end gap-2">
-                <div class="relative">
-                    <input id="target-margin" type="text" inputmode="decimal"
-                           wire:model="targetMargin" value="{{ $targetMargin }}"
-                           class="tabular h-12 w-28 rounded-xl border border-line bg-white pr-9 pl-4 text-right text-[1rem] font-bold text-ink focus:border-terracotta focus:outline-none">
-                    <span class="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm font-semibold text-umber-soft">%</span>
-                </div>
-                <button type="submit" wire:loading.attr="disabled"
-                        class="h-12 cursor-pointer rounded-xl border border-line px-5 text-[0.9375rem] font-semibold text-ink transition-colors hover:bg-cream disabled:opacity-60">
-                    Simpan
-                </button>
-            </div>
-        </form>
-
-        @error('targetMargin')
-            <p class="mt-2 text-[0.8125rem] text-merah-tua">{{ $message }}</p>
-        @enderror
     </div>
 
     {{-- ── Daftar ────────────────────────────────────────────────────────── --}}

@@ -312,7 +312,7 @@
                         <th class="px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Produk</th>
                         <th class="w-40 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Kategori</th>
                         <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Harga jual</th>
-                        <th class="w-40 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Modal &amp; margin</th>
+                        <th class="w-40 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase"><x-jelaskan kunci="untung" sebagai="Modal & untung" /></th>
                         <th class="w-28 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Stok</th>
                         <th class="w-28 px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
                         <th class="w-56 px-5 py-3.5"><span class="sr-only">Aksi</span></th>
@@ -639,18 +639,54 @@
                                                     margin {{ number_format($saranHarga['marginNyata'], 1, ',', '.') }}%
                                                 </span>
                                             </p>
-                                            <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                                <button type="button" wire:click="pakaiSaranHarga"
-                                                        class="cursor-pointer text-[0.8125rem] font-semibold text-terracotta-deep underline decoration-terracotta/40 underline-offset-2">
-                                                    Pakai harga ini
+                                            <button type="button" wire:click="pakaiSaranHarga"
+                                                    class="mt-1.5 h-11 w-full cursor-pointer rounded-lg bg-terracotta px-4 text-[0.875rem] font-bold text-white transition-colors hover:bg-terracotta-deep">
+                                                Pakai harga ini
+                                            </button>
+
+                                            {{--
+                                                Target untung DIUBAH DI SINI, tanpa pindah layar.
+
+                                                Dulu tautan ke layar Biaya operasional, dan pemilik
+                                                mengeluhkannya: angka yang dipakai di sini tapi
+                                                disetel di sana memaksa orang berpindah tiga layar
+                                                untuk mengubah satu angka — lalu berhenti
+                                                mengubahnya sama sekali.
+
+                                                Kalimat "untuk semua barang" WAJIB ada. Setelan
+                                                global yang bisa diubah dari formulir satu barang
+                                                adalah kejutan yang mahal kalau orangnya tidak
+                                                diberi tahu — ia akan mengira hanya barang ini
+                                                yang berubah.
+                                            --}}
+                                            <div x-data="{ atur: false }" class="mt-2 border-t border-line pt-2">
+                                                <button type="button" x-on:click="atur = ! atur"
+                                                        :aria-expanded="atur ? 'true' : 'false'"
+                                                        class="cursor-pointer text-[0.8125rem] text-umber underline decoration-line decoration-dotted underline-offset-2">
+                                                    Dihitung dari target untung {{ number_format($saranHarga['target'], 0, ',', '.') }}% —
+                                                    <span class="font-semibold text-terracotta-deep">ubah</span>
                                                 </button>
-                                                {{-- Targetnya disebut BERIKUT tempat mengubahnya:
-                                                     angka yang muncul tanpa asal-usul akan
-                                                     dianggap tebakan aplikasi. --}}
-                                                <a href="{{ route('owner.biaya') }}" wire:navigate
-                                                   class="text-[0.75rem] text-umber-soft underline decoration-line underline-offset-2">
-                                                    dari target margin {{ number_format($saranHarga['target'], 0, ',', '.') }}% — ubah
-                                                </a>
+
+                                                <div x-show="atur" x-cloak x-collapse class="mt-2">
+                                                    <label for="target-untung-produk" class="block text-[0.75rem] font-semibold text-ink">
+                                                        Target untung untuk <span class="underline decoration-terracotta/50">semua barang</span>
+                                                    </label>
+                                                    <div class="mt-1.5 flex items-center gap-2">
+                                                        <div class="relative">
+                                                            <input id="target-untung-produk" type="text" inputmode="decimal"
+                                                                   wire:model="targetMarginBaru" value="{{ $targetMarginBaru }}"
+                                                                   class="tabular h-11 w-24 rounded-lg border border-line bg-white pr-8 pl-3 text-right text-[0.9375rem] font-bold text-ink focus:border-terracotta focus:outline-none">
+                                                            <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[0.8125rem] font-semibold text-umber-soft">%</span>
+                                                        </div>
+                                                        <button type="button" wire:click="ubahTargetMargin"
+                                                                class="h-11 cursor-pointer rounded-lg border border-line px-4 text-[0.875rem] font-semibold text-ink transition-colors hover:bg-white">
+                                                            Simpan
+                                                        </button>
+                                                    </div>
+                                                    @error('targetMarginBaru')
+                                                        <p class="mt-1 text-[0.75rem] text-merah-tua">{{ $message }}</p>
+                                                    @enderror
+                                                </div>
                                             </div>
                                         </div>
                                     @endif

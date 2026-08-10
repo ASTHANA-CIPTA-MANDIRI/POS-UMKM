@@ -22,6 +22,8 @@
         'kartu' => 'M3 8h18v10H3V8Zm0 3h18M6.5 15H10',
         'perangkat' => 'M8 3h8v18H8V3Zm3 15h2',
         'catatan' => 'M5 4h14v16H5V4Zm3 4h8M8 12h8M8 16h5',
+        'roda' => 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7.4 7.4 0 0 0-2-1.2L14.6 3h-4l-.4 2.6a7.4 7.4 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7.4 7.4 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7.4 7.4 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.06-.4.1-.8.1-1.2Z',
+        'tanya' => 'M9.2 9a3 3 0 1 1 3.6 3.2V14M12 17.6h.01M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18Z',
     ];
 
     /*
@@ -84,6 +86,8 @@
                 ['Outlet & perangkat', null, 'toko'],
                 ['Laporan', 'owner.laporan', 'grafik'],
                 ['Langganan', 'owner.langganan', 'kartu'],
+                ['Pengaturan', 'owner.pengaturan', 'roda'],
+                ['Arti istilah', 'owner.istilah', 'tanya'],
             ],
         ];
 @endphp

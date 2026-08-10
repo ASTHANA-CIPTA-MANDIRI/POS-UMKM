@@ -3,7 +3,6 @@
 namespace App\Livewire\Pages\Owner\Biaya;
 
 use App\Actions\Biaya\HitungBiayaHarianAction;
-use App\Actions\Produk\SaranHargaAction;
 use App\Enums\PeriodeBiaya;
 use App\Livewire\Concerns\MengirimToast;
 use App\Livewire\Concerns\TerikatTenant;
@@ -84,47 +83,6 @@ class Biaya extends Component
     public string $selesai = '';
 
     public string $catatan = '';
-
-    /**
-     * Target margin usaha, dalam persen — masukan bagi saran harga jual di layar Produk.
-     *
-     * Ditaruh di layar ini, bukan di layar Produk, karena ia satu angka untuk SELURUH usaha
-     * dan sifatnya sama dengan biaya di bawahnya: angka perencanaan. Di layar Produk ia akan
-     * terlihat seperti setelan per barang, dan orang akan mengubahnya berulang kali sambil
-     * mengira hanya barang itu yang terpengaruh.
-     */
-    public string $targetMargin = '30';
-
-    public function mount(): void
-    {
-        $this->targetMargin = (string) (float) auth()->user()->tenant->target_margin;
-    }
-
-    /**
-     * Menyimpan target margin.
-     *
-     * Kolomnya SENGAJA tidak fillable di model Tenant (lihat catatan di sana), jadi diisi
-     * lewat forceFill: yang bergeser kalau ia ikut mass-assignment adalah angka yang menyusun
-     * saran harga SELURUH katalog.
-     */
-    public function simpanTargetMargin(): void
-    {
-        $data = $this->validate([
-            /*
-             * Batas atasnya 95, bukan 100. Pada 100% pembagi rumus saran harga menjadi NOL,
-             * dan di atasnya hasilnya negatif — aplikasi akan menyarankan harga minus tanpa
-             * satu pun galat, dan angka itu terlihat seperti hitungan yang sah.
-             */
-            'targetMargin' => ['required', 'numeric', 'min:0', 'max:'.SaranHargaAction::MAKS_MARGIN],
-        ], attributes: ['targetMargin' => 'target margin'], messages: [
-            'targetMargin.max' => 'Target margin paling tinggi '.(int) SaranHargaAction::MAKS_MARGIN.'%. Di atas itu rumusnya menghasilkan harga yang mustahil.',
-        ]);
-
-        $tenant = auth()->user()->tenant;
-        $tenant->forceFill(['target_margin' => (float) $data['targetMargin']])->save();
-
-        $this->toast('Target margin disimpan. Saran harga di layar Produk ikut menyesuaikan.');
-    }
 
     public function updated(string $properti): void
     {

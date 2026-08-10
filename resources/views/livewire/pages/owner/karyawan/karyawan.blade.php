@@ -185,7 +185,7 @@
                          lain. Judul rata tengah dan isinya juga (keputusan pemilik proyek). --}}
                     <tr class="border-b border-line">
                         <th class="w-[24%] px-4 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Nama</th>
-                        <th class="w-[16%] px-4 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Peran</th>
+                        <th class="w-[16%] px-4 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase"><x-jelaskan kunci="peran" /></th>
                         <th class="w-[22%] px-4 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Masuk pakai</th>
                         <th class="w-[16%] px-4 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Cabang</th>
                         <th class="w-[10%] px-4 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>

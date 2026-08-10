@@ -82,7 +82,7 @@
     @if ($totalPiutang > 0)
         <div class="kartu mb-4 flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div class="min-w-0">
-                <p class="eyebrow text-umber-soft">Total belum kembali</p>
+                <p class="eyebrow text-umber-soft"><x-jelaskan kunci="kasbon" sebagai="Total belum kembali" /></p>
                 <p class="tabular mt-0.5 text-[1.375rem] font-bold text-ink">{{ $rupiah($totalPiutang) }}</p>
             </div>
             <p class="text-[0.8125rem] text-umber">

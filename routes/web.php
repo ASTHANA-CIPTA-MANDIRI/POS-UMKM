@@ -14,6 +14,7 @@ use App\Livewire\Pages\Owner\Bahan\Bahan as BahanOwner;
 use App\Livewire\Pages\Owner\Bahan\Resep as ResepOwner;
 use App\Livewire\Pages\Owner\Biaya\Biaya as BiayaOwner;
 use App\Livewire\Pages\Owner\Dasbor\Dasbor as DasborOwner;
+use App\Livewire\Pages\Owner\Istilah\Istilah as IstilahOwner;
 use App\Livewire\Pages\Owner\Karyawan\Karyawan as KaryawanOwner;
 use App\Livewire\Pages\Owner\Kasbon\Kasbon as KasbonOwner;
 use App\Livewire\Pages\Owner\Langganan\Langganan;
@@ -21,6 +22,7 @@ use App\Livewire\Pages\Owner\Laporan\Laporan as LaporanOwner;
 use App\Livewire\Pages\Owner\Pelanggan\Pelanggan as PelangganOwner;
 use App\Livewire\Pages\Owner\Pembelian\Pembelian as PembelianOwner;
 use App\Livewire\Pages\Owner\Pembelian\PembelianBaru as PembelianBaruOwner;
+use App\Livewire\Pages\Owner\Pengaturan\Pengaturan as PengaturanOwner;
 use App\Livewire\Pages\Owner\Produk\ImporProduk as ImporProdukOwner;
 use App\Livewire\Pages\Owner\Produk\Produk as ProdukOwner;
 use App\Livewire\Pages\Owner\Stok\Opname as OpnameOwner;
@@ -211,6 +213,21 @@ Route::middleware(['auth', 'peran:owner,regional_manager,manager_outlet'])
              * bisa membuat warung terlihat untung pada hari mana pun.
              */
             Route::get('/biaya', BiayaOwner::class)->name('biaya');
+
+            /*
+             * Pengaturan & Istilah.
+             *
+             * Keduanya lahir dari keluhan pemilik (2026-08-10): angka yang dipakai di satu
+             * layar tapi disetel di layar lain memaksa orang berpindah-pindah, dan istilah
+             * yang tidak dijelaskan membuat layar yang sudah rapi tetap tidak bisa dipakai.
+             *
+             * Istilah TIDAK diberi gerbang peran yang lebih longgar daripada layar lain di
+             * grup ini, walau isinya cuma penjelasan: yang membacanya adalah orang yang
+             * sedang memakai layar back office, dan menambah satu pintu masuk baru berarti
+             * satu pintu lagi yang harus dijaga.
+             */
+            Route::get('/pengaturan', PengaturanOwner::class)->name('pengaturan');
+            Route::get('/istilah', IstilahOwner::class)->name('istilah');
 
             Route::get('/laporan', LaporanOwner::class)->name('laporan');
         });

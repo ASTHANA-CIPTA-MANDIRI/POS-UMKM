@@ -826,6 +826,18 @@ class PratinjauTest extends TestCase
         // dan halaman kosong yang diukur akan dilaporkan BERSIH tanpa membuktikan apa pun.
         $this->assertStringContainsString('Sewa tempat', $halamanBiaya);
 
+        /*
+         * Pengaturan & Arti istilah — dua layar yang lahir dari keluhan pemilik (2026-08-10).
+         *
+         * Halaman Istilah dipotret DUA KALI: apa adanya, dan dalam keadaan tercari. Yang kedua
+         * penting karena bentuknya berbeda total (kelompok yang tidak cocok hilang seluruhnya),
+         * dan itu keadaan yang paling sering dilihat orang — ia datang ke halaman ini karena
+         * ada satu kata yang tidak ia pahami, bukan untuk membaca semuanya.
+         */
+        file_put_contents("{$tujuan}/owner-pengaturan.html", $this->ambil('owner.pengaturan', $owner));
+        file_put_contents("{$tujuan}/owner-istilah.html", $this->ambil('owner.istilah', $owner));
+        file_put_contents("{$tujuan}/owner-istilah-cari.html", $this->ambil('owner.istilah', $owner, ['cari' => 'sewa']));
+
         $admin = User::withoutGlobalScopes()->where('role', 'super_admin')->firstOrFail();
         file_put_contents(
             "{$tujuan}/dasbor-admin.html",

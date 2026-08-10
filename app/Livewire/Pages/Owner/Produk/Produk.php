@@ -170,6 +170,7 @@ class Produk extends Component
 
     public function tambah(): void
     {
+        $this->targetMarginBaru = (string) (float) auth()->user()->tenant->target_margin;
         $this->reset(['produkId', 'nama', 'kategoriForm', 'harga', 'hargaBeli', 'gambar', 'gambarLama', 'hapusGambar', 'sku', 'barcode', 'satuanDasar', 'isiPerSatuan', 'stokMinimum']);
         $this->satuan = 'pcs';
         $this->lacakStok = true;
@@ -180,6 +181,7 @@ class Produk extends Component
 
     public function ubah(string $id): void
     {
+        $this->targetMarginBaru = (string) (float) auth()->user()->tenant->target_margin;
         $produk = Product::findOrFail($id);
 
         $this->produkId = $produk->getKey();
@@ -772,6 +774,33 @@ class Produk extends Component
         $target = (float) auth()->user()->tenant->target_margin;
 
         return app(SaranHargaAction::class)->untuk($hpp, $target) + ['hpp' => $hpp, 'target' => $target];
+    }
+
+    /**
+     * Target untung, bisa diubah TANPA PINDAH LAYAR.
+     *
+     * Dulu hanya bisa disetel di layar Biaya operasional, dan pemilik mengeluhkannya
+     * (2026-08-10): angka yang dipakai di sini tapi disetel di sana memaksa orang berpindah
+     * tiga layar untuk mengubah satu angka — lalu berhenti mengubahnya sama sekali.
+     *
+     * Nilainya BERLAKU UNTUK SEMUA BARANG, bukan barang ini saja, dan layarnya wajib
+     * mengatakan itu dengan jelas. Setelan global yang bisa diubah dari formulir satu barang
+     * adalah kejutan yang mahal kalau orangnya tidak diberi tahu.
+     */
+    public string $targetMarginBaru = '';
+
+    public function ubahTargetMargin(): void
+    {
+        $data = $this->validate([
+            'targetMarginBaru' => ['required', 'numeric', 'min:0', 'max:'.SaranHargaAction::MAKS_MARGIN],
+        ], attributes: ['targetMarginBaru' => 'target untung'], messages: [
+            'targetMarginBaru.max' => 'Target untung paling tinggi '.(int) SaranHargaAction::MAKS_MARGIN.'%.',
+        ]);
+
+        // Kolomnya sengaja tidak fillable di model Tenant — lihat catatan di sana.
+        auth()->user()->tenant->forceFill(['target_margin' => (float) $data['targetMarginBaru']])->save();
+
+        $this->toast('Target untung jadi '.$data['targetMarginBaru'].'% untuk SEMUA barang. Sarannya sudah menyesuaikan.');
     }
 
     /** Memakai saran harga — SATU ketukan, dan tetap keputusan pemilik. */
