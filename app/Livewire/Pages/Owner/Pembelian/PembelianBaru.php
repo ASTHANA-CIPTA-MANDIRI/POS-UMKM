@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages\Owner\Pembelian;
 
 use App\Actions\Pembelian\CatatPembelianAction;
+use App\Actions\Pembelian\SalinNotaTerakhirAction;
 use App\Actions\Pembelian\SimpanBuktiBelanjaAction;
 use App\Actions\Stok\SusunBarisStokAction;
 use App\Enums\Satuan;
@@ -405,6 +406,75 @@ class PembelianBaru extends Component
      * dokumen, dan tidak boleh ada baris yang sudah masuk stok saat pemiliknya melihat
      * pesan galat — ia akan mengulang, dan baris yang sudah masuk terhitung dua kali.
      */
+    /**
+     * Mengisi seluruh nota dari kulakan TERAKHIR — "sama seperti belanja terakhir".
+     *
+     * Pekerjaan manual terbesar yang tersisa di aplikasi ini adalah mengetik ulang empat
+     * puluh baris nota tiap kali kulakan, dan pekerjaan manual terbesar adalah alasan orang
+     * berhenti mencatat lalu kembali ke buku.
+     *
+     * MENGISI, BUKAN MENYIMPAN. Harga grosir berubah tiap pekan; yang tersimpan otomatis
+     * dengan harga pekan lalu menaruh angka yang salah ke dalam hitungan modal seluruh
+     * barang. Orangnya wajib melihat dan bisa mengubah dulu.
+     */
+    public function ulangiTerakhir(): void
+    {
+        $outletId = $this->outletTerpakai();
+
+        if ($outletId === null) {
+            $this->toast('Pilih cabang dulu, supaya yang disalin nota cabang itu.', 'peringatan');
+
+            return;
+        }
+
+        $salinan = app(SalinNotaTerakhirAction::class)->untuk($outletId);
+
+        if ($salinan === null) {
+            $this->toast('Belum ada nota belanja sebelumnya di cabang ini, jadi belum ada yang bisa disalin.', 'info');
+
+            return;
+        }
+
+        /*
+         * Isian lama DITIMPA, tidak digabung.
+         *
+         * Menggabungkan berarti jumlah yang sudah diketik orangnya bertambah diam-diam
+         * dengan jumlah nota lama — dan yang berubah adalah angka barang yang masuk ke stok.
+         * Menimpa lebih jujur: apa yang terlihat di layar itulah yang akan tersimpan.
+         */
+        $this->jumlah = $salinan['jumlah'];
+        $this->harga = $salinan['harga'];
+
+        // Nama tempat belanja hanya diisi kalau kotaknya masih kosong: yang sudah diketik
+        // orangnya lebih tahu daripada nota lama.
+        if (trim($this->beliDari) === '') {
+            $this->beliDari = $salinan['beliDari'];
+        }
+
+        // Kunci outlet dipasang sekarang, sama seperti kalau angkanya diketik tangan —
+        // kalau tidak, dropdown yang diganti sesudah ini akan memindahkan seluruh nota ke
+        // cabang lain tanpa satu pun peringatan.
+        $this->outletTerkunci ??= $outletId;
+
+        /*
+         * Angka generasi dinaikkan supaya Livewire MEMBUANG kotak lama dan menggambar yang
+         * baru. Tanpa ini kotak uang ber-Alpine mempertahankan nilai lokalnya sendiri, jadi
+         * layarnya tetap kosong walau propertinya sudah terisi — dan orangnya menekan
+         * tombolnya berkali-kali.
+         */
+        $this->generasiUang++;
+
+        $jumlahBaris = count($salinan['jumlah']);
+
+        $this->toast(
+            $jumlahBaris.' barang diisi dari nota '.$salinan['nomor'].' ('.$salinan['tanggal'].'). '
+            .'Harganya harga waktu itu — periksa dulu sebelum disimpan.'
+            .($salinan['dilewati'] > 0
+                ? ' '.$salinan['dilewati'].' barang dilewati karena sudah tidak ada di daftar.'
+                : ''),
+        );
+    }
+
     public function simpan(): void
     {
         $outletId = $this->outletTerpakai();
@@ -1008,6 +1078,18 @@ class PembelianBaru extends Component
             'namaPerKunci' => $semua->pluck('nama', 'kunci')->all(),
             'outletTersedia' => auth()->user()->scopedOutletId() === null ? $this->outletTersedia() : [],
             'outletDipakai' => $this->outletTerpakai(),
+            /*
+             * Ringkasan nota terakhir untuk tombol "sama seperti belanja terakhir".
+             *
+             * Yang dikirim ringkasannya, bukan cuma benar-tidaknya ada: tombol yang berbunyi
+             * "Sama seperti belanja terakhir" tanpa menyebut TANGGAL dan NOMORNYA adalah
+             * tombol yang tidak bisa dipercaya orang — ia tidak tahu nota mana yang akan
+             * disalin, dan tombol yang mengisi empat puluh kotak tanpa memberi tahu isinya
+             * dari mana tidak akan ditekan dua kali.
+             */
+            'notaTerakhir' => $this->outletTerpakai() !== null
+                ? app(SalinNotaTerakhirAction::class)->untuk($this->outletTerpakai())
+                : null,
             // null berarti tidak ada permintaan pindah yang tertahan ATAU id-nya bukan
             // outlet yang boleh dilihat pengguna ini — dan dalam kedua keadaan itu tidak
             // ada nama yang boleh dicetak.

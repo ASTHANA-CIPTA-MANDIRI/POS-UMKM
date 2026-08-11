@@ -285,7 +285,30 @@ fitur akan susah". Dan minta input manual diperkecil.
       pengukuran ulang menyeluruh — bukan tempelan. Pilihannya juga perlu
       diputuskan: naikkan untuk semua orang, atau saklar "teks besar" per pengguna?
       Saklar berarti dua tata letak yang harus dijaga selamanya.
-- [ ] Kurangi input manual: tebak isian dari kebiasaan | | owner | 5j
+- [x] Kurangi input manual: "sama seperti belanja terakhir" | 2026-08-10 | owner | 3j
+      Pengurang pengetikan TERBESAR, dan bukan yang saya duga di awal. Yang paling
+      sering diketik ulang bukan produk (itu sudah ditutup impor CSV) — tapi NOTA
+      BELANJA: warung kulakan 2-3x sepekan dari grosir yang sama, barangnya hampir
+      sama, dan tiap kali empat puluh baris diketik dari nol.
+      Satu tombol mengisi barang + jumlah + harga + nama tempat belanja dari nota
+      terakhir DI CABANG YANG SAMA. Tanggal, potongan, ongkos kirim, catatan, dan
+      foto bukti SENGAJA tidak ikut — masing-masing alasannya di docblock aksinya.
+      MENGISI, BUKAN MENYIMPAN: harga grosir berubah tiap pekan, dan nota yang
+      tersimpan otomatis dengan harga pekan lalu menaruh angka salah ke hitungan
+      modal seluruh barang. Tombolnya menyebut nomor dan tanggal nota yang disalin.
+      Uji menemukan bug nyata: `beli_dari` cuma nama medan di muatan aksi — yang
+      tersimpan `supplier_id`, jadi membacanya sebagai kolom mengembalikan null
+      diam-diam dan kotaknya tetap kosong.
+- [ ] Kurangi input manual: sisanya | | owner | 4j
+      Yang masih terbuka, berurut dari yang paling sering diketik: satuan ditebak
+      dari nama barang ("Beras 5kg" → kg); batas menipis diusulkan dari rata-rata
+      penjualan seminggu; kategori ditebak dari barang serupa.
+      SEMUANYA harus berupa USULAN yang terlihat dan bisa ditolak, bukan pengisian
+      diam-diam — nilai yang muncul sendiri tanpa dikatakan asalnya membuat orang
+      berhenti memercayai kolom mana pun.
+      CATATAN: "harga beli terisi dari nota terakhir" yang sempat direncanakan
+      TERNYATA SUDAH ADA — TerimaPembelianAction memperbarui `products.harga_beli`
+      tiap nota diterima. Tidak perlu dikerjakan.
       Diminta bersama butir di atas ("minimalisir input manual"), belum dikerjakan.
       Yang paling menjanjikan, berurut dari yang paling sering diketik:
       harga beli terisi sendiri dari nota belanja terakhir barang itu; satuan

@@ -84,6 +84,38 @@
                 </span>
                 Daftar nota
             </a>
+
+            {{--
+                "Sama seperti belanja terakhir" — pengurang pengetikan terbesar di aplikasi ini.
+
+                Warung kulakan dua sampai tiga kali sepekan dari grosir yang sama, dan
+                barangnya hampir sama tiap kali. Mengetik ulang empat puluh baris tiap kali
+                adalah alasan orang berhenti mencatat lalu kembali ke buku.
+
+                TANGGAL DAN NOMOR NOTANYA DISEBUT di tombolnya. Tombol yang mengisi empat
+                puluh kotak sekaligus tanpa memberi tahu isinya dari mana tidak akan ditekan
+                dua kali oleh siapa pun.
+
+                Muncul HANYA kalau memang ada nota sebelumnya di cabang ini: tombol yang
+                selalu ada tapi menjawab "belum ada apa-apa" mengajari orang bahwa tombol di
+                aplikasi ini tidak selalu berarti.
+            --}}
+            @if ($notaTerakhir !== null)
+                <button type="button" wire:click="ulangiTerakhir"
+                        class="tombol-kedua h-11 w-auto shrink-0 px-4 text-left text-[0.875rem]">
+                    <span class="tombol-ikon">
+                        <svg viewBox="0 0 20 20" class="size-4" fill="none" aria-hidden="true">
+                            <path d="M4 10a6 6 0 1 1 1.8 4.2M4 15v-4h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </span>
+                    <span>
+                        Sama seperti belanja terakhir
+                        <span class="block text-[0.6875rem] font-medium text-umber-soft">
+                            {{ count($notaTerakhir['jumlah']) }} barang · {{ $notaTerakhir['tanggal'] }}
+                        </span>
+                    </span>
+                </button>
+            @endif
         </x-slot:aksi>
 
         <x-slot:saringan>
