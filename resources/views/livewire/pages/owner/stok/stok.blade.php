@@ -392,6 +392,8 @@
         </x-slot:saringan>
     </x-kartu-alat>
 
+    <x-istilah-layar :kunci="['stok', 'batas-menipis', 'hitung-stok', 'kartu-stok']" />
+
     {{-- ── Harus belanja ───────────────────────────────────────────────────
          DAFTAR TINDAKAN, bukan tabel angka. Urutan "paling parah dulu" sudah disusun
          komponen; di sini tidak diurut ulang supaya tidak ada dua definisi untuk hal

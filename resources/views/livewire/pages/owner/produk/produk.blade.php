@@ -151,6 +151,8 @@
         </x-slot:saringan>
     </x-kartu-alat>
 
+    <x-istilah-layar :kunci="['modal', 'untung', 'kode-barang', 'barcode']" />
+
     {{-- ── Daftar ────────────────────────────────────────────────────────── --}}
     @if ($daftar->isEmpty())
         <x-kosong judul="Tidak ada produk yang cocok"
@@ -312,7 +314,7 @@
                         <th class="px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Produk</th>
                         <th class="w-40 px-5 py-3.5 text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Kategori</th>
                         <th class="w-32 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Harga jual</th>
-                        <th class="w-40 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase"><x-jelaskan kunci="untung" sebagai="Modal & untung" /></th>
+                        <th class="w-40 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Modal &amp; untung</th>
                         <th class="w-28 px-5 py-3.5 text-right text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Stok</th>
                         <th class="w-28 px-5 py-3.5 text-center text-[0.75rem] font-semibold tracking-wide text-umber uppercase">Status</th>
                         <th class="w-56 px-5 py-3.5"><span class="sr-only">Aksi</span></th>
@@ -922,7 +924,7 @@
                         --}}
                         <div class="md:col-start-2 md:row-span-2 md:row-start-1 xl:col-start-3 xl:row-span-1">
                             <div class="hidden xl:block">
-                                <p class="eyebrow text-umber-soft">Pengenal barang</p>
+                                <p class="eyebrow text-umber-soft"><x-jelaskan kunci="kode-barang" sebagai="Pengenal barang" /></p>
                                 <div class="mt-1 mb-2.5 h-px bg-line"></div>
                             </div>
 

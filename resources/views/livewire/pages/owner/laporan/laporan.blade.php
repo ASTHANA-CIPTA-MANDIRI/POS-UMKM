@@ -77,7 +77,7 @@
     <div class="mt-4 grid gap-4 sm:mt-5 sm:gap-5 lg:grid-cols-[1.5fr_1fr]">
         {{-- ── Grafik harian ─────────────────────────────────────────────── --}}
         <div class="kartu min-w-0 p-5 sm:p-6">
-            <h2 class="text-[1.0625rem] font-bold text-ink">Omzet per hari</h2>
+            <h2 class="text-[1.0625rem] font-bold text-ink"><x-jelaskan kunci="omzet" sebagai="Omzet per hari" /></h2>
             <p class="text-[0.8125rem] text-umber-soft">Hari tanpa penjualan tetap ditampilkan supaya hari sepi terlihat.</p>
 
             @php $tertinggi = collect($perHari)->max('total') ?: 1; @endphp

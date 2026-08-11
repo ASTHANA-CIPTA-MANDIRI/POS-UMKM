@@ -253,6 +253,113 @@ class OwnerPengaturanTest extends TestCase
             ->assertSee(Istilah::ambil('untung')['arti']);
     }
 
+    #[Test]
+    public function istilah_yang_dipasang_di_layar_selalu_kunci_yang_ada(): void
+    {
+        /*
+         * Kunci yang salah ketik TIDAK menghilangkan katanya dari layar — <x-jelaskan>
+         * sengaja mencetak labelnya apa adanya, karena judul kolom yang lenyap jauh lebih
+         * buruk daripada kata tanpa penjelasan. Akibatnya: salah ketik kunci TIDAK BERSUARA
+         * sama sekali. Layarnya tetap rapi, penjelasannya hilang, dan tidak ada satu pun
+         * galat di mana pun.
+         *
+         * Berkas Blade karena itu disisir langsung. Uji ini yang menjaganya, bukan mata.
+         */
+        $kunciAda = array_keys(Istilah::semua());
+        $terpasang = [];
+
+        $berkas = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator(resource_path('views')),
+        );
+
+        foreach ($berkas as $satu) {
+            if ($satu->isDir() || ! str_ends_with($satu->getFilename(), '.blade.php')) {
+                continue;
+            }
+
+            $isi = (string) file_get_contents($satu->getPathname());
+
+            /*
+             * Bentuk TERIKAT (`:kunci="$k"`) sengaja DILEWATI — bukan kelalaian regex.
+             *
+             * Nilainya baru diketahui saat dirender, jadi tidak ada yang bisa diperiksa dari
+             * teksnya. Yang dijaga di sini kunci yang ditulis LITERAL, dan itu yang bisa
+             * salah ketik. Pemasangan terikat satu-satunya ada di komponen <x-istilah-layar>,
+             * yang daftarnya sendiri dibaca di bawah.
+             *
+             * Awalnya regex ini ikut menangkap bentuk terikat dan melaporkan kunci bernama
+             * "$k" — uji ini merah pada pemakaian pertamanya sendiri.
+             */
+            preg_match_all('/<x-jelaskan\s[^>]*(?<!:)kunci="([^"]+)"/', $isi, $cocok);
+
+            // Daftar di <x-istilah-layar :kunci="['a', 'b']"> — kuncinya literal di dalam array.
+            preg_match_all('/<x-istilah-layar\s[^>]*:kunci="\[([^\]]*)\]"/', $isi, $daftar);
+
+            foreach ($daftar[1] as $isiArray) {
+                preg_match_all("/'([^']+)'/", $isiArray, $satuan);
+                $cocok[1] = array_merge($cocok[1], $satuan[1]);
+            }
+
+            foreach ($cocok[1] as $kunci) {
+                $terpasang[$kunci] = ($terpasang[$kunci] ?? 0) + 1;
+            }
+        }
+
+        $this->assertNotEmpty($terpasang, 'tidak ada satu pun penjelasan terpasang — pemasangannya hilang');
+
+        foreach (array_keys($terpasang) as $kunci) {
+            $this->assertContains($kunci, $kunciAda, "kunci \"{$kunci}\" dipasang di Blade tapi tidak ada di kamus");
+        }
+    }
+
+    #[Test]
+    public function layar_yang_paling_banyak_jargonnya_sudah_punya_penjelasan(): void
+    {
+        /*
+         * Dijaga per BERKAS, bukan sekadar jumlah total: kamus yang lengkap tapi tidak
+         * terpasang di mana-mana tidak menolong siapa pun, dan yang paling mudah terjadi
+         * adalah layar baru dibuat lalu penjelasannya "menyusul nanti".
+         *
+         * Daftarnya sengaja pendek — hanya layar yang istilahnya benar-benar tidak bisa
+         * ditebak orang awam. Menuntut penjelasan di setiap layar akan membuat orang
+         * memasangnya sembarangan supaya ujinya hijau.
+         *
+         * BATAS UJI INI, dan ia terukur lewat mutasi: yang dijaga KEBERADAAN minimal satu
+         * penjelasan per berkas, BUKAN tiap pemasangan satu per satu. Membuang satu dari
+         * tiga penjelasan di layar Stok tidak membuatnya merah. Itu disengaja: menuntut
+         * kunci tertentu di berkas tertentu akan pecah setiap kali satu judul kolom diganti
+         * nama, dan uji yang pecah karena penggantian nama akan dilonggarkan orang
+         * berikutnya sampai tidak menjaga apa pun.
+         */
+        $wajib = [
+            'livewire/pages/owner/produk/produk.blade.php',
+            'livewire/pages/owner/biaya/biaya.blade.php',
+            'livewire/pages/owner/kasbon/kasbon.blade.php',
+            'livewire/pages/owner/karyawan/karyawan.blade.php',
+            'livewire/pages/owner/stok/stok.blade.php',
+            'livewire/pages/owner/stok/opname.blade.php',
+            'livewire/pages/owner/bahan/bahan.blade.php',
+            'livewire/pages/owner/laporan/laporan.blade.php',
+            'livewire/pages/owner/pengaturan/pengaturan.blade.php',
+        ];
+
+        foreach ($wajib as $berkas) {
+            $isi = (string) file_get_contents(resource_path('views/'.$berkas));
+
+            /*
+             * DUA bentuk diterima, dan bedanya bukan sepele: <x-jelaskan> menempel pada satu
+             * kata di tempatnya, sementara <x-istilah-layar> adalah baris istilah untuk
+             * seluruh layar. Yang kedua lahir karena yang pertama TERJEPIT selebar kolom
+             * kalau ditaruh di judul tabel — terukur dari potret, dan pemeriksa kerapian
+             * melaporkannya bersih.
+             */
+            $this->assertTrue(
+                str_contains($isi, '<x-jelaskan') || str_contains($isi, '<x-istilah-layar'),
+                "{$berkas} belum punya satu pun penjelasan istilah",
+            );
+        }
+    }
+
     /* ── Peran ───────────────────────────────────────────────────────────── */
 
     #[Test]

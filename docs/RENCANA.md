@@ -269,7 +269,23 @@ fitur akan susah". Dan minta input manual diperkecil.
       sebelahnya: sasaran sentuh sekecil itu meleset terus di ponsel, dan yang
       paling sering meleset jari orang tua — yaitu orang yang paling butuh
       penjelasannya.
-- [ ] Istilah: pasang <x-jelaskan> di layar yang belum | | owner | 3j
+- [x] Istilah: terpasang di seluruh layar owner | 2026-08-10 | owner | 3j
+      Terpasang di Produk, Biaya, Kasbon, Karyawan, Stok, Hitung stok, Bahan,
+      Laporan, dan Pengaturan — dijaga uji per-berkas.
+      BENTUKNYA BERUBAH di tengah jalan, karena potret memperlihatkan cacat yang
+      angka tidak bisa lihat: <x-jelaskan> di dalam <th> membuat gelembungnya
+      TERJEPIT selebar kolomnya (~190px), jadi kalimatnya turun satu kata per baris
+      dan menjadi pita yang lebih sulit dibaca daripada tidak ada penjelasan sama
+      sekali — sambil mendorong seluruh baris judul tabel ke bawah. Pemeriksa
+      kerapian melaporkannya BERSIH.
+      Diganti komponen <x-istilah-layar>: satu baris "Belum paham istilahnya?" di
+      bawah kepala tiap layar, memuat istilah yang dipakai layar itu. Panelnya
+      terukur 879px di 1280 — penjelasannya terbaca satu baris. Bentuk ini juga
+      lebih baik untuk orang yang dituju: satu tempat yang sama di tiap layar,
+      terlihat sebelum orangnya bingung, tidak bersembunyi di judul kolom.
+      BELUM: layar KASIR (sesi kas, modal awal, selisih kas). Sengaja ditahan —
+      kasir bekerja sambil ada antrean, dan menambah blok yang bisa dibuka di layar
+      itu perlu dipikirkan sendiri, bukan disalin dari layar owner.
       Sudah dipasang di: Produk (modal & untung), Biaya (beban per hari), Kasbon
       (total belum kembali), Karyawan (peran), Pengaturan (target untung).
       BELUM: layar Stok & hitung stok (batas menipis, kartu stok, hitung stok),

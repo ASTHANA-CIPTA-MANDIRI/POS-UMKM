@@ -157,6 +157,8 @@
         </x-slot:saringan>
     </x-kartu-alat>
 
+    <x-istilah-layar :kunci="['hitung-stok', 'stok', 'kartu-stok']" />
+
     {{-- ── Pergantian cabang yang DITOLAK ─────────────────────────────────────
          MENETAP di halaman, bukan toast, dan itu bukan pilihan gaya: blok ini membawa
          tombol keputusannya. Toast hilang sendiri sesudah beberapa detik, dan bersama

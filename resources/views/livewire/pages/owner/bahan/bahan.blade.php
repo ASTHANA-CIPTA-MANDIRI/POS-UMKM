@@ -85,6 +85,8 @@
         </x-slot:saringan>
     </x-kartu-alat>
 
+    <x-istilah-layar :kunci="['bahan-baku', 'resep', 'modal']" />
+
     {{-- ── Daftar ────────────────────────────────────────────────────────── --}}
     @if ($daftar->isEmpty())
         <x-kosong

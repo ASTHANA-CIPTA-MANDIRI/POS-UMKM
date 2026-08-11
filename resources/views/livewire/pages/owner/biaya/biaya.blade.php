@@ -63,6 +63,8 @@
         </x-slot:saringan>
     </x-kartu-alat>
 
+    <x-istilah-layar :kunci="['biaya-operasional', 'untung-bersih', 'titik-impas']" />
+
     {{-- Ringkasan beban. SELALU dirender, termasuk saat nol — beda dengan kartu piutang di
          layar Kasbon, dan sengaja: "Rp 0 per hari" DI SINI adalah kabar yang penting, bukan
          kotak kosong. Ia memberi tahu pemilik bahwa margin yang ia lihat di layar Produk

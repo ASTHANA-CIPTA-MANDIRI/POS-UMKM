@@ -76,6 +76,8 @@
         </x-slot:saringan>
     </x-kartu-alat>
 
+    <x-istilah-layar :kunci="['kasbon', 'jatuh-tempo']" />
+
     {{-- Total piutang SENGAJA tidak ikut saringan — lihat alasannya di komponen. Muncul
          hanya kalau ada isinya: kotak berbunyi "Rp 0" tiap hari mengajarkan mata untuk
          melewatinya, dan hari angkanya besar ia ikut terlewat. --}}
